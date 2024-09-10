@@ -1,0 +1,28 @@
+.rt-td .tag {
+  display: inline-block;
+  padding: 0.125rem 0.75rem;
+  border-radius: 15px;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.rt-td .status-high {
+  background: hsl(116, 60%, 90%);
+  color: hsl(116, 30%, 25%);
+}
+
+.rt-td .status-medium {
+  background: hsl(230, 70%, 90%);
+  color: hsl(230, 45%, 30%);
+}
+
+.rt-td .status-low {
+  background: hsl(350, 70%, 90%);
+  color: hsl(350, 45%, 30%);
+}
+/* All reactables - filtering row */
+
+.component-germ {
+  border: 1px solid rgba(0,0,0,.1); /* Color of cells edge*/
+  border-radius: 3px;  /* Rounding of cell edge*/
+}
