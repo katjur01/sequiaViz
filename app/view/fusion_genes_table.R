@@ -1,7 +1,7 @@
 # app/view/fusion_genes_table.R
 
 box::use(
-  shiny[moduleServer,NS,h3,tagList,div,textInput,renderPrint,reactive,observe,observeEvent,icon,mainPanel,titlePanel,
+  shiny[moduleServer,NS,h3,tagList,div,textInput,renderPrint,reactive,observe,observeEvent,icon,mainPanel,titlePanel,isolate,
         uiOutput,renderUI,HTML,req],
   reactable,
   reactable[colDef],
@@ -15,7 +15,8 @@ box::use(
   app/logic/load_data[get_inputs,load_data],
   app/logic/prepare_table[prepare_fusion_genes_table,prepare_arriba_images,columnName_map], 
   app/logic/waiters[use_spinner],
-  app/logic/reactable_helpers[generate_columnsDef]
+  app/logic/reactable_helpers[generate_columnsDef],
+  app/logic/prepare_table[colFilter]
 )
 
 # Load and process data table
@@ -37,59 +38,12 @@ ui <- function(id) {
   ns <- NS(id)
   useShinyjs()
   tagList(
-    tags$style(HTML("
-    .fusion-table .rt-th .rt-text-content {
-      white-space: normal;
-      text-align: center;
-    }
-    .fusion-table .rt-th-header {
-      height: auto;
-    }
-      text-align: center;
-    }
-    .text-black {
-      color: black;
-    }
-    .fusion-table .rt-td {
-      display: flex;
-      align-items: center; 
-      justify-content: center;
-      text-align: center;
-    }
-    .tag {
-      display: inline-block;
-      width: 83px;
-      padding: 0.125rem 0.75rem;
-      border-radius: 15px;
-      font-weight: 600;
-      font-size: 16px;
-    }
-    .called-true {
-      background: hsl(116, 60%, 90%);
-      color: hsl(116, 30%, 25%);
-    }
-    .called-false {
-      background: hsl(350, 70%, 90%);
-      color: hsl(350, 45%, 30%);
-    }
-    .confidence-high {
-      background: #FFC78F;
-      color: #DC5801;
-    }
-    .confidence-medium {
-      background: #FEF8A6;
-      color: #A57C02;
-    }
-    .confidence-low {
-      background: #D9F2FE;
-      color: #428BBA;
-    }
-    .confidence-na {
-      display: none;
-    }
-    ")),
-    use_spinner(reactable$reactableOutput(ns("fusion_genes_tab")))
+    # div(
+    #   class = "fusion-table-contant",
+      use_spinner(reactable$reactableOutput(ns("fusion_genes_tab")))
+    # )
   )
+
 }
 
 #' @export
@@ -100,11 +54,12 @@ server <- function(id, selected_samples, selected_columns,column_mapping) {
   # Call loading function to load data
     dt <- reactive({
       message("Loading input data for fusion")
-      input_data(selected_samples) # ,selected_columns()
+      input_data(selected_samples) 
     })
-    
+
   # Call generate_columnsDef to generate colDef setting for reactable
     column_defs <- reactive({
+      message("Generating colDef for fusion")
       req(selected_columns())
       generate_columnsDef(names(dt()), selected_columns(), "fusion", column_mapping, session)
     })
@@ -147,37 +102,8 @@ server <- function(id, selected_samples, selected_columns,column_mapping) {
                           },
                           onClick = "expand",
                           elementId = "tbl-fusion"
-                          # custom sort indicator: https://glin.github.io/reactable/articles/cookbook/cookbook.html#custom-sort-indicators
-                          # selection = "multiple",
-                          # onClick = "select",
-                          # getReactableState() gets the state of a reactable instance within a Shiny application (get the selected rows)
-                          # To customize the selection column, use ".selection" as the column name.
-                          # columns = list(
-                          #   # arriba.confidence = colDef(
-                          #   #   cell = pill_buttons(
-                          #   #       data = dt,
-                          #   #       color_ref = "confidence_color",
-                          #   #       box_shadow = TRUE
-                          #   #       )
-                          #   #   ),
-                          #   # arriba.called = colDef(
-                          #   #   cell = pill_buttons(
-                          #   #     data = dt,
-                          #   #     color_ref = "arriba.called_color",
-                          #   #     box_shadow = TRUE
-                          #   #   )
-                          #   # ),
-                          #   # starfus.called = colDef(
-                          #   #   cell = pill_buttons(
-                          #   #     data = dt,
-                          #   #     color_ref = "starfus.called_color",
-                          #   #     box_shadow = TRUE
-                          #   #   )
-                          #   # ),
-
-
         )
-      })
+  })
     
     # observeEvent(input$igvButton_click, {
     #   runjs("

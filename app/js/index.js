@@ -1,5 +1,3 @@
-export function sayHello(name) {
-  console.log(`Hello ${name}!`);
+export function showHelp() {
+  alert('Learn more about Rhino: https://appsilon.github.io/rhino/');
 }
-
-Shiny.addCustomMessageHandler('sayHello', sayHello);

@@ -18,6 +18,7 @@ box::use(
   htmltools[tags,HTML],
   app/logic/patients_list[set_patient_to_sample],
   shinyWidgets[prettyCheckbox],
+  app/logic/prepare_table[colFilter]
   # reactablefmtr
 )
 
@@ -55,7 +56,6 @@ ui <- function(id) {
 
 server <- function(id, selected_samples, selected_columns, column_mapping, selection_enabled) {
   moduleServer(id, function(input, output, session) {
-    ns <- session$ns
     
     # Call loading function to load data
     data <- reactive({

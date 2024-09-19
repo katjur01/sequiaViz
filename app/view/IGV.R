@@ -8,13 +8,13 @@ box::use(
   reactable[reactableOutput,renderReactable,reactable,JS],
 )
 
-start_server <- function(){
-  setwd("/Users/katerinajuraskova/Desktop/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze/mapped/")
-  data_server = serve_data('./')
-  data_server$stop_server()
-}
+# start_server <- function(){
+#   setwd("/Users/katerinajuraskova/Desktop/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze/mapped/")
+#   data_server = serve_data('./')
+#   data_server$stop_server()
+# }
 
-
+#' @export
 igv_ui <- function(id) {
   ns <- NS(id)
   
@@ -43,17 +43,18 @@ igv_ui <- function(id) {
     ),
     fluidRow(
       column(6, reactableOutput(ns("bookmarks")))),
-      br(),
+    br(),
     fluidRow(
       column(2, actionButton(ns("loadIGVButton"), "Load IGV Viewer"))
     ),
-
+    
     br(),
     uiOutput(ns("igvDivOutput"))
-  
+    
   )
 }
 
+#' @export
 igv_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     
@@ -80,29 +81,29 @@ igv_server <- function(id) {
     })
     
     observeEvent(input$loadIGVButton, {
-      runjs(sprintf("
-       var igvDiv = document.createElement('div');
-        igvDiv.id = 'igv-igvDiv';  /* Apply the correct ID */
-        var container = document.getElementById('%s');  /* Find the box element by its ID */
-        container.appendChild(igvDiv);
-
-        var options = {
-          genome: 'hg38',
-          locus: 'all'
-        };
-
-      igv.createBrowser(igvDiv, options).then(function(browser) {
-                console.log('IGV browser created');
-                window.igvBrowser = browser;
-              });
-            ", "igv_page"))
-      
-        #window.igvBrowser = igv.createBrowser(igvDiv, options);", "igv_page"))
-      
-      
+      # Krok 1: Vytvoření divu pro IGV
       output$igvDivOutput <- renderUI({
-        HTML('<div id="igv-igvDiv"></div>')
+        div(id = session$ns("igv-igvDiv"))  # Zajistíme, že div má správný namespace
       })
+      
+      # Krok 2: Po vykreslení spustíme JavaScript pro IGV s mírným zpožděním
+      runjs(sprintf("
+        setTimeout(function() {
+          var igvDiv = document.getElementById('%s');
+          if (igvDiv) {
+            var options = {
+              genome: 'hg38',
+              locus: 'all'
+            };
+            igv.createBrowser(igvDiv, options).then(function(browser) {
+              console.log('IGV browser created');
+              window.igvBrowser = browser;
+            });
+          } else {
+            console.error('IGV div not found.');
+          }
+        }, 20);  // Zpoždění 20 ms k zajištění, že div je vykreslen
+      ", session$ns("igv-igvDiv")))  # Přidáme správné ID divu s namespace
     })
     
     observeEvent(input$bookmarks_click, {
@@ -129,9 +130,9 @@ igv_server <- function(id) {
           }", positions, positions))
       }
     })
-  
   })
 }
+
 
 
 # ui <- fluidPage(
@@ -139,10 +140,6 @@ igv_server <- function(id) {
 #     igv_ui("igv")
 #   )
 # )
-# 
-# 
-# 
-# 
 # server <- function(input, output, session) {
 #   igv_server("igv")
 # }

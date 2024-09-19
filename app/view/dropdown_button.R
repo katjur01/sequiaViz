@@ -25,26 +25,26 @@ colFilterDropdown_ui <- function(id,column_list,default_setting,columnName_map) 
     width = "240px",
     
     tagList(
-    prettyCheckboxGroup(
-      inputId = ns("colFilter_checkBox"),
-      label = NULL, 
-      choices = setNames(column_list, sapply(column_list, function(x) columnName_map[[x]])),
-      selected = default_setting,
-      icon = icon("check"), 
-      status = "primary",
-      outline = FALSE),
-    
-    tags$hr(),
-    
-    actionButton(
-      inputId = ns("colFilter_all"),
-      label = "Show all columns",
-      icon = icon("eye")),
-    
-    actionButton(
-      inputId = ns("colFilter_default"),
-      label = "Show default columns",
-      icon = icon("rotate"))
+      prettyCheckboxGroup(
+        inputId = ns("colFilter_checkBox"),
+        label = NULL, 
+        choices = setNames(column_list, sapply(column_list, function(x) columnName_map[[x]])),
+        selected = default_setting,
+        icon = icon("check"), 
+        status = "primary",
+        outline = FALSE),
+      
+      tags$hr(),
+      
+      actionButton(
+        inputId = ns("colFilter_all"),
+        label = "Show all columns",
+        icon = icon("eye")),
+      
+      actionButton(
+        inputId = ns("colFilter_default"),
+        label = "Show default columns",
+        icon = icon("rotate"))
     )
   )
 }
@@ -78,7 +78,7 @@ colFilterDropdown_server <- function(id, all_columns, default_setting) {
 #' @export
 igvDropdown_ui <- function(id,patients) {
   ns <- NS(id)
-
+  
   dropdown(
     inputId = ns("igv_dropdownButton"),
     label = "IGV",
@@ -101,7 +101,7 @@ igvDropdown_ui <- function(id,patients) {
         choices = patients,
         status = "mygrey",
         selected = patients
-        ),
+      ),
       tags$b(" Select variants: "),
       actionButton(
         inputId = ns("selectGermline_button"),
@@ -111,13 +111,13 @@ igvDropdown_ui <- function(id,patients) {
       tags$br(),
       
       div(style = "display: flex; justify-content: center; margin-top: 10px;",
-        actionBttn(
-          inputId = ns("go2igv_button"),
-          label = "Go to IGV",
-          style = "stretch",
-          color = "success",
-          size = "sm",
-          individual = TRUE)
+          actionBttn(
+            inputId = ns("go2igv_button"),
+            label = "Go to IGV",
+            style = "stretch",
+            color = "success",
+            size = "sm",
+            individual = TRUE)
       )
     )
   )

@@ -58,7 +58,6 @@ filterMinValue <- JS("(rows, columnId, filterValue) => {
 # Generate column definitions (colDef) for a reactable 
 #' @export
 generate_columnsDef <- function(column_names, selected_columns, tag, column_mapping,session) {
-
   if (tag == "fusion") {
     hide <- c("sample", "png_path", "svg_path")
   } else if (tag == "germline") {
@@ -67,9 +66,7 @@ generate_columnsDef <- function(column_names, selected_columns, tag, column_mapp
     hide <- c()
     print("No column has been selected for permanent hiding")
   }
-
   custom_colDef <- custom_colDef_setting(tag,session)
-
   column_defs <- lapply(column_names, function(col) {
     if (col %in% hide) {
       return(colDef(show = FALSE))

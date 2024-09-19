@@ -8,7 +8,6 @@ box::use(
 # input_files <- fusion_genes_filenames
 #' @export
 load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){ 
-
   if (flag == "varcall"){
     input_var <- input_files[grepl(sample, input_files)]
     dt <- fread(input_var)
@@ -103,7 +102,7 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
 get_inputs <- function(flag){
   
   library <- "MOII_e117"
-  path = paste0("../input_files/", library)
+  path = paste0("./input_files/", library)
   
   if (flag == "per_sample_file"){
     
