@@ -4,12 +4,13 @@
 #
 # ## when .js file added or changed, run this command:
 # # rhino::build_js()
-#
+# #
 # ## run this from console when the css style is changed ##
 # # rhino::build_sass()
 #
 # ## run shiny app with command:
 # # shiny::runApp()
+# # shiny::shinyAppDir(".")
 #
 # script_dir <- dirname(rstudioapi::getSourceEditorContext()$path)
 # setwd(paste0(script_dir))
@@ -38,7 +39,8 @@ box::use(
   app/logic/patients_list[patients_list,set_patient_to_sample],
   app/view/IGV,
 #   app/logic/load_data[load_data,get_inputs],
-  app/logic/prepare_table[colFilter,columnName_map]
+  app/logic/prepare_table[colFilter,columnName_map],
+  app/view/network_graph
 #   
 )
 
@@ -56,11 +58,12 @@ ui <- function(id){
             h3( "MOII_e_117krve", style = "font-size: 20px; padding: 10px; color: #FFFFFF; "),
             sidebarMenu(id = ns("sidebar_menu"),
                         menuItem("Network graph", tabName = ns("network_graph"), icon = icon("diagram-project")),
+                        menuItem("Variant calling", tabName = ns("variant_calling"), icon = icon("dna")),
+
                         menuItem("Fusion genes", tabName = ns("fusion_genes"), icon = icon("atom")),
                         menuItem("Hidden IGV Item", tabName = ns("hidden_igv"), icon = icon("eye-slash")),
                         menuItem("Summary",tabName = ns("summary"),icon = icon("id-card-clip")),
-                        menuItem("Expression profile", tabName = ns("expression_profile"), icon = icon("chart-line")),
-                        menuItem("Variant calling", tabName = ns("variant_calling"), icon = icon("dna"))
+                        menuItem("Expression profile", tabName = ns("expression_profile"), icon = icon("chart-line"))
                   
                   )),
           body = dashboardBody(
@@ -149,7 +152,10 @@ ui <- function(id){
 
 
               ),
-              tabItem(h1("Network graph"),tabName = ns("network_graph")),
+              tabItem(h1("Gene Interactions Network"),tabName = ns("network_graph"),
+                      fluidPage(
+                        network_graph$ui(ns("network_graph")))
+              ),
               tabItem(tabName = ns("hidden_igv"),
                       tags$style(HTML("
                               #igv-igvDiv {
@@ -174,6 +180,7 @@ ui <- function(id){
 server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
 ## run summary module
     summary_table$summaryServer("summaryUI", session)
 
@@ -244,7 +251,11 @@ server <- function(id) {
     })
 
 
-
+##################    
+    ## run network graph module    
+    network_graph$server("network_graph")
+    
+    
 
 
     IGV$igv_server("igv")

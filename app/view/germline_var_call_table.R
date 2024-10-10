@@ -104,10 +104,10 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
         outlined = TRUE,
         defaultColDef = colDef(align = "center", sortNALast = TRUE),
         defaultSorted = list("CGC_Germline" = "desc", "trusight_genes" = "desc", "fOne" = "desc"),
-        columnGroups = list(
-          colGroup(name = "Databases", columns = c("gnomAD_NFE", "clinvar_sig", "snpDB", "CGC_Germline", "trusight_genes", "fOne")),
-          colGroup(name = "Annotation", columns = c("Consequence", "HGVSc", "HGVSp", "all_full_annot_name"))
-        ),
+        # columnGroups = list(
+        #   colGroup(name = "Databases", columns = c("gnomAD_NFE", "clinvar_sig", "snpDB", "CGC_Germline", "trusight_genes", "fOne")),
+        #   colGroup(name = "Annotation", columns = c("Consequence", "HGVSc", "HGVSp", "all_full_annot_name"))
+        # ),
         selection = if (selection_enabled()) "multiple" else NULL,  # Enable selection conditionally
         onClick = if (selection_enabled()) "select" else NULL,  # Enable selection by click
         class = "germline-table",

@@ -5,7 +5,8 @@ shinyjs.loadStringData = function(genes) {
         genes = genes[0];
     }
     var url = "https://string-db.org/api/json/network?identifiers=" + encodeURIComponent(genes) + "&species=9606";
-
+    console.log("URL is: " + url);
+    
     fetch(url)
         .then(response => response.json())
         .then(data => {

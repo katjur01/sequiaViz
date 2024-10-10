@@ -2,7 +2,6 @@ library(shiny)
 library(shinyjs)
 library(htmlwidgets)
 
-
 ui <- fluidPage(
   titlePanel("Cytoscape.js v Shiny aplikaci"),
   tags$head(
