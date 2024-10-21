@@ -44,8 +44,9 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
     return(dt)
     
   } else if (flag == "expression") { 
+    # input_files <- expression_profile_filenames
     # input_files_var <- get_inputs("per_sample_file")
-    patient_files <- input_files[grep(sample, input_files)] # sample = "DZ1601"
+    patient_files <- input_files[grep(sample, input_files)] # sample = "MR1507"
     
     if(expr_flag == "genes_of_interest"){
       patient_files <- patient_files[grep(expr_flag, patient_files)] # sample = "DZ1601"
@@ -60,13 +61,16 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
 
     } else if (expr_flag == "all_genes"){
       patient_files <- patient_files[grep(expr_flag, patient_files)] # sample = "DZ1601"
+      patient_files <- patient_files[grep("multiRow", patient_files)]
       dt_list <- lapply(patient_files, function(file) {
         dt <- fread(file)
-        tissue <- gsub("^.*/|_all_genes\\.tsv$","",file)
+        tissue <- gsub("^.*/|_all_genes_multiRow\\.tsv$","",file)
         dt[, c("tissue", "sample") := .(tissue, sample)]
         return(dt)
       })
       combined_dt <- rbindlist(dt_list, use.names = TRUE, fill = TRUE)
+      combined_dt$sample <- NULL
+      combined_dt[, sample := sample]
     } else{
       stop("Your data table has wrong name. Must contain string gene_of_interest or all_genes.")
     }

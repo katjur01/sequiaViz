@@ -3,19 +3,23 @@
 
 
 box::use(
-  shiny[NS, moduleServer, observeEvent, tagList, fluidPage, fluidRow, column, textInput, actionButton, selectInput, reactive, req],
+  shiny[NS, moduleServer, observeEvent, tagList, fluidPage, fluidRow, column, textInput, actionButton, selectInput, reactive, req,reactiveVal,conditionalPanel],
   httr[GET, status_code, content],
-  htmltools[h3, tags, div],
+  htmltools[h3, tags, div,HTML],
   jsonlite[fromJSON, toJSON],
   cyjShiny[cyjShinyOutput, renderCyjShiny, cyjShiny, dataFramesToJSON,setNodeAttributes],
   data.table[fread,setnames],
   readxl[read_excel],
   graph[nodes],
-  reactable[reactable,colDef,renderReactable,reactableOutput]
+  reactable[reactable,colDef,renderReactable,reactableOutput,JS],
+  shinyWidgets[radioGroupButtons,pickerInput],
+
 )
 
 box::use(
-  app/logic/waiters[use_spinner]
+  app/logic/load_data[get_inputs,load_data],
+  app/logic/waiters[use_spinner],
+  
 )
 
 # Funkce pro získání interakcí mezi proteiny z STRING API
@@ -53,12 +57,12 @@ prepare_cytoscape_network <- function(interactions, proteins, fc_values) {
   degrees <- table(c(interactions$preferredName_A, interactions$preferredName_B))
   degree_values <- sapply(all_nodes, function(x) ifelse(x %in% names(degrees), degrees[x], 0))
   
-  # Příprava uzlů včetně fold-change hodnot, lfc a label
+  # Příprava uzlů včetně fold-change hodnot, fc a label
   node_data <- data.frame(
     id = all_nodes,
     name = all_nodes,
     label = all_nodes,
-    lfc = ifelse(all_nodes %in% proteins, fc_values[match(all_nodes, proteins)], NA),  # Přidání sloupce lfc
+    log2FC = ifelse(all_nodes %in% proteins, fc_values[match(all_nodes, proteins)], NA),  # Přidání sloupce fc
     degree = degree_values,  # Přidání stupně (degree) uzlu
     stringsAsFactors = FALSE
   )
@@ -77,36 +81,49 @@ prepare_cytoscape_network <- function(interactions, proteins, fc_values) {
 }
 
 get_pathway_list <- function(){
-  dt <- fread("input_files/testing_pathway_data.tsv")
-  pathway_list <- unique(dt$kegg_paths_name)
+  dt <- fread("input_files/kegg_tab.tsv")
+  pathway_list <- sort(unique(dt$kegg_paths_name))
   return(pathway_list)
 }
 
-# Load and process data table
-input_data <- function(){
-  data <- fread("input_files/testing_pathway_data.tsv")
-  data <- data[kegg_paths_name != ""]
-  setnames(data,"P_001","FC")
+get_tissue_list <- function(){
+  input_files <- get_inputs("per_sample_file")
+  tissue_list <- sort(unique(gsub(".*/RNAseq21_NEW/[^/]+/([^_]+)_.*", "\\1", input_files$expression.file)))
+  return(tissue_list)
+}
 
-  # # Načtení dat z Excelu
-  # data <- read_excel("input_files/MOII_e117/RNAseq21/DZ1601_032023_Blood Vessel_report.xlsx", sheet = 1)
-  # proteins <- data$Gene
-  # fc_values <- data$FC
-  
+input_data <- function(sample,expr_flag){
+  input_files <- get_inputs("per_sample_file")
+  # message("Loading data for expression profile: ", filenames$expression.files)
+  data <- load_data(input_files$expression.files,"expression",sample,expr_flag)
+  # data <- data[kegg_paths_name != ""]
   return(data)
 }
+
 
 # Shiny aplikace UI modul
 ui <- function(id) {
   ns <- NS(id)
   tagList(
-       selectInput(ns("selected_pathway"), "Pathway", choices = get_pathway_list(), selected = NULL),
-       # textInput(ns("proteins"), "Enter protein names (comma-separated)", value = "TP53,MDM2"),
-       actionButton(ns("plot"), "Plot Network"),
-      
-       cyjShinyOutput(ns("cyj_network"), height = "900px"),
-       reactableOutput(ns("network_tab"))
-       # use_spinner(cyjShinyOutput(ns("cyj_network"), height = "900px"))
+     tags$script(src = "static/js/cyjShiny_handlers.js"),
+     tags$script(src = "static/js/reactable_handlers.js"),
+     tags$style(HTML("
+        .selected {
+          background-color: lightblue !important;
+        }")),
+     
+     pickerInput(ns("selected_pathway"), "Pathway", choices = get_pathway_list(), options = list(`live-search` = TRUE)), #choices = c("", get_pathway_list())
+     
+     textInput(ns("proteins"), "List of gene names (comma-separated)", value = ""),
+     # actionButton(ns("plot"), "Plot Network"),
+
+     # cyjShinyOutput(ns("cyj_network"), height = "900px"),
+     
+     use_spinner(cyjShinyOutput(ns("cyj_network"), height = "900px")), # conditionalPanel is not working for some reason!!!
+     
+     radioGroupButtons(ns("selected_tissue"),"Choose a tissue :",choices = get_tissue_list(),justified = TRUE),
+     reactableOutput(ns("network_tab"))
+     # use_spinner(cyjShinyOutput(ns("cyj_network"), height = "900px"))
   )
 }
 
@@ -114,35 +131,47 @@ ui <- function(id) {
 server <- function(id) {
   moduleServer(id, function(input, output, session) {
 
-    dt <- input_data()
+    dt <- input_data("MR1507","all_genes")
     
     pathway_dt <- reactive({
       req(input$selected_pathway)
-      unique(dt[kegg_paths_name == input$selected_pathway,-c("all_kegg_gene_names","kegg_paths_id")])
+      unique(dt[grep(input$selected_pathway, all_kegg_paths_name),-c("all_kegg_gene_names","counts_tpm_round","size","mu","lower_than_p","higher_than_p","type","gene_definition")])
     })
     
-    network_json <- reactive({
+    tissue_dt <- reactive({
+      req(input$selected_tissue)
       req(pathway_dt())
-      # proteins <- unlist(strsplit(input$proteins, ","))
-      interactions <- get_string_interactions(pathway_dt()[,gene_name])
-      # interactions <- fromJSON("input_files/breast_cancer_network")
-      prepare_cytoscape_network(interactions,pathway_dt()[,gene_name],pathway_dt()[,FC])
+      unique(pathway_dt()[tissue == input$selected_tissue])
     })
+    
 
-
+    network_json <- reactive({
+      req(tissue_dt())
+      # Fetch STRING interactions for the current tissue
+      interactions <- get_string_interactions(tissue_dt()[, feature_name])
+      # Prepare the Cytoscape network using the fetched interactions and log2FC values
+      prepare_cytoscape_network(interactions, tissue_dt()[, feature_name], tissue_dt()[, log2FC])
+    })
+    
+    
+    
     output$network_tab <- renderReactable({
       message("Rendering Reactable for network")
-      reactable(pathway_dt(),
+      reactable(tissue_dt(),
                 columns = list(
-                  gene_name = colDef(name = "Gene name", maxWidth = 100),
-                  ensembl_id = colDef(name = "Ensembl id", width = 140),
+                  feature_name = colDef(name = "Gene name", maxWidth = 100),
+                  geneid = colDef(name = "Ensembl id", width = 140),
                   refseq_id = colDef(name = "Refseq id", maxWidth = 80),
-                  FC = colDef(name = "FC", maxWidth = 100),
-                  kegg_paths_name = colDef(name = "Pathway name", minWidth = 140, maxWidth = 180, resizable = TRUE)
+                  fc = colDef(name = "FC", maxWidth = 100),
+                  all_kegg_paths_name = colDef(name = "Pathway name", minWidth = 140, maxWidth = 180, resizable = TRUE)
                 ),
                 defaultPageSize = 10,
                 showPageSizeOptions = TRUE,
                 pageSizeOptions = c(10, 20, 50, 100),
+                # selection = "single",
+                # onClick = "select",
+                onClick = JS("function(rowInfo) { 
+                  Shiny.setInputValue('selected_row', rowInfo.index);}"),
                 striped = TRUE,
                 wrap = FALSE,
                 highlight = TRUE,
@@ -151,15 +180,72 @@ server <- function(id) {
     
     
     
-
-    
-    observeEvent(input$plot, {
+    observeEvent(input$selected_pathway, {
+      req(input$selected_pathway != "")
+      message("Selected pathway: ", input$selected_pathway)
       output$cyj_network <- renderCyjShiny({
-        cyjShiny(network_json(), layoutName = "cola",styleFile="app/styles/cytoscape_styling.js")
+        cyjShiny(network_json(), layoutName = "cola", styleFile = "app/styles/cytoscape_styling.js")
       })
+      # 
+      # session$sendCustomMessage(type = "initializeCy", message = list())
     })
+    
+    # Aktualizace uzlů na základě výběru tkáně bez opětovného renderování grafu
+    observeEvent(input$selected_tissue, {
+      req(tissue_dt(), input$selected_tissue != "")
+      message("Selected tissue: ", input$selected_tissue)
+      session$sendCustomMessage(type = "updateTissueStyle", message = list(tissue = input$selected_tissue))
+    })
+    
+    # Color selected row (without checkbox)
+    observeEvent(input$selected_row, {
+      message("Row selected: ", input$selected_row)  # Log pro kontrolu, zda se kliknutí na řádek detekuje
+      session$sendCustomMessage(type = "highlightRow", message = list(rowIndex = input$selected_row))
+    })
+    
+    
+    
+    
+    
   })
 }
+
+# #fusion
+# input_data <- function(sample,expr_flag = NULL){
+#   filenames <- get_inputs("per_sample_file")
+# 
+#   fusion <- as.data.table(prepare_fusion_genes_table(load_data(filenames$fusions,"fusion",sample),sample))
+#   germline <- as.data.table(prepare_germline_table(load_data(filenames$var_call.germline,"varcall",sample)))
+#   # expression <- as.data.table(prepare_expression_table(load_data(input_files$expression.files,"expression",sample,expr_flag = "all_genes"),expr_flag = "all_genes"))
+#   
+#   
+#   germline[!is.na(Gene_symbol), n_mut := .N,.(Gene_symbol)]
+#   
+#   fusion[,visual_check := FALSE]
+#   fusion[gene1 == "RUNX2",visual_check := TRUE]
+#   fusion[,fus_id := 1:length(gene1)]
+#   expression[feature_name %in% fusion$gene1]$feature_name
+#   
+#   
+#   
+#   return(list(fusion,germline,expression))
+# }
+# 
+# 
+# dt <- reactive({
+#   message("Loading input data for fusion")
+#   input_data(selected_samples) 
+# })
+# 
+# 
+# create_omic_table <- function(){
+#   
+# }
+
+
+
+
+
 
 
 

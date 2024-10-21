@@ -9,15 +9,16 @@
 # dt <- openxlsx::read.xlsx("../AK1860krev.germ_variants.xlsx")
 
 box::use(
-  shiny[moduleServer,NS,h2,h3,tagList,div,tabsetPanel,tabPanel,observeEvent,fluidPage,fluidRow, reactive,icon,textInput,isTruthy,
-        sliderInput,showModal,modalDialog,column,uiOutput,renderUI,textOutput,renderText,reactiveVal,req,observe,outputOptions,checkboxInput],
+  shiny[moduleServer,NS,h2,h3,tagList,div,tabsetPanel,tabPanel,observeEvent,fluidPage,fluidRow, reactive,icon,textInput,isTruthy,verbatimTextOutput,
+        sliderInput,showModal,modalDialog,column,uiOutput,renderUI,textOutput,renderText,reactiveVal,req,observe,outputOptions,checkboxInput,
+        renderPrint],
   bs4Dash[actionButton, box,popover,addPopover],
   reactable,
-  reactable[reactable,renderReactable,colDef,colGroup,JS,getReactableState],
+  reactable[reactable,reactableOutput,renderReactable,colDef,colGroup,JS,getReactableState],
   # reactable.extras[reactable_extras_ui,reactable_extras_server],
   htmltools[tags,HTML],
   app/logic/patients_list[set_patient_to_sample],
-  shinyWidgets[prettyCheckbox],
+  shinyWidgets[prettyCheckbox,searchInput],
   app/logic/prepare_table[colFilter]
   # reactablefmtr
 )
@@ -46,17 +47,25 @@ ui <- function(id) {
         border-radius: 3px;  /* Zaoblení hrany bunky */
         }
       ")),
-    use_spinner(reactable$reactableOutput(ns("germline_var_call_tab"))),
+    use_spinner(reactableOutput(ns("germline_var_call_tab"))),
     tags$br(),
-    tags$div(id = ns("checkbox_popover"), style = "width:245px; position: absolute; left: 10;", #margin-top: 13.5px;
+    tags$div(id = ns("checkbox_popover"), style = "width:245px; position: absolute; right: 10;", #margin-top: 13.5px;
              checkboxInput(ns("fullTable_checkbox"),label = "Keep pre-filtered variant table",value = TRUE)),
-    tags$br()
+    tags$br(),
+    # searchInput(ns("selectPathogenic_button2"),label = "Select possibly pathogenic gene: ", width = "30%",
+    #             placeholder = "variant name", btnSearch = icon("plus"),
+    #             btnClass = "btn-default btn-outline-secondary"),
+    # 
+    actionButton(ns("selectPathogenic_button"), "Select variantu as posibly patogenic"),
+    actionButton(ns("delete_button"), "Delete variants"),
+    reactableOutput(ns("selectPathogenic_tab"))
+
   )
 }
 
 server <- function(id, selected_samples, selected_columns, column_mapping, selection_enabled) {
   moduleServer(id, function(input, output, session) {
-    
+
     # Call loading function to load data
     data <- reactive({
       message("Loading input data for germline")
@@ -85,14 +94,19 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
       as.data.frame(dt)
     })
     
-    # Reactive value to store selected rows
-    selected_rows <- reactiveVal(data.frame())
+    # # Reactive value to store selected rows
+    selected_variants <- reactiveVal(data.frame(var_name = character(), Gene_symbol = character()))
     
     # Render reactable with conditional selection
     output$germline_var_call_tab <- renderReactable({
       message("Rendering Reactable for germline")
+      filtered_data <- filtered_data() # tvoje data pro hlavní tabulku
+      pathogenic_variants <- selected_variants() # seznam variant, které byly označeny jako patogenní
+      
+      
       reactable(
-        filtered_data(),
+        # filtered_data(),
+        filtered_data,
         columns = column_defs(),
         resizable = TRUE,
         showPageSizeOptions = TRUE,
@@ -104,31 +118,84 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
         outlined = TRUE,
         defaultColDef = colDef(align = "center", sortNALast = TRUE),
         defaultSorted = list("CGC_Germline" = "desc", "trusight_genes" = "desc", "fOne" = "desc"),
+        rowStyle = function(index) {
+          gene_in_row <- filtered_data$Gene_symbol[index]
+          var_in_row <- filtered_data$var_name[index]
+          if (var_in_row %in% pathogenic_variants$var_name &           # Pokud je aktuální řádek v seznamu patogenních variant, zvýrazníme ho
+              gene_in_row %in% pathogenic_variants$Gene_symbol) {
+            list(backgroundColor = "#ffcccc",fontWeight = "bold")
+          } else {
+            NULL
+          }
+        },
         # columnGroups = list(
         #   colGroup(name = "Databases", columns = c("gnomAD_NFE", "clinvar_sig", "snpDB", "CGC_Germline", "trusight_genes", "fOne")),
         #   colGroup(name = "Annotation", columns = c("Consequence", "HGVSc", "HGVSp", "all_full_annot_name"))
         # ),
-        selection = if (selection_enabled()) "multiple" else NULL,  # Enable selection conditionally
-        onClick = if (selection_enabled()) "select" else NULL,  # Enable selection by click
+        selection = "multiple",
+        onClick = "select",
         class = "germline-table",
         elementId = "tbl-germline"
       )
     })
     
-    # Observe changes in selected rows if selection is enabled
-    observe({
-      if (selection_enabled()) {
-        selected <- getReactableState("germline_var_call_tab", "selected")
-        selected_rows(filtered_data()[selected, , drop = FALSE])
+    # Sledování vybraného řádku a varianty
+    selected_variant <- reactive({
+      selected_row <- getReactableState("germline_var_call_tab", "selected")
+      if (!is.null(selected_row)) {
+        filtered_data()[selected_row, c("var_name","Gene_symbol")]  # Získání varianty z vybraného řádku
+        # var <- filtered_data()[selected_row, c("var_name","Gene_symbol")]  # Získání varianty z vybraného řádku
+        # var$remove <- NA
+      } else {
+        NULL
       }
     })
     
-    # You can access the selected rows using selected_rows() in other parts of the server logic
-    observeEvent(selected_rows(), {
-      if (selection_enabled()) {
-        message("Selected rows:")
-        print(selected_rows())
+    # Akce po kliknutí na tlačítko pro přidání varianty
+    observeEvent(input$selectPathogenic_button, {
+      selected_rows <- getReactableState("germline_var_call_tab", "selected")
+      req(selected_rows)
+      
+      new_variants <- filtered_data()[selected_rows, c("var_name", "Gene_symbol")]  # Získání vybraných variant
+      current_variants <- selected_variants()  # Stávající přidané varianty
+      new_unique_variants <- new_variants[!(new_variants$var_name %in% current_variants$var_name &       # Porovnání - přidáme pouze ty varianty, které ještě nejsou v tabulce
+                                              new_variants$Gene_symbol %in% current_variants$Gene_symbol), ]
+
+      if (nrow(new_unique_variants) > 0) {      # Přidáme pouze unikátní varianty
+        selected_variants(rbind(current_variants, new_unique_variants))
       }
+    })
+    
+
+    output$selectPathogenic_tab <- renderReactable({
+      variants <- selected_variants()
+      if (nrow(variants) == 0) {
+        return(NULL)
+      }
+      
+      reactable(
+        variants,
+        columns = list(
+          var_name = colDef(name = "Variant name"),
+          Gene_symbol = colDef(name = "Gene name")
+          # remove = colDef(
+          #   name = "",
+          #   cell = function(value, index) {
+          #     # actionButton(session$ns("delete"), label = "", class = "btn btn-danger btn-sm", icon = icon("remove"))
+          #     # actionButton(session$ns(paste0("remove_", index)), label = "", class = "btn btn-danger btn-sm", icon = icon("remove"))
+          #   })
+        ),
+        selection = "multiple", onClick = "select",
+        width = "30%"
+      )
+    })
+    
+    observeEvent(input$delete_button, {
+      rows <- getReactableState("selectPathogenic_tab", "selected")
+      req(rows)
+      current_variants <- selected_variants()
+      updated_variants <- current_variants[-rows, ]
+      selected_variants(updated_variants)
     })
     
     addPopover(id = "checkbox_popover",

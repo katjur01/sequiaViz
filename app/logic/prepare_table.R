@@ -135,10 +135,12 @@ prepare_expression_table <- function(combined_dt,expr_flag){
     }))
     wide_dt <- wide_dt[, c(ordered_columns, tissue_cols), with = FALSE]
   } else if (expr_flag == "all_genes"){
+
     wide_dt <- dcast(combined_dt,
-                     sample + feature_name + geneid + pathway + refseq_id + type + all_kegg_gene_names
-                     + gene_definition + kegg_paths_id + kegg_paths_name ~ tissue,
+                     sample + feature_name + geneid + refseq_id + type + all_kegg_gene_names
+                     + gene_definition + all_kegg_paths_name + num_of_paths ~ tissue,
                      value.var = c("log2FC", "p_value", "p_adj"))
+    
   } else {
     stop("Unknown expr_tag: ", expr_flag)
   }
@@ -328,6 +330,8 @@ default_sorted_table <- function(dt){
 
   return(default_sorted)
 }
+
+
 
 
 # dt <- fread("./input_files/MOII_e117/117_WES_germline/final_variant_table.tsv")

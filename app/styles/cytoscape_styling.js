@@ -10,12 +10,12 @@
        "height": "mapData(degree, 0, 20, 100, 300)"
        }},
 
-    {"selector": "node[lfc<=0]", "css": {
-        "background-color": "mapData(lfc, -1, 0, blue, white)"
-        }},
+    {"selector": "node[log2FC<=0]", "css": {
+        "background-color": "mapData(log2FC, -10, 0, blue, white)"
+    }},
 
-    {"selector": "node[lfc>0]", "css": {
-        "background-color": "mapData(lfc, 0, 2, white, red)"
+    {"selector": "node[log2FC>0]", "css": {
+        "background-color": "mapData(log2FC, 0, 10, white, red)"
     }},
 
     {"selector": "node:selected", "css": {

@@ -38,11 +38,11 @@ ui_allGenes <- function(id, patient) {
 server_allGenes <- function(id, patient) {
   moduleServer(id, function(input, output, session) {
     data <- reactive({
-      input_data(patient,expr_flag = "all_genes")
+      input_data(patient,expr_flag = "all_genes") 
     })
 
     output[[paste0("table_", patient)]] <- renderReactable({
-      reactable(as.data.frame(data()[1:100,]),
+      reactable(as.data.frame(data()),
                 resizable = TRUE,
                 showPageSizeOptions = TRUE,
                 pageSizeOptions = c(10, 20, 50, 100),

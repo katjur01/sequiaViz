@@ -58,12 +58,12 @@ ui <- function(id){
             h3( "MOII_e_117krve", style = "font-size: 20px; padding: 10px; color: #FFFFFF; "),
             sidebarMenu(id = ns("sidebar_menu"),
                         menuItem("Network graph", tabName = ns("network_graph"), icon = icon("diagram-project")),
+                        menuItem("Expression profile", tabName = ns("expression_profile"), icon = icon("chart-line")),
                         menuItem("Variant calling", tabName = ns("variant_calling"), icon = icon("dna")),
 
                         menuItem("Fusion genes", tabName = ns("fusion_genes"), icon = icon("atom")),
                         menuItem("Hidden IGV Item", tabName = ns("hidden_igv"), icon = icon("eye-slash")),
-                        menuItem("Summary",tabName = ns("summary"),icon = icon("id-card-clip")),
-                        menuItem("Expression profile", tabName = ns("expression_profile"), icon = icon("chart-line"))
+                        menuItem("Summary",tabName = ns("summary"),icon = icon("id-card-clip"))
                   
                   )),
           body = dashboardBody(
