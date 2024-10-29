@@ -17,12 +17,10 @@
     {"selector": "node[log2FC>0]", "css": {
         "background-color": "mapData(log2FC, 0, 10, white, red)"
     }},
-
     {"selector": "node:selected", "css": {
        "overlay-opacity": 0.3,
-       "overlay-color": "gray"
+       "border-color": "gray"
     }},
-
     {"selector": "edge", "css": {
         "curve-style": "bezier"
     }},

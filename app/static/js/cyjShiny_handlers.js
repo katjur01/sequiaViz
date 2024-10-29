@@ -1,7 +1,8 @@
+
 Shiny.addCustomMessageHandler("initializeCy", function(message) {
   var cyContainer = document.getElementById('app-network_graph-cyj_network');
   
-  if (cyContainer) {
+  if (cyContainer && !cy) {  // Zkontroluj, zda už nebyla instance cy vytvořena
     var cy = cytoscape({
       container: cyContainer, 
       elements: [], 
@@ -11,25 +12,56 @@ Shiny.addCustomMessageHandler("initializeCy", function(message) {
     console.log("Cytoscape instance (cy) initialized");
 
     // Definuj handler pro aktualizaci stylů uzlů po změně tkáně
-    Shiny.addCustomMessageHandler("updateTissueStyle", function(message) {
-      var tissue = message.tissue;
-      console.log("JS function 'updateTissueStyle' called with tissue: " + tissue);
+  Shiny.addCustomMessageHandler('updateTissueStyle', function(message) {
+    var tissue = message.tissue;
+    console.log("JS function 'updateTissueStyle' called with tissue: " + tissue);
+  
+    // Clear the current node styles before applying new ones
+    cy.style()
+      .selector('node')
+      .style({
+        'background-color': ''  // Clear existing colors
+      })
+      .update();
+  
+    // Apply new styles based on log2FC
+    cy.style()
+      .selector('node[log2FC<=0]')
+      .style({
+        'background-color': 'green'  // Change from blue to green
+      })
+      .selector('node[log2FC>0]')
+      .style({
+        'background-color': 'mapData(log2FC, 0, 10, white, red)'
+      })
+      .update();
+      
+    console.log("Node styles updated with new colors.");
+  });
 
-      // Změna barvy uzlů podle log2FC
-      cy.style()
-        .selector('node[log2FC<=0]')
-        .style({
-          'background-color': 'mapData(log2FC, -10, 0, blue, white)'
-        })
-        .selector('node[log2FC>0]')
-        .style({
-          'background-color': 'mapData(log2FC, 0, 10, white, red)'
-        })
-        .update();
+    
+    
+  Shiny.addCustomMessageHandler('highlightNode', function(message) {
+    console.log('Custom message received: ' + JSON.stringify(message));
+    var gene = message.gene;
+    console.log('Highlighting node for gene: ' + gene);
+    
+    cy.style()
+      .selector('node[label="' + gene + '"]')
+      .style({
+        'background-color': 'yellow'
+      })
+      .update();
+    console.log('Node for gene ' + gene + ' should be colored now.');
+  });
 
-      console.log("Node styles updated for tissue: " + tissue);
-    });
   } else {
     console.error("Div with ID 'app-network_graph-cyj_network' not found.");
   }
 });
+
+
+
+
+
+

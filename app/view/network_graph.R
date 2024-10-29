@@ -1,13 +1,15 @@
 # app/view/network_graph.R
+# shiny::shinyAppDir(".", options = list(launch.browser = TRUE))
 
 
 
 box::use(
-  shiny[NS, moduleServer, observeEvent, tagList, fluidPage, fluidRow, column, textInput, actionButton, selectInput, reactive, req,reactiveVal,conditionalPanel],
+  shiny[NS, moduleServer, observeEvent, observe, tagList, fluidPage, fluidRow, column, textInput, actionButton, selectInput, reactive, req,reactiveVal,conditionalPanel,verbatimTextOutput,
+        renderPrint,renderText,htmlOutput],
   httr[GET, status_code, content],
   htmltools[h3, tags, div,HTML],
   jsonlite[fromJSON, toJSON],
-  cyjShiny[cyjShinyOutput, renderCyjShiny, cyjShiny, dataFramesToJSON,setNodeAttributes],
+  cyjShiny[cyjShinyOutput, renderCyjShiny, cyjShiny, dataFramesToJSON, selectNodes,setNodeAttributes,selectFirstNeighbors,fit,fitSelected,clearSelection,getSelectedNodes],
   data.table[fread,setnames],
   readxl[read_excel],
   graph[nodes],
@@ -105,25 +107,20 @@ input_data <- function(sample,expr_flag){
 ui <- function(id) {
   ns <- NS(id)
   tagList(
-     tags$script(src = "static/js/cyjShiny_handlers.js"),
-     tags$script(src = "static/js/reactable_handlers.js"),
-     tags$style(HTML("
-        .selected {
-          background-color: lightblue !important;
-        }")),
-     
+     # tags$script(src = "static/js/cyjShiny_handlers.js"),
      pickerInput(ns("selected_pathway"), "Pathway", choices = get_pathway_list(), options = list(`live-search` = TRUE)), #choices = c("", get_pathway_list())
-     
      textInput(ns("proteins"), "List of gene names (comma-separated)", value = ""),
-     # actionButton(ns("plot"), "Plot Network"),
-
-     # cyjShinyOutput(ns("cyj_network"), height = "900px"),
+     
+     actionButton(ns("sfn"), "Select First Neighbor"),
+     actionButton(ns("fit"), "Fit Graph"),
+     actionButton(ns("fitSelected"), "Fit Selected"),
+     actionButton(ns("clearSelection"), "Clear Selection"), HTML("<br>"),
+     actionButton(ns("getSelectedNodes"), "Get Selected Nodes"), HTML("<br><br>"),
+     htmlOutput(ns("selectedNodesDisplay")),
      
      use_spinner(cyjShinyOutput(ns("cyj_network"), height = "900px")), # conditionalPanel is not working for some reason!!!
-     
      radioGroupButtons(ns("selected_tissue"),"Choose a tissue :",choices = get_tissue_list(),justified = TRUE),
      reactableOutput(ns("network_tab"))
-     # use_spinner(cyjShinyOutput(ns("cyj_network"), height = "900px"))
   )
 }
 
@@ -168,79 +165,52 @@ server <- function(id) {
                 defaultPageSize = 10,
                 showPageSizeOptions = TRUE,
                 pageSizeOptions = c(10, 20, 50, 100),
-                # selection = "single",
-                # onClick = "select",
-                onClick = JS("function(rowInfo) { 
-                  Shiny.setInputValue('selected_row', rowInfo.index);}"),
+                # onClick = JS(sprintf("function(rowInfo, column) {
+                #   console.log('Clicked row index: ' + rowInfo.index);
+                #   Shiny.setInputValue('%s', { index: rowInfo.index + 1 }, { priority: 'event' });
+                # }", session$ns("selected_row"))),
+                onClick = JS(sprintf("function(rowInfo, column) {
+                  console.log('Clicked row gene name: ' + rowInfo.row.feature_name);
+                  Shiny.setInputValue('%s', { gene: rowInfo.row.feature_name }, { priority: 'event' });
+                }", session$ns("selected_row"))),
                 striped = TRUE,
                 wrap = FALSE,
                 highlight = TRUE,
                 outlined = TRUE)
     })
-    
-    
-    
+
     observeEvent(input$selected_pathway, {
       req(input$selected_pathway != "")
       message("Selected pathway: ", input$selected_pathway)
       output$cyj_network <- renderCyjShiny({
         cyjShiny(network_json(), layoutName = "cola", styleFile = "app/styles/cytoscape_styling.js")
       })
-      # 
-      # session$sendCustomMessage(type = "initializeCy", message = list())
+    })
+
+    observeEvent(input$selected_row,  ignoreInit=TRUE,{
+      message("Selected row is: ",input$selected_row)
+      selectNodes(session, as.character(input$selected_row))
+    })
+
+    observeEvent(input$sfn,  ignoreInit=TRUE,{
+      selectFirstNeighbors(session)
+    })
+    observeEvent(input$fit, ignoreInit=TRUE, {
+      fit(session, 80)
+    })
+    observeEvent(input$fitSelected,  ignoreInit=TRUE,{
+      fitSelected(session, 100)
     })
     
-    # Aktualizace uzlů na základě výběru tkáně bez opětovného renderování grafu
-    observeEvent(input$selected_tissue, {
-      req(tissue_dt(), input$selected_tissue != "")
-      message("Selected tissue: ", input$selected_tissue)
-      session$sendCustomMessage(type = "updateTissueStyle", message = list(tissue = input$selected_tissue))
+    observeEvent(input$clearSelection,  ignoreInit=TRUE, {
+      clearSelection(session)
     })
-    
-    # Color selected row (without checkbox)
-    observeEvent(input$selected_row, {
-      message("Row selected: ", input$selected_row)  # Log pro kontrolu, zda se kliknutí na řádek detekuje
-      session$sendCustomMessage(type = "highlightRow", message = list(rowIndex = input$selected_row))
+    observeEvent(input$getSelectedNodes, ignoreInit=TRUE, {
+      output$selectedNodesDisplay <- renderText({" "})
+      getSelectedNodes(session)
     })
-    
-    
-    
-    
-    
   })
 }
-
-# #fusion
-# input_data <- function(sample,expr_flag = NULL){
-#   filenames <- get_inputs("per_sample_file")
-# 
-#   fusion <- as.data.table(prepare_fusion_genes_table(load_data(filenames$fusions,"fusion",sample),sample))
-#   germline <- as.data.table(prepare_germline_table(load_data(filenames$var_call.germline,"varcall",sample)))
-#   # expression <- as.data.table(prepare_expression_table(load_data(input_files$expression.files,"expression",sample,expr_flag = "all_genes"),expr_flag = "all_genes"))
-#   
-#   
-#   germline[!is.na(Gene_symbol), n_mut := .N,.(Gene_symbol)]
-#   
-#   fusion[,visual_check := FALSE]
-#   fusion[gene1 == "RUNX2",visual_check := TRUE]
-#   fusion[,fus_id := 1:length(gene1)]
-#   expression[feature_name %in% fusion$gene1]$feature_name
-#   
-#   
-#   
-#   return(list(fusion,germline,expression))
-# }
-# 
-# 
-# dt <- reactive({
-#   message("Loading input data for fusion")
-#   input_data(selected_samples) 
-# })
-# 
-# 
-# create_omic_table <- function(){
-#   
-# }
 
 
 
