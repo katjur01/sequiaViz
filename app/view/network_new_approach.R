@@ -1,3 +1,195 @@
+# 
+# 
+# box::use(
+#   shiny[NS, moduleServer, observeEvent, observe, tagList, fluidPage, fluidRow, column, textInput, actionButton, selectInput, reactive, req,reactiveVal,conditionalPanel,verbatimTextOutput,
+#         renderPrint,renderText,htmlOutput],
+#   httr[GET, status_code, content],
+#   htmltools[h3, tags, div,HTML],
+#   jsonlite[fromJSON, toJSON],
+#   cyjShiny[cyjShinyOutput, renderCyjShiny, cyjShiny, dataFramesToJSON, selectNodes,setNodeAttributes,selectFirstNeighbors,fit,fitSelected,clearSelection,getSelectedNodes],
+#   data.table[fread,setnames],
+#   readxl[read_excel],
+#   graph[nodes],
+#   dplyr[bind_rows],
+#   reactable[reactable,colDef,renderReactable,reactableOutput,JS],
+#   shinyWidgets[radioGroupButtons,pickerInput],
+#   
+# )
+# 
+# box::use(
+#   app/logic/load_data[get_inputs,load_data],
+#   app/logic/waiters[use_spinner],
+#   
+# )
+# 
+# # Funkce pro získání interakcí mezi proteiny z STRING API
+# get_string_interactions <- function(proteins, species = 9606, chunk_size = 100) {
+#   # Funkce pro odesílání jednotlivých požadavků
+#   fetch_interactions <- function(protein_chunk) {
+#     base_url <- "https://string-db.org/api/json/network?"
+#     query <- paste0("identifiers=", paste(protein_chunk, collapse = "%0D"), "&species=", species)
+#     url <- paste0(base_url, query)
+#     
+#     response <- GET(url)
+#     
+#     if (status_code(response) == 200) {
+#       content <- fromJSON(content(response, as = "text"))
+#       return(content)
+#     } else {
+#       stop("Request failed with status: ", status_code(response))
+#     }
+#   }
+#   
+#   # Rozdělení proteinů na bloky podle chunk_size (občas je proteinů moc)
+#   protein_chunks <- split(proteins, ceiling(seq_along(proteins) / chunk_size))
+#   all_interactions <- do.call(rbind, lapply(protein_chunks, fetch_interactions))
+#   
+#   return(all_interactions)
+# }
+# 
+# 
+# prepare_cytoscape_network <- function(interactions, proteins, fc_values) {
+#   # Získání uzlů z interakcí
+#   interaction_nodes <- unique(c(interactions$preferredName_A, interactions$preferredName_B))
+#   all_nodes <- unique(c(interaction_nodes, proteins))
+#   
+#   # Spočítání stupně (degree) pro každý uzel - singletony mají stupen 0
+#   degrees <- table(c(interactions$preferredName_A, interactions$preferredName_B))
+#   degree_values <- sapply(all_nodes, function(x) ifelse(x %in% names(degrees), degrees[x], 0))
+#   
+#   # Příprava uzlů včetně fold-change hodnot, fc a label
+#   node_data <- data.frame(
+#     id = all_nodes,
+#     name = all_nodes,
+#     label = all_nodes,
+#     log2FC = ifelse(all_nodes %in% proteins, fc_values[match(all_nodes, proteins)], NA),  # Přidání sloupce fc
+#     degree = degree_values,
+#     highlighted = "no",
+#     stringsAsFactors = FALSE
+#   )
+#   
+#   # Příprava hran (interakcí)
+#   edges <- data.frame(
+#     source = interactions$preferredName_A,
+#     target = interactions$preferredName_B,
+#     interaction = "interaction",  # Obecný popis interakce
+#     stringsAsFactors = FALSE
+#   )
+#   
+#   # Generování JSON pro cyjShiny
+#   network_json <- toJSON(dataFramesToJSON(edges, node_data), auto_unbox = TRUE)
+#   return(network_json)
+# }
+# 
+# 
+# # Funkce pro extrakci dat uzlů z JSON formátu do data frame
+# json_to_dataframe <- function(json_str,gene_name) {
+#   json_data <- fromJSON(fromJSON(json_str, simplifyVector = FALSE), simplifyVector = FALSE)
+#   json_data$elements$nodes <- lapply(json_data$elements$nodes, function(node) {
+#     if (node$data$name == gene_name) {
+#       node$data$highlighted <- "yes"
+#     }
+#     return(node)
+#   })
+#   node_data <- lapply(json_data$elements$nodes, function(node) {
+#     node$data
+#   }) 
+#   nodes_df <- bind_rows(node_data)
+#   return(nodes_df)
+# }
+# 
+# # Shiny aplikace UI modul
+# fui <- function(id) {
+#   ns <- NS(id)
+#   tagList(
+#     use_spinner(cyjShinyOutput(ns("cyj_network"), height = "900px")), # conditionalPanel is not working for some reason!!!
+#     reactableOutput(ns("network_tab"))
+#   )
+# }
+# 
+# # Shiny aplikace server modul
+# fserver <- function(id) {
+#   moduleServer(id, function(input, output, session) {
+#     
+#     dt <- fread("/home/katka/BioRoots/sequiaViz/input_files/testing_pathway_data.tsv")
+#     setnames(dt, c("gene_name","P_001"),c("feature_name","log2FC"))
+#     
+#     tissue_dt <- unique(dt[kegg_paths_name == "Breast cancer"])
+#     
+#     # Fetch STRING interactions for the current tissue
+#     interactions <- get_string_interactions(tissue_dt[, feature_name])
+#     network_json <- prepare_cytoscape_network(interactions, tissue_dt[, feature_name], tissue_dt[, log2FC])
+#     
+#     # network_dt <- fromJSON(network_json,simplifyVector = TRUE)
+#     # # Data jako seznam pro hierarchii: list(elements = list(nodes = node_data, edges = edges))
+#     # 
+#     # network_json <- toJSON(network_list, auto_unbox = TRUE)
+#     # 
+#     # network_dt$elements$nodes
+#     
+# 
+#       
+#       output$network_tab <- renderReactable({
+#         message("Rendering Reactable for network")
+#         reactable(tissue_dt,
+#                   defaultPageSize = 10,
+#                   showPageSizeOptions = TRUE,
+#                   pageSizeOptions = c(10, 20, 50, 100),
+#                   # onClick = JS(sprintf("function(rowInfo, column) {
+#                   #   console.log('Clicked row index: ' + rowInfo.index);
+#                   #   Shiny.setInputValue('%s', { index: rowInfo.index + 1 }, { priority: 'event' });
+#                   # }", session$ns("selected_row"))),
+#                   onClick = JS(sprintf("function(rowInfo, column) {
+#                   console.log('Clicked row gene name: ' + rowInfo.row.feature_name);
+#                   Shiny.setInputValue('%s', { gene: rowInfo.row.feature_name }, { priority: 'event' });
+#                 }", session$ns("selected_row"))),
+#                   striped = TRUE,
+#                   wrap = FALSE,
+#                   highlight = TRUE,
+#                   outlined = TRUE)
+#       })
+#       
+#       # observeEvent(input$selected_pathway, {
+#       #   req(input$selected_pathway != "")
+#       #   message("Selected pathway: ", input$selected_pathway)
+#       output$cyj_network <- renderCyjShiny({
+#         cyjShiny(network_json, layoutName = "cola", styleFile = "/home/katka/BioRoots/sequiaViz/app/styles/cytoscape_styling.js")
+#       })
+#       # })
+#       
+#       observeEvent(input$selected_row,  ignoreInit=TRUE,{
+#         message("Selected row is: ",input$selected_row)
+#         # nodes_df <- json_to_dataframe(network_json,input$selected_row)
+#         # network_json <- toJSON(toJSON(nodes_df), auto_unbox = TRUE)
+#         # selectNodes(session, as.character(input$selected_row))
+#         
+#         setNodeAttributes(session, nodes = input$selected_row, attributeName = "highlighted", value = "yes")
+#       })
+#       
+#       
+#   })
+# }
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# ui <- fluidPage(
+#   fui("network")
+# )
+# server <- function(input, output, session){
+#   fserver("network")
+# }
+# shinyApp(ui, server, options = list(launch.browser = TRUE))
+# 
+# 
+# 
+# 
+# 
+
+
 # # app/view/network_graph.R
 # # shiny::shinyAppDir(".", options = list(launch.browser = TRUE))
 # 
@@ -210,14 +402,14 @@
 # 
 # ##############################################
 # ##############################################
-# 
-# # dt <- fread("input_files/testing_pathway_data.tsv")
-# # dt <- dt[kegg_paths_name != ""]
-# #
-# # library(shiny)
-# # library(shinyjs)
-# # library(jsonlite)
-# # library(readxl)
+
+# dt <- fread("input_files/testing_pathway_data.tsv")
+# dt <- dt[kegg_paths_name != ""]
+#
+# library(shiny)
+# library(shinyjs)
+# library(jsonlite)
+# library(readxl)
 
 box::use(
   shiny[NS,moduleServer,observeEvent,tagList,actionButton,checkboxInput,fluidPage],
@@ -229,7 +421,7 @@ box::use(
 
 box::use(
   app/js/cytoscape_js[jsCode, custom_setting],
-  # app/logic/waiters[use_spinner],
+  app/logic/waiters[use_spinner],
 )
 
 fui <- function(id){
@@ -265,21 +457,21 @@ fserver <- function(id) {
       genes <- paste(genes, collapse = "%0D")
       js$loadStringData(genes)
     })
-#
-#     observeEvent(input$button, {
-#       shinyjs::runjs("$('#cy').addClass('loading-spinner')")  # Přidej spinner
-#
-#       genes <- paste(genes, collapse = "%0D")
-#       print(genes)
-#       print(js$loadStringData(genes))
-#       js$loadStringData(genes)
-#
-#       # Po načtení dat ze sítě
-#       shinyjs::delay(3000, {
-#         shinyjs::runjs("$('#cy').removeClass('loading-spinner')")  # Odeber spinner po 3s (pro test)
-#       })
-#     })
-#
+
+    observeEvent(input$button, {
+      shinyjs::runjs("$('#cy').addClass('loading-spinner')")  # Přidej spinner
+
+      genes <- paste(genes, collapse = "%0D")
+      print(genes)
+      print(js$loadStringData(genes))
+      js$loadStringData(genes)
+
+      # Po načtení dat ze sítě
+      shinyjs::delay(3000, {
+        shinyjs::runjs("$('#cy').removeClass('loading-spinner')")  # Odeber spinner po 3s (pro test)
+      })
+    })
+
 
 
 

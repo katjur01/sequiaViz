@@ -13,47 +13,13 @@
     {"selector": "node[log2FC<=0]", "css": {
         "background-color": "mapData(log2FC, -10, 0, blue, white)"
     }},
-
     {"selector": "node[log2FC>0]", "css": {
         "background-color": "mapData(log2FC, 0, 10, white, red)"
     }},
     {"selector": "node:selected", "css": {
-       "overlay-opacity": 0.3,
-       "border-color": "gray"
+       "background-color": "green"
     }},
     {"selector": "edge", "css": {
         "curve-style": "bezier"
-    }},
-    
-    {
-    // initial viewport state:
-    "zoom": 1,
-    "pan": "{ x: 0, y: 0 }",
-  
-    // interaction options:
-    "minZoom": 1e-50,
-    "maxZoom": 1e50,
-    "zoomingEnabled": true,
-    "userZoomingEnabled": true,
-    "panningEnabled": true,
-    "userPanningEnabled": true,
-    "boxSelectionEnabled": true,
-    "selectionType": "single",
-    "touchTapThreshold": 8,
-    "desktopTapThreshold": 4,
-    "autolock": false,
-    "autoungrabify": false,
-    "autounselectify": false,
-    "multiClickDebounceTime": 250,
-  
-    // rendering options:
-    "headless": false,
-    "styleEnabled": true,
-    "hideEdgesOnViewport": false,
-    "textureOnViewport": false,
-    "motionBlur": false,
-    "motionBlurOpacity": 0.2,
-    "wheelSensitivity": 1,
-    "pixelRatio": "auto"
-    }
+    }}
 ]

@@ -40,7 +40,7 @@ box::use(
   app/view/IGV,
 #   app/logic/load_data[load_data,get_inputs],
   app/logic/prepare_table[colFilter,columnName_map],
-  app/view/network_graph
+  app/view/networkGraph_cytoscape
 #   
 )
 
@@ -154,7 +154,7 @@ ui <- function(id){
               ),
               tabItem(h1("Gene Interactions Network"),tabName = ns("network_graph"),
                       fluidPage(
-                        network_graph$ui(ns("network_graph")))
+                        networkGraph_cytoscape$ui(ns("network_graph")))
               ),
               tabItem(tabName = ns("hidden_igv"),
                       tags$style(HTML("
@@ -253,7 +253,7 @@ server <- function(id) {
 
 ##################    
     ## run network graph module    
-    network_graph$server("network_graph")
+    networkGraph_cytoscape$server("network_graph")
     
     
 
