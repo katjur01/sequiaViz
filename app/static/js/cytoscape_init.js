@@ -1,9 +1,11 @@
 // Registrace layoutů `cola` a `fcose`
 cytoscape.use(cytoscapeCola);
 cytoscape.use(cytoscapeFcose);  // Použití `cytoscapeFcose` pro fcose layout
+//cytoscape.use(cytoscapePanzoom); 
 
 let cy;
 let cySubset;
+let lastHighlightedNode = null;
 
 // Společná funkce pro inicializaci Cytoscape grafu
 function initializeCytoscape(containerId, elementsData, isSubset = false) {
@@ -52,6 +54,14 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
                 }
             },
             {
+                selector: 'node.highlighted',
+                style: {
+                    'background-color': 'yellow',
+                    'border-color': 'yellow',
+                    'border-width': '4px'
+                }
+            },
+            {
                 selector: 'edge',
                 style: {
                     'curve-style': 'bezier'
@@ -60,6 +70,7 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
         ],
         layout: { name: 'cola' }  // Výchozí layout
     });
+    
 
     if (!isSubset) {
         cytoscapeInstance.on('select unselect', 'node', function(evt) {
@@ -69,10 +80,41 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
             // Nastavení hodnoty pro Shiny pomocí správného ID
             Shiny.setInputValue(ns + 'cySelectedNodes', selectedNodes, { priority: "event" });
         });
+            
+    Shiny.addCustomMessageHandler('cy-add-node-selection', function(data) {
+        // Najděte uzel odpovídající vybranému genu
+        const nodeToHighlight = cytoscapeInstance.nodes().filter(function(ele) {
+            return ele.data('name') === data.gene.gene;
+        });
+
+        if (nodeToHighlight.length > 0) {
+            // Pokud už je stejný uzel zvýrazněn, zrušíme zvýraznění
+            if (lastHighlightedNode && lastHighlightedNode.same(nodeToHighlight)) {
+                lastHighlightedNode.removeClass('highlighted');
+                lastHighlightedNode = null;
+                console.log("Node unhighlighted:", nodeToHighlight.data('id'));
+            } else {
+                // Pokud je zvýrazněn jiný uzel, zrušíme jeho zvýraznění
+                if (lastHighlightedNode) {
+                    lastHighlightedNode.removeClass('highlighted');
+                }
+                
+                // Přidáme zvýraznění novému uzlu
+                nodeToHighlight.addClass('highlighted');
+                console.log("Node highlighted:", nodeToHighlight.data('id'));
+
+                // Uložíme aktuální zvýrazněný uzel jako poslední
+                lastHighlightedNode = nodeToHighlight;
+            }
+        } else {
+            console.error("Node not found for gene:", data.gene);
+        }
+    });
     }
 
     return cytoscapeInstance;
 }
+
 
 // Handler pro vykreslení hlavního grafu
 Shiny.addCustomMessageHandler('cy-init', function(data) {
@@ -100,23 +142,41 @@ Shiny.addCustomMessageHandler('cy-subset', function(data) {
     }
 });
 
-/*
-// Handler pro odznačení všech uzlů
-Shiny.addCustomMessageHandler('cy-clear-selection', function(data) {
-    if (cy) {
-        console.log("Clearing selection...");
-        cy.$(':selected').unselect();  // Deselect all selected nodes
 
-        // Ověření, zda jsou uzly skutečně odznačeny
-        const selectedNodesAfterClear = cy.$(':selected').map(node => node.data('id'));
-        console.log("Po výběru vymazání, vybrané uzly:", selectedNodesAfterClear);
 
-        // Nastavení hodnoty pro Shiny na prázdný seznam
-        Shiny.setInputValue(ns + 'cySelectedNodes', [], { priority: "event" });
-        console.log("Selection cleared, nastavuji Shiny input na prázdný seznam.");
+
+
+// Přidání naslouchání pro kliknutí na tlačítko pro odznačení všech uzlů
+document.addEventListener('DOMContentLoaded', function() {
+    // Počkej, až bude `ns` definováno
+    if (typeof ns === 'undefined') {
+        console.error("Namespace 'ns' není definován, zkusíme znovu za 100ms.");
+        setTimeout(arguments.callee, 100);
+        return;
+    }
+
+    const clearButton = document.getElementById(ns + 'clearSelectionButton');
+    if (clearButton) {
+        console.log("Tlačítko 'clearSelectionButton' nalezeno, přidávám událost pro vymazání výběru.");
+        clearButton.addEventListener('click', function() {
+            if (cy) {
+                console.log("Clearing selection...");
+                cy.$(':selected').unselect();  // Deselect all selected nodes
+
+                // Ověření, zda jsou uzly skutečně odznačeny
+                const selectedNodesAfterClear = cy.$(':selected').map(node => node.data('id'));
+                console.log("Po výběru vymazání, vybrané uzly:", selectedNodesAfterClear);
+
+                // Nastavení hodnoty pro Shiny na prázdný seznam
+                Shiny.setInputValue(ns + 'cySelectedNodes', [], { priority: "event" });
+                console.log("Selection cleared, nastavuji Shiny input na prázdný seznam.");
+            }
+        });
+    } else {
+        console.error("Tlačítko 'clearSelectionButton' nebylo nalezeno.");
     }
 });
-*/
+
 // Handler pro změnu layoutu
 Shiny.addCustomMessageHandler('cy-layout', function(layout) {
     if (cy) {

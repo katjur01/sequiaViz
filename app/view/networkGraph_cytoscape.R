@@ -41,6 +41,8 @@ ui <- function(id) {
       tags$script(src="https://unpkg.com/layout-base/layout-base.js"),
       tags$script(src="https://unpkg.com/cose-base/cose-base.js"),
       tags$script(src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"),
+      # tags$script(src="https://www.unpkg.com/jquery@3.0.0/dist/jquery.min.js"),
+      # tags$script(src="https://unpkg.com/cytoscape-panzoom@2.5.3/cytoscape-panzoom.js"),
       tags$script(src = "static/js/cytoscape_init.js"),
       tags$script(HTML(sprintf("var cyContainerId = '%s'; var cySubsetContainerId = '%s'; var cySelectedNodesInputId = '%s';", 
                                ns("cyContainer"), ns("cySubsetContainer"), ns("cySelectedNodes"))))
@@ -66,6 +68,8 @@ ui <- function(id) {
 
 server <- function(id) {
   moduleServer(id, function(input, output, session) {
+    interactions <- reactiveVal(NULL)
+    previous_selected_nodes <- reactiveVal(NULL)
     ns <- session$ns
     dt <- input_data("MR1507","all_genes")
     
@@ -84,8 +88,6 @@ server <- function(id) {
       req(pathway_dt())
       unique(pathway_dt()[tissue == input$selected_tissue])
     })
-
-    interactions <- reactiveVal(NULL)
     
     observe({
       req(tissue_dt())
@@ -99,7 +101,65 @@ server <- function(id) {
       # Prepare the Cytoscape network using the fetched interactions and log2FC values
       prepare_cytoscape_network(interactions(), tissue_dt()[, feature_name], tissue_dt()[, log2FC])
     })
+  
+    ###### network observeEvents #####
 
+    observeEvent(list(input$selected_pathway, input$selected_tissue), {
+      req(input$selected_pathway, input$selected_tissue)
+      message("Selected pathway: ", input$selected_pathway, ", Selected tissue: ", input$selected_tissue)
+      session$sendCustomMessage("cy-init", network_json())
+      previous_selected_nodes(NULL)  # Resetujeme uložený výběr uzlů
+    })
+    
+    # Plot subset network when nodes are selected
+    observeEvent(list(input$selected_pathway,input$selected_tissue, input$cySelectedNodes), {
+      req(interactions())
+      selected_nodes <- input$cySelectedNodes
+      previous_nodes <- previous_selected_nodes()
+      
+      if (!identical(selected_nodes, previous_nodes)) {
+        # Aktualizujte pouze, pokud se výběr změnil
+        message("Aktualizace subgrafu s uzly: ", paste(selected_nodes, collapse = ", "))
+        # Nastavíme novou hodnotu výběru
+        previous_selected_nodes(selected_nodes)
+        
+        # Aktualizujeme subgraf
+        if (is.null(selected_nodes) || length(selected_nodes) == 0) {
+          empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
+          session$sendCustomMessage("cy-subset", empty_json)
+          message("Vybrané uzly (server): žádné - vymazání subgrafu.")
+        } else {
+          subnetwork_json <- prepare_cytoscape_network(interactions(), selected_nodes, tissue_dt()[feature_name %in% selected_nodes, log2FC])
+          session$sendCustomMessage("cy-subset", subnetwork_json)
+        }
+      }
+    })
+    ####
+    output$selected_nodes_text <- renderText({
+      if (is.null(input$cySelectedNodes) || length(input$cySelectedNodes) == 0) {
+        "Žádné uzly nejsou vybrány."
+      } else {
+        paste("Vybrané uzly: ", paste(input$cySelectedNodes, collapse = ", "))
+      }
+    })
+    
+    # Předat jmenný prostor do JavaScriptu - umožní  používat ns v JS
+    output$js_namespace <- renderUI({
+      tags$script(HTML(sprintf("var ns = '%s';", ns(""))))
+    })
+    
+    
+    observeEvent(input$selected_layout, {
+      session$sendCustomMessage("cy-layout",input$selected_layout)
+    })
+    
+    observeEvent(input$clearSelectionButton, {
+      message("Clearing selection...")
+      session$sendCustomMessage("cy-clear-selection", NULL)
+    })
+    
+  ##### reactable calling #####
+    
     output$network_tab <- renderReactable({
       message("Rendering Reactable for network")
       reactable(tissue_dt(),
@@ -126,58 +186,17 @@ server <- function(id) {
                 highlight = TRUE,
                 outlined = TRUE)
     })
-
     
-    # Sledujte inicializaci Cytoscape grafu
-    observeEvent(list(input$selected_pathway, input$selected_tissue), {
-      req(input$selected_pathway, input$selected_tissue)
-      message("Selected pathway: ", input$selected_pathway, ", Selected tissue: ", input$selected_tissue)
+    # Reagujte na kliknutí na řádek v tabulce
+    observeEvent(input$selected_row, {
+      selected_gene <- input$selected_row
+      message("Vybraný gen z tabulky: ", selected_gene)
       
-      # Pošlete data pro vykreslení grafu
-      session$sendCustomMessage("cy-init", network_json())
+      # Pošlete zprávu do JavaScriptu pro vybrání uzlu
+      session$sendCustomMessage("cy-add-node-selection", list(gene = selected_gene))
     })
     
-    # Plot subset network when nodes are selected
-    observeEvent(list(input$selected_tissue, input$cySelectedNodes), {
-      req(interactions())
-      selected_nodes <- input$cySelectedNodes
-      
-      if (is.null(selected_nodes) || length(selected_nodes) == 0) {  # Pokud nejsou žádné vybrané uzly, vymaž subgraf
-        empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
-        session$sendCustomMessage("cy-subset", empty_json)
-      } else {  # Pokud jsou vybrané uzly, připrav subgraf
-        message("Vybrané uzly pro subgraf: ", paste(selected_nodes, collapse = ", "))
-        subnetwork_json <- prepare_cytoscape_network(interactions(), selected_nodes, tissue_dt()[feature_name %in% selected_nodes, log2FC])
-        session$sendCustomMessage("cy-subset", subnetwork_json)
-      }
-    })
     
-    output$selected_nodes_text <- renderText({
-      if (is.null(input$cySelectedNodes) || length(input$cySelectedNodes) == 0) {
-        "Žádné uzly nejsou vybrány."
-      } else {
-        paste("Vybrané uzly: ", paste(input$cySelectedNodes, collapse = ", "))
-      }
-    })
-    
-    observeEvent(input$cySelectedNodes, {
-      message("Vybrané uzly (server): ", paste(input$cySelectedNodes, collapse = ", "))
-    })
-    
-    # Předat jmenný prostor do JavaScriptu - umožní  používat ns v JS
-    output$js_namespace <- renderUI({
-      tags$script(HTML(sprintf("var ns = '%s';", ns(""))))
-    })
-    
-    observeEvent(input$selected_layout, {
-      session$sendCustomMessage("cy-layout",input$selected_layout)
-    })
-    
-    observeEvent(input$clearSelectionButton, {
-      message("Clearing selection...")
-      session$sendCustomMessage("cy-clear-selection", NULL)
-    })
-
   })
 }
 

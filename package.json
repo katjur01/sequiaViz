@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "cytoscape-cola": "^2.5.1",
+    "cytoscape-panzoom": "^2.5.3",
     "webcola": "^3.4.0"
   }
 }
