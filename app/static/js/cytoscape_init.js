@@ -119,6 +119,12 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
 // Handler pro vykreslení hlavního grafu
 Shiny.addCustomMessageHandler('cy-init', function(data) {
     console.log('Received data for main graph:', data);
+    
+    data.elements.nodes.forEach(node => {
+        if (node.data && node.data.log2FC !== undefined) {
+            console.log(`Hlavní graf - Node ID: ${node.data.id}, log2FC: ${node.data.log2FC}`);
+        }
+    });
 
     if (!cy) {
         cy = initializeCytoscape(cyContainerId, data.elements);
@@ -133,6 +139,10 @@ Shiny.addCustomMessageHandler('cy-init', function(data) {
 Shiny.addCustomMessageHandler('cy-subset', function(data) {
     console.log('Received data for subset graph:', data);
 
+    data.elements.nodes.forEach((node, index) => {
+        console.log(`Podgraf - Index: ${index}, Node ID: ${node.data.id}, log2FC: ${node.data.log2FC}`);
+    });
+
     if (!cySubset) {
         cySubset = initializeCytoscape(cySubsetContainerId, data.elements, true);
     } else {
@@ -141,6 +151,7 @@ Shiny.addCustomMessageHandler('cy-subset', function(data) {
         cySubset.layout({ name: 'cola' }).run();
     }
 });
+
 
 
 

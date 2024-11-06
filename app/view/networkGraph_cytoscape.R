@@ -130,6 +130,7 @@ server <- function(id) {
           message("Vybrané uzly (server): žádné - vymazání subgrafu.")
         } else {
           subnetwork_json <- prepare_cytoscape_network(interactions(), selected_nodes, tissue_dt()[feature_name %in% selected_nodes, log2FC])
+          message("Připravený podgraf: ", subnetwork_json)
           session$sendCustomMessage("cy-subset", subnetwork_json)
         }
       }

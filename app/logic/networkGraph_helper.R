@@ -67,7 +67,7 @@ prepare_cytoscape_network <- function(interactions, proteins, fc_values) {
   # Generování JSON pro cyjShiny
   # network_json <- toJSON(dataFramesToJSON(edges, node_data), auto_unbox = TRUE)
 
-  node_data <- node_data[node_data$id %in% proteins, ]
+  node_data <- node_data[match(proteins, node_data$id, nomatch = 0), ]
   edges <- edges[edges$source %in% proteins & edges$target %in% proteins, ]
   
   json_data <- list(
