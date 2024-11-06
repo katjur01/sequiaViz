@@ -73,14 +73,14 @@ server <- function(id) {
     ns <- session$ns
     dt <- input_data("MR1507","all_genes")
     
-    # pathway_dt <- unique(dt[grep("Breast cancer", all_kegg_paths_name),-c("all_kegg_gene_names","counts_tpm_round","size","mu","lower_than_p","higher_than_p","type","gene_definition")])
+    # pathway_dt <- unique(dt[grepl("Metabolic pathways", all_kegg_paths_name, fixed = TRUE),-c("all_kegg_gene_names","counts_tpm_round","size","mu","lower_than_p","higher_than_p","type","gene_definition")])
     # tissue_dt <- unique(pathway_dt[tissue == "Breast"])
     # interactions <- get_string_interactions(tissue_dt[, feature_name])
     # network_json <- prepare_cytoscape_network(interactions, tissue_dt[, feature_name], tissue_dt[, log2FC])
 
     pathway_dt <- reactive({
       req(input$selected_pathway)
-      unique(dt[grep(input$selected_pathway, all_kegg_paths_name),-c("all_kegg_gene_names","counts_tpm_round","size","mu","lower_than_p","higher_than_p","type","gene_definition")])
+      unique(dt[grepl(input$selected_pathway, all_kegg_paths_name,fixed = TRUE),-c("all_kegg_gene_names","counts_tpm_round","size","mu","lower_than_p","higher_than_p","type","gene_definition")])
     })
 
     tissue_dt <- reactive({

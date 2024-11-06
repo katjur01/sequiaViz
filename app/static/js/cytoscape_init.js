@@ -119,12 +119,9 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
 // Handler pro vykreslení hlavního grafu
 Shiny.addCustomMessageHandler('cy-init', function(data) {
     console.log('Received data for main graph:', data);
-    
-    data.elements.nodes.forEach(node => {
-        if (node.data && node.data.log2FC !== undefined) {
-            console.log(`Hlavní graf - Node ID: ${node.data.id}, log2FC: ${node.data.log2FC}`);
-        }
-    });
+
+    // Uložení aktuálně vybraných uzlů, pokud existují
+    const previouslySelectedNodes = cy ? cy.$('node:selected').map(node => node.data('id')) : [];
 
     if (!cy) {
         cy = initializeCytoscape(cyContainerId, data.elements);
@@ -133,16 +130,22 @@ Shiny.addCustomMessageHandler('cy-init', function(data) {
         cy.add(data.elements);
         cy.layout({ name: 'cola' }).run(); // Použije výchozí layout při spuštění
     }
+
+    // Znovu označ uzly, které byly vybrány před překreslením
+    if (previouslySelectedNodes.length > 0) {
+        const nodesToSelect = cy.nodes().filter(function(ele) {
+            return previouslySelectedNodes.includes(ele.data('id'));
+        });
+        nodesToSelect.select();
+        console.log("Nodes re-selected:", previouslySelectedNodes);
+    }
 });
+
 
 // Handler pro vykreslení podgrafu
 Shiny.addCustomMessageHandler('cy-subset', function(data) {
     console.log('Received data for subset graph:', data);
-
-    data.elements.nodes.forEach((node, index) => {
-        console.log(`Podgraf - Index: ${index}, Node ID: ${node.data.id}, log2FC: ${node.data.log2FC}`);
-    });
-
+    
     if (!cySubset) {
         cySubset = initializeCytoscape(cySubsetContainerId, data.elements, true);
     } else {
