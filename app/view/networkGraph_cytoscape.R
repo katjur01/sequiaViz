@@ -118,19 +118,14 @@ server <- function(id) {
       previous_nodes <- previous_selected_nodes()
       
       if (!identical(selected_nodes, previous_nodes)) {
-        # Aktualizujte pouze, pokud se výběr změnil
-        message("Aktualizace subgrafu s uzly: ", paste(selected_nodes, collapse = ", "))
-        # Nastavíme novou hodnotu výběru
+        # Aktualizujte pouze, pokud se výběr změnil a nastavíme novou hodnotu výběru
         previous_selected_nodes(selected_nodes)
         
-        # Aktualizujeme subgraf
         if (is.null(selected_nodes) || length(selected_nodes) == 0) {
           empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
           session$sendCustomMessage("cy-subset", empty_json)
-          message("Vybrané uzly (server): žádné - vymazání subgrafu.")
         } else {
           subnetwork_json <- prepare_cytoscape_network(interactions(), selected_nodes, tissue_dt()[feature_name %in% selected_nodes, log2FC])
-          message("Připravený podgraf: ", subnetwork_json)
           session$sendCustomMessage("cy-subset", subnetwork_json)
         }
       }
@@ -181,20 +176,21 @@ server <- function(id) {
                 onClick = JS(sprintf("function(rowInfo, column) {
                   console.log('Clicked row gene name: ' + rowInfo.row.feature_name);
                   Shiny.setInputValue('%s', { gene: rowInfo.row.feature_name }, { priority: 'event' });
+                  backgroundColor: '#ADD8E6';
                 }", session$ns("selected_row"))),
                 striped = TRUE,
                 wrap = FALSE,
                 highlight = TRUE,
                 outlined = TRUE)
     })
-    
-    # Reagujte na kliknutí na řádek v tabulce
+
     observeEvent(input$selected_row, {
       selected_gene <- input$selected_row
       message("Vybraný gen z tabulky: ", selected_gene)
       
       # Pošlete zprávu do JavaScriptu pro vybrání uzlu
       session$sendCustomMessage("cy-add-node-selection", list(gene = selected_gene))
+      session$sendCustomMessage("highlight-row", list(gene = selected_gene))
     })
     
     
