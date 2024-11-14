@@ -50,7 +50,7 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
                 selector: 'node:selected',
                 style: {
                     'label': 'data(name)',
-                    "background-color": "green"
+                    "background-color": "#B8E788"
                 }
             },
             {
@@ -68,7 +68,8 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
                 }
             }
         ],
-        layout: { name: 'cola' }  // Výchozí layout
+        layout: { name: 'cola' },  // Výchozí layout
+        multiselect: false
     });
     
 
@@ -87,10 +88,66 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
         cytoscapeInstance.on('select unselect', 'node', function(evt) {
             const selectedNodes = cytoscapeInstance.$('node:selected').map(node => node.data('id'));
             console.log("Vybrané uzly:", selectedNodes);
+            
+            Shiny.setInputValue(ns + 'cySelectedNodes', selectedNodes, { priority: "event" });  // Nastavení hodnoty pro Shiny pomocí správného ID
+            
+             if (evt.type === 'unselect') {
+              const cyUnselectedNodes = evt.target.data('id');  // Nebo použijte jiný atribut podle potřeby
+              console.log("Odznačený uzel:", cyUnselectedNodes);
 
-            // Nastavení hodnoty pro Shiny pomocí správného ID
-            Shiny.setInputValue(ns + 'cySelectedNodes', selectedNodes, { priority: "event" });
+              Shiny.setInputValue(ns + 'cyUnselectedNodes', cyUnselectedNodes, { priority: "event" });  // Nastavení hodnoty pro Shiny s odznačeným uzlem
+            } 
         });
+
+
+        // Synchronizace vybraných uzlů s hlavním grafem
+   Shiny.addCustomMessageHandler('update-selected-from-gene-list', function(data) {
+    // Kontrola, zda je `selected_nodes` definováno a je pole
+    if (!data.selected_nodes || !Array.isArray(data.selected_nodes)) {
+        console.warn("selectedNodes není platné pole nebo je undefined.");
+        return;
+    }
+
+    const selectedNodes = data.selected_nodes;
+    console.log("Seznam uzlů k označení:", selectedNodes);
+
+    // Získání všech aktuálně vybraných uzlů v hlavním grafu
+    const currentlySelectedNodes = cytoscapeInstance.$('node:selected').map(node => node.data('id'));
+
+    // Najdi uzly, které mají být odznačené (nejsou v `selectedNodes`)
+    const nodesToDeselect = currentlySelectedNodes.filter(nodeId => !selectedNodes.includes(nodeId));
+
+    // Najdi uzly, které mají být označené (jsou v `selectedNodes` a nejsou v `currentlySelectedNodes`)
+    const nodesToSelect = selectedNodes.filter(nodeId => !currentlySelectedNodes.includes(nodeId));
+
+    console.log("Uzly k odznačení:", nodesToDeselect);
+    console.log("Uzly k označení:", nodesToSelect);
+
+    // Odznačení uzlů
+    nodesToDeselect.forEach(nodeId => {
+        const node = cytoscapeInstance.getElementById(nodeId);
+        if (node) {
+            node.unselect();
+            console.log("Uzly byly odznačeny:", nodeId);
+        }
+    });
+
+    // Označení uzlů
+    nodesToSelect.forEach(nodeId => {
+        const node = cytoscapeInstance.getElementById(nodeId);
+        if (node) {
+            node.select();
+            console.log("Uzly byly označeny:", nodeId);
+        }
+    });
+
+    console.log("Aktualizované vybrané uzly v hlavním grafu: ", selectedNodes);
+});
+
+
+
+
+
 
         Shiny.addCustomMessageHandler('cy-add-node-selection', function(data) {
             // Najděte uzel odpovídající vybranému genu
@@ -167,39 +224,26 @@ Shiny.addCustomMessageHandler('cy-subset', function(data) {
 });
 
 
+/*/ Handler to synchronize nodes from pickerInput
+Shiny.addCustomMessageHandler('cy-sync-picker', function(pickerGenes) {
+  console.log('Received data from pickerGenes:', pickerGenes);
+    // Deselect all nodes first to sync accurately
+   // cy.elements().unselect();
+
+    // Select nodes in Cytoscape that match genes from pickerInput
+    pickerGenes.forEach(gene => {
+        console.log('JS gene:', gene);
+        let node = cy.getElementById(gene);  // assuming gene names match node IDs
+        console.log('JS node:', node);
+        if (node) {
+            node.select();
+        }
+    });
+    
+    console.log("Synchronized picker genes to cytoscape: ", pickerGenes);
+});*/
 
 
-
-
-// Listening clearSelectionButton for unselecting all nodes
-document.addEventListener('DOMContentLoaded', function() {
-    // Počkej, až bude `ns` definováno
-    if (typeof ns === 'undefined') {
-        console.error("Namespace 'ns' is not defined, waiting 500ms before another try.");
-        setTimeout(arguments.callee, 500);
-        return;
-    }
-
-    const clearButton = document.getElementById(ns + 'clearSelectionButton');
-    if (clearButton) {
-        clearButton.addEventListener('click', function() {
-            if (cy) {
-                console.log("Clearing selection...");
-                cy.$(':selected').unselect();  // Unselect all selected nodes
-
-                // Check if the nodes are truly unselected
-                const selectedNodesAfterClear = cy.$(':selected').map(node => node.data('id'));
-                console.log("Unselecting some nodes, selected nodes left:", selectedNodesAfterClear);
-
-                // Set shiny value as empty list
-                Shiny.setInputValue(ns + 'cySelectedNodes', [], { priority: "event" });
-                console.log("Selection cleared, seting Shiny input as empty list.");
-            }
-        });
-    } else {
-        console.error("Tlačítko 'clearSelectionButton' nebylo nalezeno.");
-    }
-});
 
 // Highlight row by clicking 
 Shiny.addCustomMessageHandler('highlight-row', function(data) {
@@ -228,3 +272,5 @@ Shiny.addCustomMessageHandler('cy-layout', function(layout) {
         cy.layout({ name: layout }).run();
     }
 });
+
+

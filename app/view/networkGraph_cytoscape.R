@@ -2,8 +2,8 @@
 
 
 box::use(
-  shiny[NS, moduleServer, observeEvent, observe, tagList, fluidPage, fluidRow, column, textInput, actionButton, selectInput, reactive, req,reactiveVal,conditionalPanel,verbatimTextOutput,
-        renderPrint,renderText,textOutput,htmlOutput,uiOutput,renderUI],
+  shiny[NS, moduleServer, observeEvent, observe, tagList, fluidPage, fluidRow, column, textInput, updateTextInput, actionButton, selectInput, reactive, req,reactiveVal,conditionalPanel,verbatimTextOutput,
+        renderPrint,renderText,textOutput,htmlOutput,uiOutput,renderUI,icon,textAreaInput,updateTextAreaInput,isolate,isTruthy],
   httr[GET, status_code, content],
   htmltools[h3, h4, tags, div,HTML,p],
   jsonlite[fromJSON, toJSON,read_json],
@@ -12,8 +12,8 @@ box::use(
   readxl[read_excel],
   graph[nodes],
   reactable[reactable,colDef,renderReactable,reactableOutput,JS],
-  shinyWidgets[radioGroupButtons,pickerInput],
-  
+  shinyWidgets[radioGroupButtons,pickerInput,searchInput,updatePickerInput],
+  shinyjs[hidden,useShinyjs,toggle,hide]
 )
 
 box::use(
@@ -32,7 +32,7 @@ input_data <- function(sample,expr_flag){
 
 ui <- function(id) {
   ns <- NS(id)
-  
+  useShinyjs()
   tagList(
     tags$head(
       tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.1/cytoscape.min.js"),
@@ -44,25 +44,35 @@ ui <- function(id) {
       # tags$script(src="https://www.unpkg.com/jquery@3.0.0/dist/jquery.min.js"),
       # tags$script(src="https://unpkg.com/cytoscape-panzoom@2.5.3/cytoscape-panzoom.js"),
       tags$script(src = "static/js/cytoscape_init.js"),
-      tags$script(HTML(sprintf("var cyContainerId = '%s'; var cySubsetContainerId = '%s'; var cySelectedNodesInputId = '%s';", 
-                               ns("cyContainer"), ns("cySubsetContainer"), ns("cySelectedNodes"))))
+      tags$script(HTML(sprintf("var cyContainerId = '%s'; var cySubsetContainerId = '%s'; var cySelectedNodesInputId = '%s'; var cyUnselectedNodes = '%s';", 
+                               ns("cyContainer"), ns("cySubsetContainer"), ns("cySelectedNodes"), ns("cyUnselectedNodes"))))
     ),
-    pickerInput(ns("selected_pathway"), "Pathway", choices = get_pathway_list(), options = list(`live-search` = TRUE)), #choices = c("", get_pathway_list())
     selectInput(ns("selected_layout"),"Choose layout: ", choices = c("cola","cose","fcose"),selected = "cola"),
-    
+
+    fluidRow(
+      column(7, 
+             pickerInput(ns("selected_pathway"), "Pathway", choices = get_pathway_list(), options = list(`live-search` = TRUE))),
+      column(2, div(style = "display: flex; align-items: center;",
+             textAreaInput(ns("select_geneList"), "List of genes", placeholder = "BRCA1\nE2F1\nNOTCH3\nTP53", rows = 10, resize = "both"),
+             actionButton(ns("add_genes_btn"), label = NULL, icon = icon("plus"), style = "margin-left: 5px; margin-bottom: 10px;"),
+             actionButton(ns("remove_genes_btn"), label = NULL, icon = icon("minus"), class = "btn btn-danger"))), # trash, trash-can, eraser
+      column(2, div(
+            hidden(textAreaInput(ns("new_genes"), label = "Add new genes (comma-separated):", placeholder = "Enter gene names here...", rows = 4, resize = "none")),
+            hidden(actionButton(ns("confirm_new_genes_btn"), label = "Add Genes", icon = icon("check"), style = "margin-top: 10px; width: 75%;"))),
+            hidden(pickerInput(ns("remove_genes"), "Remove genes:", choices = NULL, multiple = TRUE, options = list(`live-search` = TRUE, `actions-box` = TRUE,
+                                                    `multiple-separator` = ", ", `none-selected-text` = "", size = 5, `width` = "75%", `virtual-scroll` = 10))),
+            hidden(actionButton(ns("confirm_remove_genes_btn"), label = "Remove genes", icon = icon("trash-can"), style = "margin-top: 10px; width: 75%;")))
+    ),
+  
+
     uiOutput(ns("js_namespace")),
-    textOutput(ns("selected_nodes_text")),
     actionButton(ns("clearSelectionButton"), "Clear Selection"),
     fluidRow(
       column(7,div(id = ns("cyContainer"), style = "width: 100%; height: 600px;")),
       column(5,div(id = ns("cySubsetContainer"), style = "width: 100%; height: 600px;"))
     ),
-    # tags$script(HTML(sprintf("var cyContainerId = '%s';", ns("cyContainer")))),
-    # tags$script(HTML(sprintf("var cySelectedNodesInputId = '%s';", ns("cySelectedNodes")))),
-    
-    
     radioGroupButtons(ns("selected_tissue"),"Choose a tissue :",choices = get_tissue_list(),justified = TRUE),
-    reactableOutput(ns("network_tab")),
+    tab_UI(ns("tab"))
   )
 }
 
@@ -70,6 +80,8 @@ server <- function(id) {
   moduleServer(id, function(input, output, session) {
     interactions <- reactiveVal(NULL)
     previous_selected_nodes <- reactiveVal(NULL)
+    previous_combined_genes <- reactiveVal(character(0))
+    
     ns <- session$ns
     dt <- input_data("MR1507","all_genes")
     
@@ -77,6 +89,7 @@ server <- function(id) {
     # tissue_dt <- unique(pathway_dt[tissue == "Breast"])
     # interactions <- get_string_interactions(tissue_dt[, feature_name])
     # network_json <- prepare_cytoscape_network(interactions, tissue_dt[, feature_name], tissue_dt[, log2FC])
+
 
     pathway_dt <- reactive({
       req(input$selected_pathway)
@@ -89,21 +102,24 @@ server <- function(id) {
       unique(pathway_dt()[tissue == input$selected_tissue])
     })
     
-    observe({
+    observe({      # Fetch STRING interactions for the current tissue
       req(tissue_dt())
-      # Fetch STRING interactions for the current tissue
       message("Fetching STRING interactions")
       interactions(get_string_interactions(tissue_dt()[, feature_name]))
     })
     
-    network_json <- reactive({
+    network_json <- reactive({      # Prepare the Cytoscape network using the fetched interactions and log2FC values
       req(tissue_dt(),interactions())
-      # Prepare the Cytoscape network using the fetched interactions and log2FC values
       prepare_cytoscape_network(interactions(), tissue_dt()[, feature_name], tissue_dt()[, log2FC])
     })
   
+    output$js_namespace <- renderUI({    # Předat jmenný prostor do JavaScriptu - umožní  používat ns v JS
+      tags$script(HTML(sprintf("var ns = '%s';", ns(""))))
+    })
+    
     ###### network observeEvents #####
-
+    selected_genes <- reactiveVal(character(0))
+                                  
     observeEvent(list(input$selected_pathway, input$selected_tissue), {
       req(input$selected_pathway, input$selected_tissue)
       message("Selected pathway: ", input$selected_pathway, ", Selected tissue: ", input$selected_tissue)
@@ -111,60 +127,198 @@ server <- function(id) {
       previous_selected_nodes(NULL)  # Resetujeme uložený výběr uzlů
     })
     
-    # Plot subset network when nodes are selected
-    observeEvent(list(input$selected_pathway,input$selected_tissue, input$cySelectedNodes), {
-      req(interactions())
-      selected_nodes <- input$cySelectedNodes
-      previous_nodes <- previous_selected_nodes()
-      
-      if (!identical(selected_nodes, previous_nodes)) {
-        # Aktualizujte pouze, pokud se výběr změnil a nastavíme novou hodnotu výběru
-        previous_selected_nodes(selected_nodes)
-        
-        if (is.null(selected_nodes) || length(selected_nodes) == 0) {
-          empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
-          session$sendCustomMessage("cy-subset", empty_json)
+    # Plot subset network when nodes are entered in the textInput
+   observeEvent(list(input$cySelectedNodes, input$selected_pathway, input$selected_tissue, input$select_geneList), {
+    req(interactions())
+
+    # Získání seznamu genů z cySelectedNodes (výběr v grafu)
+    selected_genes_from_graph <- input$cySelectedNodes
+    message("Vybrané uzly z hlavního grafu: ", paste(selected_genes_from_graph, collapse = ", "))
+
+    # Kombinace s aktuálními vybranými geny
+    combined_genes <- unique(c(selected_genes_from_graph, selected_genes()))
+    message("Kombinované vybrané geny: ", paste(combined_genes, collapse = ", "))
+
+    # Získání aktuálního obsahu textového pole
+    current_genes_in_textarea <- isolate(input$select_geneList)
+    message("Aktuální obsah textového pole select_geneList: ", current_genes_in_textarea)
+
+    # Podmínka pro aktualizaci pouze při změně obsahu textového pole
+    if (!identical(current_genes_in_textarea, paste(combined_genes, collapse = "\n"))) {
+        message("Aktualizuji textové pole select_geneList s novými hodnotami.")
+        updateTextAreaInput(session, "select_geneList", value = paste(combined_genes, collapse = "\n"))
+    } else {
+        message("Obsah textového pole select_geneList se nezměnil, aktualizace není potřeba.")
+    }
+
+    # Porovnání kombinovaných genů s předchozími pro aktualizaci podgrafu
+    previous_nodes <- previous_selected_nodes()
+    message("Předchozí vybrané geny (previous_selected_nodes): ", paste(previous_nodes, collapse = ", "))
+    if (!identical(combined_genes, previous_nodes)) {
+        previous_selected_nodes(combined_genes)
+
+        if (length(combined_genes) == 0) {
+            message("Žádné geny nejsou vybrány. Odesílám prázdný podgraf.")
+            empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
+            session$sendCustomMessage("cy-subset", empty_json)
         } else {
-          subnetwork_json <- prepare_cytoscape_network(interactions(), selected_nodes, tissue_dt()[feature_name %in% selected_nodes, log2FC])
-          session$sendCustomMessage("cy-subset", subnetwork_json)
+            message("Připravuji podgraf pro vybrané geny.")
+            subnetwork_json <- prepare_cytoscape_network(interactions(), combined_genes, tissue_dt()[feature_name %in% combined_genes, log2FC])
+            session$sendCustomMessage("cy-subset", subnetwork_json)
         }
-      }
-    })
-    ####
-    output$selected_nodes_text <- renderText({
-      if (is.null(input$cySelectedNodes) || length(input$cySelectedNodes) == 0) {
-        "Žádné uzly nejsou vybrány."
-      } else {
-        paste("Vybrané uzly: ", paste(input$cySelectedNodes, collapse = ", "))
-      }
-    })
-    
-    # Předat jmenný prostor do JavaScriptu - umožní  používat ns v JS
-    output$js_namespace <- renderUI({
-      tags$script(HTML(sprintf("var ns = '%s';", ns(""))))
-    })
-    
-    
+    } else {
+        message("Výběr uzlů se nezměnil. Podgraf se neaktualizuje.")
+    }
+  })
+
+   observeEvent(selected_genes(), {
+     session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = selected_genes()))
+   })
+   
     observeEvent(input$selected_layout, {
       session$sendCustomMessage("cy-layout",input$selected_layout)
     })
     
     observeEvent(input$clearSelectionButton, {
+      req(input$cySelectedNodes)
       message("Clearing selection...")
-      session$sendCustomMessage("cy-clear-selection", NULL)
+      session$sendCustomMessage("cy-clear-selection", list())
+      
+      previous_selected_nodes(NULL)
+
+    #  updatePickerInput(session, "select_geneList", choices = character(0), selected = character(0))
     })
     
-  ##### reactable calling #####
+    #########
+    
+    # Přidání nových genů do pickerInput po stisknutí tlačítka "Add Genes"
+    observeEvent(input$confirm_new_genes_btn, {
+      new_genes <- input$new_genes
+      
+      if (!is.null(new_genes) && length(new_genes) > 0 && is.character(new_genes)) {
+        message("Přidání nových genů: ", new_genes)
+        
+        # Rozdělení a odstranění prázdných mezer
+        new_genes <- trimws(unlist(strsplit(new_genes, ",")))
+        new_genes <- new_genes[new_genes != ""]
+        
+        # Kombinace aktuálních vybraných genů (včetně těch z grafu) s novými geny
+        combined_genes <- unique(c(selected_genes(), input$cySelectedNodes, new_genes))
+        selected_genes(combined_genes)
+        
+        # Aktualizace textového pole
+        updateTextAreaInput(session, "select_geneList", value = paste(combined_genes, collapse = "\n"))
+        
+        # Vymazání a skrytí textového pole pro nové geny
+        updateTextAreaInput(session, "new_genes", value = "")
+        hide("new_genes")
+        hide("confirm_new_genes_btn")
+      }
+    })
+    
+    observeEvent(input$confirm_remove_genes_btn, {
+      # Zkontrolujeme, zda má `remove_genes` nějaké vybrané položky
+      genes_to_remove <- input$remove_genes
+      if (!is.null(genes_to_remove) && length(genes_to_remove) > 0) {
+        # Filtrování genů v selected_geneList - ponecháme pouze ty, které nebyly vybrány k odstranění
+        remaining_genes <- setdiff(selected_genes(), genes_to_remove)
+        
+        # Aktualizace seznamu vybraných genů a příslušné komponenty
+        selected_genes(remaining_genes)
+        
+        # Aktualizace textového pole a vymazání výběru v pickerInput
+        updateTextAreaInput(session, "select_geneList", value = paste(remaining_genes, collapse = "\n"))
+        updatePickerInput(session, "remove_genes", choices = remaining_genes, selected = NULL)
+        
+        # Aktualizace hlavního grafu pro odebrání výběru uzlů, které byly odstraněny
+        session$sendCustomMessage("update-selected-from-gene-list", list(genes = remaining_genes))
+        hide("remove_genes")
+      }
+    })
+    # 
+     # 
+    
+    
+    # Sleduje změny ve vstupu select_geneList a aktualizuje pickerInput pro odstraňování genů
+    observeEvent(input$select_geneList, {
+      # Kontrola nulového vstupu a zpracování pouze, pokud je vstup neprázdný
+      if (!is.null(input$select_geneList) && nzchar(input$select_geneList)) {
+        # Získání seznamu genů z textového pole a odstranění prázdných hodnot
+        selected_genes <- trimws(unlist(strsplit(input$select_geneList, "\n")))
+        selected_genes <- selected_genes[selected_genes != ""]  # Odstraní prázdné hodnoty
+        
+        # Aktualizace pickerInput s aktuálními geny, které lze odstranit
+        updatePickerInput(session, "remove_genes", choices = selected_genes)
+      } else {
+        # Když je vstup prázdný, nastaví pickerInput na prázdné hodnoty
+        updatePickerInput(session, "remove_genes", choices = character(0))
+      }
+    })
+    
+    observeEvent(input$add_genes_btn, {
+      toggle("new_genes")
+      toggle("confirm_new_genes_btn")
+    })
+    
+    # Zobrazení a nastavení výběru pro pickerInput s možností potvrzení
+    observeEvent(input$remove_genes_btn, {
+      # Nastaví všechny aktuálně vybrané geny pro odstranění
+      current_genes <- trimws(unlist(strsplit(input$select_geneList, "\n")))
+      current_genes <- current_genes[current_genes != ""]  # Odstraní prázdné hodnoty
+      
+      updatePickerInput(session, "remove_genes", choices = current_genes, selected = current_genes)
+      
+      # Zobrazí pickerInput pro výběr genů k odstranění a tlačítko pro potvrzení
+      toggle("remove_genes")
+      toggle("confirm_remove_genes_btn")
+    })
+    
+    # Zpracování odstranění vybraných genů po potvrzení
+    observeEvent(input$confirm_remove_genes_btn, {
+      # Načtení vybraných genů pro odstranění
+      genes_to_remove <- input$remove_genes
+      
+      if (!is.null(genes_to_remove) && length(genes_to_remove) > 0) {
+        # Aktualizace `select_geneList` odstraněním vybraných genů
+        remaining_genes <- setdiff(trimws(unlist(strsplit(input$select_geneList, "\n"))), genes_to_remove)
+        
+        # Aktualizace textAreaInput s upraveným seznamem genů
+        updateTextAreaInput(session, "select_geneList", value = paste(remaining_genes, collapse = "\n"))
+        
+        # Odebere výběr uzlů z hlavního grafu (pokud byly vybrány)
+        session$sendCustomMessage("update-selected-from-gene-list", list(genes = remaining_genes))
+        
+        # Skrytí pickerInput a potvrzovacího tlačítka
+        hide("remove_genes")
+        hide("confirm_remove_genes_btn")
+      }
+    })
+    
+    
+    tab_server("tab",tissue_dt)
+  })
+}
+
+
+
+tab_UI <- function(id){
+  ns <- NS(id)
+  reactableOutput(ns("network_tab"))
+}
+tab_server <- function(id,tissue_dt) {
+  moduleServer(id, function(input, output, session) {
+    
+    ##### reactable calling #####
     
     output$network_tab <- renderReactable({
       message("Rendering Reactable for network")
       reactable(tissue_dt(),
                 columns = list(
-                  feature_name = colDef(name = "Gene name", maxWidth = 100),
+                  feature_name = colDef(name = "Gene name", maxWidth = 100, filterable = TRUE),
                   geneid = colDef(name = "Ensembl id", width = 140),
                   refseq_id = colDef(name = "Refseq id", maxWidth = 80),
                   fc = colDef(name = "FC", maxWidth = 100),
-                  all_kegg_paths_name = colDef(name = "Pathway name", minWidth = 140, maxWidth = 180, resizable = TRUE)
+                  all_kegg_paths_name = colDef(name = "Pathway name", minWidth = 140, resizable = TRUE)
                 ),
                 defaultPageSize = 10,
                 showPageSizeOptions = TRUE,
@@ -183,7 +337,7 @@ server <- function(id) {
                 highlight = TRUE,
                 outlined = TRUE)
     })
-
+    
     observeEvent(input$selected_row, {
       selected_gene <- input$selected_row
       message("Vybraný gen z tabulky: ", selected_gene)
@@ -192,7 +346,6 @@ server <- function(id) {
       session$sendCustomMessage("cy-add-node-selection", list(gene = selected_gene))
       session$sendCustomMessage("highlight-row", list(gene = selected_gene))
     })
-    
     
   })
 }
