@@ -60,13 +60,13 @@ ui <- function(id) {
             hidden(textAreaInput(ns("new_genes"), label = "Add new genes (comma-separated):", placeholder = "Enter gene names here...", rows = 4, resize = "none")),
             hidden(actionButton(ns("confirm_new_genes_btn"), label = "Add Genes", icon = icon("check"), style = "margin-top: 10px; width: 75%;"))),
             hidden(pickerInput(ns("remove_genes"), "Remove genes:", choices = NULL, multiple = TRUE, options = list(`live-search` = TRUE, `actions-box` = TRUE,
-                                                    `multiple-separator` = ", ", `none-selected-text` = "", size = 5, `width` = "75%", `virtual-scroll` = 10))),
+                                                    `multiple-separator` = ", ", `none-selected-text` = "", size = 5, `width` = "75%", `virtual-scroll` = 10,`tick-icon` = "fa fa-times"))),
             hidden(actionButton(ns("confirm_remove_genes_btn"), label = "Remove genes", icon = icon("trash-can"), style = "margin-top: 10px; width: 75%;")))
     ),
   
 
     uiOutput(ns("js_namespace")),
-    actionButton(ns("clearSelectionButton"), "Clear Selection"),
+    actionButton(ns("clearSelectionButton"), label = "Clear selection", icon = icon("eraser"), class = "btn btn-warning"),
     fluidRow(
       column(7,div(id = ns("cyContainer"), style = "width: 100%; height: 600px;")),
       column(5,div(id = ns("cySubsetContainer"), style = "width: 100%; height: 600px;"))
@@ -180,14 +180,18 @@ server <- function(id) {
     })
     
     observeEvent(input$clearSelectionButton, {
-      req(input$cySelectedNodes)
-      message("Clearing selection...")
-      session$sendCustomMessage("cy-clear-selection", list())
+      message("Clearing all selections...")
       
-      previous_selected_nodes(NULL)
-
-    #  updatePickerInput(session, "select_geneList", choices = character(0), selected = character(0))
+      selected_genes(character(0))
+      updateTextAreaInput(session, "select_geneList", value = "")
+      session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = character(0)))
+      updatePickerInput(session, "remove_genes", choices = character(0), selected = NULL)
+      empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
+      session$sendCustomMessage("cy-subset", empty_json)
+      
+      message("All selections cleared.")
     })
+    
     
     #########
     
@@ -215,29 +219,7 @@ server <- function(id) {
         hide("confirm_new_genes_btn")
       }
     })
-    
-    observeEvent(input$confirm_remove_genes_btn, {
-      # Zkontrolujeme, zda má `remove_genes` nějaké vybrané položky
-      genes_to_remove <- input$remove_genes
-      if (!is.null(genes_to_remove) && length(genes_to_remove) > 0) {
-        # Filtrování genů v selected_geneList - ponecháme pouze ty, které nebyly vybrány k odstranění
-        remaining_genes <- setdiff(selected_genes(), genes_to_remove)
-        
-        # Aktualizace seznamu vybraných genů a příslušné komponenty
-        selected_genes(remaining_genes)
-        
-        # Aktualizace textového pole a vymazání výběru v pickerInput
-        updateTextAreaInput(session, "select_geneList", value = paste(remaining_genes, collapse = "\n"))
-        updatePickerInput(session, "remove_genes", choices = remaining_genes, selected = NULL)
-        
-        # Aktualizace hlavního grafu pro odebrání výběru uzlů, které byly odstraněny
-        session$sendCustomMessage("update-selected-from-gene-list", list(genes = remaining_genes))
-        hide("remove_genes")
-      }
-    })
-    # 
-     # 
-    
+
     
     # Sleduje změny ve vstupu select_geneList a aktualizuje pickerInput pro odstraňování genů
     observeEvent(input$select_geneList, {
@@ -266,7 +248,7 @@ server <- function(id) {
       current_genes <- trimws(unlist(strsplit(input$select_geneList, "\n")))
       current_genes <- current_genes[current_genes != ""]  # Odstraní prázdné hodnoty
       
-      updatePickerInput(session, "remove_genes", choices = current_genes, selected = current_genes)
+      updatePickerInput(session, "remove_genes", choices = current_genes, selected = NULL)
       
       # Zobrazí pickerInput pro výběr genů k odstranění a tlačítko pro potvrzení
       toggle("remove_genes")
@@ -279,20 +261,31 @@ server <- function(id) {
       genes_to_remove <- input$remove_genes
       
       if (!is.null(genes_to_remove) && length(genes_to_remove) > 0) {
-        # Aktualizace `select_geneList` odstraněním vybraných genů
-        remaining_genes <- setdiff(trimws(unlist(strsplit(input$select_geneList, "\n"))), genes_to_remove)
+        # Získání aktuálního seznamu genů z textového pole
+        current_genes <- trimws(unlist(strsplit(input$select_geneList, "\n")))
+        current_genes <- current_genes[current_genes != ""]  # Odstraní prázdné hodnoty
+        
+        # Vytvoření seznamu genů, které zůstanou po odstranění
+        remaining_genes <- setdiff(current_genes, genes_to_remove)
+        
+        # Aktualizace `selected_genes` s novým seznamem
+        selected_genes(remaining_genes)
         
         # Aktualizace textAreaInput s upraveným seznamem genů
         updateTextAreaInput(session, "select_geneList", value = paste(remaining_genes, collapse = "\n"))
-        
-        # Odebere výběr uzlů z hlavního grafu (pokud byly vybrány)
-        session$sendCustomMessage("update-selected-from-gene-list", list(genes = remaining_genes))
+        updatePickerInput(session, "remove_genes", choices = remaining_genes, selected = NULL)
+        # Odebere výběr odstraněných uzlů z hlavního grafu
+        session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = remaining_genes))
         
         # Skrytí pickerInput a potvrzovacího tlačítka
         hide("remove_genes")
         hide("confirm_remove_genes_btn")
       }
     })
+    
+    # 
+    # 
+    
     
     
     tab_server("tab",tissue_dt)

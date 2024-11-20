@@ -100,49 +100,44 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
         });
 
 
-        // Synchronizace vybraných uzlů s hlavním grafem
-   Shiny.addCustomMessageHandler('update-selected-from-gene-list', function(data) {
-    // Kontrola, zda je `selected_nodes` definováno a je pole
-    if (!data.selected_nodes || !Array.isArray(data.selected_nodes)) {
-        console.warn("selectedNodes není platné pole nebo je undefined.");
+    // Synchronizace vybraných uzlů s hlavním grafem
+Shiny.addCustomMessageHandler('update-selected-from-gene-list', function(data) {
+    const selectedNodes = data.selected_nodes;
+
+    if (!selectedNodes || !Array.isArray(selectedNodes)) {
+        console.warn("Selected_nodes is not valid or undefined.");
         return;
     }
 
-    const selectedNodes = data.selected_nodes;
-    console.log("Seznam uzlů k označení:", selectedNodes);
+    console.log("Selected nodes to update:", selectedNodes);
 
-    // Získání všech aktuálně vybraných uzlů v hlavním grafu
-    const currentlySelectedNodes = cytoscapeInstance.$('node:selected').map(node => node.data('id'));
+    // Odznačení všech aktuálních uzlů, pokud je seznam `selectedNodes` prázdný
+    if (selectedNodes.length === 0) {
+        cy.nodes(':selected').unselect();
+        console.log("All nodes deselected.");
+        return;
+    }
 
-    // Najdi uzly, které mají být odznačené (nejsou v `selectedNodes`)
-    const nodesToDeselect = currentlySelectedNodes.filter(nodeId => !selectedNodes.includes(nodeId));
+    // Získání aktuálně vybraných uzlů v hlavním grafu
+    const currentlySelectedNodes = cy.$('node:selected').map(node => node.data('id'));
 
-    // Najdi uzly, které mají být označené (jsou v `selectedNodes` a nejsou v `currentlySelectedNodes`)
-    const nodesToSelect = selectedNodes.filter(nodeId => !currentlySelectedNodes.includes(nodeId));
-
-    console.log("Uzly k odznačení:", nodesToDeselect);
-    console.log("Uzly k označení:", nodesToSelect);
-
-    // Odznačení uzlů
-    nodesToDeselect.forEach(nodeId => {
-        const node = cytoscapeInstance.getElementById(nodeId);
-        if (node) {
-            node.unselect();
-            console.log("Uzly byly odznačeny:", nodeId);
-        }
-    });
+    // Odznačení všech aktuálních uzlů
+    cy.nodes(':selected').unselect();
 
     // Označení uzlů
-    nodesToSelect.forEach(nodeId => {
-        const node = cytoscapeInstance.getElementById(nodeId);
-        if (node) {
+    selectedNodes.forEach(nodeId => {
+        const node = cy.getElementById(nodeId);
+        if (node && node.length > 0) {
             node.select();
             console.log("Uzly byly označeny:", nodeId);
+        } else {
+            console.warn("Uzel nebyl nalezen v hlavním grafu:", nodeId);
         }
     });
 
     console.log("Aktualizované vybrané uzly v hlavním grafu: ", selectedNodes);
 });
+
 
 
 
