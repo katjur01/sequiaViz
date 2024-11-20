@@ -12,7 +12,7 @@ box::use(
   readxl[read_excel],
   graph[nodes],
   reactable[reactable,colDef,renderReactable,reactableOutput,JS],
-  shinyWidgets[radioGroupButtons,pickerInput,searchInput,updatePickerInput],
+  shinyWidgets[radioGroupButtons,pickerInput,searchInput,updatePickerInput,prettySwitch],
   shinyjs[hidden,useShinyjs,toggle,hide]
 )
 
@@ -47,31 +47,54 @@ ui <- function(id) {
       tags$script(HTML(sprintf("var cyContainerId = '%s'; var cySubsetContainerId = '%s'; var cySelectedNodesInputId = '%s'; var cyUnselectedNodes = '%s';", 
                                ns("cyContainer"), ns("cySubsetContainer"), ns("cySelectedNodes"), ns("cyUnselectedNodes"))))
     ),
+    fluidRow(
+      column(6,
+        fluidRow(
+          column(5,
+                 pickerInput(ns("selected_pathway"), "Pathway", choices = get_pathway_list(), options = list(`live-search` = TRUE))),
+          column(4,
+            div(prettySwitch(ns("selectedVariants"), label = "Add possibly pathogenic variants", status = "primary", slim = TRUE)),
+            div(prettySwitch(ns("selectedFusions"), label = "Add selected fusions", status = "primary", slim = TRUE)))
+        )
+      ),
+      column(6,
+         fluidRow(
+           column(2,),
+           column(4,
+                  textAreaInput(ns("select_geneList"), "List of genes", placeholder = "BRCA1,E2F1,NOTCH3,TP53", rows = 1, resize = "both")), # "BRCA1\nE2F1\nNOTCH3\nTP53"
+          column(1,
+                 div(actionButton(ns("add_genes_btn"), label = NULL, icon = icon("plus"))),
+                 div(actionButton(ns("remove_genes_btn"), label = NULL, icon = icon("trash-can")))),
+          column(4,
+                 div(hidden(textAreaInput(ns("new_genes"), label = "Add new genes (comma-separated):", placeholder = "Enter gene names here...", rows = 4, resize = "none")), style = "width: 90%;"),
+                 div(hidden(actionButton(ns("confirm_new_genes_btn"), label = "Add Genes", icon = icon("check"), style = "margin-bottom: 10px; width: 90%;"))),
+                 div(hidden(pickerInput(ns("remove_genes"), "Remove genes:", choices = NULL, multiple = TRUE, options = list(`live-search` = TRUE, `actions-box` = TRUE,`multiple-separator` = ", ", `none-selected-text` = "", size = 5, `width` = "100%", `virtual-scroll` = 10,`tick-icon` = "fa fa-times")))
+                     ,style = "margin-top: 35px;"),
+                 div(hidden(actionButton(ns("confirm_remove_genes_btn"), label = "Remove genes", icon = icon("trash-can"), style = "margin-bottom: 10px; width: 90%;"))))
+         )
+     )
+   ),
+    # fluidRow(
+    #   column(8,),
+    #   column(2,hidden(actionButton(ns("confirm_new_genes_btn"), label = "Add Genes", icon = icon("check"), style = "margin-top: 10px; width: 75%;"))),
+    #   column(2,hidden(actionButton(ns("confirm_remove_genes_btn"), label = "Remove genes", icon = icon("trash-can"), style = "margin-top: 10px; width: 75%;")))
+    # ),
+    
     selectInput(ns("selected_layout"),"Choose layout: ", choices = c("cola","cose","fcose"),selected = "cola"),
 
-    fluidRow(
-      column(7, 
-             pickerInput(ns("selected_pathway"), "Pathway", choices = get_pathway_list(), options = list(`live-search` = TRUE))),
-      column(2, div(style = "display: flex; align-items: center;",
-             textAreaInput(ns("select_geneList"), "List of genes", placeholder = "BRCA1\nE2F1\nNOTCH3\nTP53", rows = 10, resize = "both"),
-             actionButton(ns("add_genes_btn"), label = NULL, icon = icon("plus"), style = "margin-left: 5px; margin-bottom: 10px;"),
-             actionButton(ns("remove_genes_btn"), label = NULL, icon = icon("minus"), class = "btn btn-danger"))), # trash, trash-can, eraser
-      column(2, div(
-            hidden(textAreaInput(ns("new_genes"), label = "Add new genes (comma-separated):", placeholder = "Enter gene names here...", rows = 4, resize = "none")),
-            hidden(actionButton(ns("confirm_new_genes_btn"), label = "Add Genes", icon = icon("check"), style = "margin-top: 10px; width: 75%;"))),
-            hidden(pickerInput(ns("remove_genes"), "Remove genes:", choices = NULL, multiple = TRUE, options = list(`live-search` = TRUE, `actions-box` = TRUE,
-                                                    `multiple-separator` = ", ", `none-selected-text` = "", size = 5, `width` = "75%", `virtual-scroll` = 10,`tick-icon` = "fa fa-times"))),
-            hidden(actionButton(ns("confirm_remove_genes_btn"), label = "Remove genes", icon = icon("trash-can"), style = "margin-top: 10px; width: 75%;")))
-    ),
-  
-
     uiOutput(ns("js_namespace")),
-    actionButton(ns("clearSelectionButton"), label = "Clear selection", icon = icon("eraser"), class = "btn btn-warning"),
+    actionButton(ns("clearSelection_btn"), label = "Clear selection", icon = icon("eraser")),
+    actionButton(ns("selectNeighbors_btn"), label = "Select first neighbors"),
+    actionButton(ns("fitGraph_btn"), label = "Fit graph"),
+    
     fluidRow(
       column(7,div(id = ns("cyContainer"), style = "width: 100%; height: 600px;")),
       column(5,div(id = ns("cySubsetContainer"), style = "width: 100%; height: 600px;"))
     ),
-    radioGroupButtons(ns("selected_tissue"),"Choose a tissue :",choices = get_tissue_list(),justified = TRUE),
+   fluidRow(
+     column(6,
+        radioGroupButtons(ns("selected_tissue"),"Choose a tissue :",choices = get_tissue_list(),justified = TRUE))
+   ),
     tab_UI(ns("tab"))
   )
 }
@@ -174,24 +197,7 @@ server <- function(id) {
    observeEvent(selected_genes(), {
      session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = selected_genes()))
    })
-   
-    observeEvent(input$selected_layout, {
-      session$sendCustomMessage("cy-layout",input$selected_layout)
-    })
-    
-    observeEvent(input$clearSelectionButton, {
-      message("Clearing all selections...")
-      
-      selected_genes(character(0))
-      updateTextAreaInput(session, "select_geneList", value = "")
-      session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = character(0)))
-      updatePickerInput(session, "remove_genes", choices = character(0), selected = NULL)
-      empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
-      session$sendCustomMessage("cy-subset", empty_json)
-      
-      message("All selections cleared.")
-    })
-    
+
     
     #########
     
@@ -283,12 +289,46 @@ server <- function(id) {
       }
     })
     
-    # 
-    # 
+    #### buttons ###
     
+    observeEvent(input$selected_layout, {
+      session$sendCustomMessage("cy-layout",input$selected_layout)
+    })
     
+    observeEvent(input$clearSelection_btn, {
+      message("Clearing all selections...")
+      
+      selected_genes(character(0))
+      updateTextAreaInput(session, "select_geneList", value = "")
+      session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = character(0)))
+      updatePickerInput(session, "remove_genes", choices = character(0), selected = NULL)
+      empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
+      session$sendCustomMessage("cy-subset", empty_json)
+      
+      message("All selections cleared.")
+    })
     
-    tab_server("tab",tissue_dt)
+    observeEvent(input$selectNeighbors_btn, {
+      selected_gene <- input$selected_row
+      session$sendCustomMessage("select-first-neighbors", list(gene = selected_gene))
+    })
+    
+    observeEvent(input$fitGraph_btn, {
+      selected_genes <- input$cySelectedNodes
+      
+      if (!is.null(selected_genes) && length(selected_genes) > 0) {
+        message("Fitting view to selected nodes: ", paste(selected_genes, collapse = ", "))
+        session$sendCustomMessage("fit-selected-nodes", list(nodes = selected_genes))
+      } else {
+        message("No nodes selected, fitting view to all nodes.")
+        session$sendCustomMessage("fit-selected-nodes", list(nodes = NULL)) # NULL znamená vycentrování na celý graf
+      }
+    })
+    
+  
+    
+    tab_server("tab", tissue_dt = tissue_dt, selected_nodes = reactive(input$cySelectedNodes))
+    
   })
 }
 
@@ -296,30 +336,33 @@ server <- function(id) {
 
 tab_UI <- function(id){
   ns <- NS(id)
-  reactableOutput(ns("network_tab"))
+  fluidRow(
+    column(6,reactableOutput(ns("network_tab"))),
+    column(1,),
+    column(5,reactableOutput(ns("subNetwork_tab")))
+  )
 }
-tab_server <- function(id,tissue_dt) {
+tab_server <- function(id,tissue_dt,selected_nodes) {
   moduleServer(id, function(input, output, session) {
     
     ##### reactable calling #####
-    
     output$network_tab <- renderReactable({
       message("Rendering Reactable for network")
       reactable(tissue_dt(),
                 columns = list(
                   feature_name = colDef(name = "Gene name", maxWidth = 100, filterable = TRUE),
-                  geneid = colDef(name = "Ensembl id", width = 140),
-                  refseq_id = colDef(name = "Refseq id", maxWidth = 80),
+                  geneid = colDef(name = "Ensembl id", width = 140, show = F),
+                  refseq_id = colDef(name = "Refseq id", maxWidth = 80, show = F),
                   fc = colDef(name = "FC", maxWidth = 100),
-                  all_kegg_paths_name = colDef(name = "Pathway name", minWidth = 140, resizable = TRUE)
+                  log2FC = colDef(show = F),
+                  p_adj = colDef(show = F),
+                  all_kegg_paths_name = colDef(name = "Pathway name", minWidth = 140, resizable = TRUE),
+                  tissue = colDef(show = F),
+                  sample = colDef(show = F)
                 ),
                 defaultPageSize = 10,
                 showPageSizeOptions = TRUE,
                 pageSizeOptions = c(10, 20, 50, 100),
-                # onClick = JS(sprintf("function(rowInfo, column) {
-                #   console.log('Clicked row index: ' + rowInfo.index);
-                #   Shiny.setInputValue('%s', { index: rowInfo.index + 1 }, { priority: 'event' });
-                # }", session$ns("selected_row"))),
                 onClick = JS(sprintf("function(rowInfo, column) {
                   console.log('Clicked row gene name: ' + rowInfo.row.feature_name);
                   Shiny.setInputValue('%s', { gene: rowInfo.row.feature_name }, { priority: 'event' });
@@ -332,13 +375,57 @@ tab_server <- function(id,tissue_dt) {
     })
     
     observeEvent(input$selected_row, {
-      selected_gene <- input$selected_row
-      message("Vybraný gen z tabulky: ", selected_gene)
+      selectedRow <- input$selected_row
+      message("Vybraný gen z tabulky: ", selectedRow)
       
       # Pošlete zprávu do JavaScriptu pro vybrání uzlu
-      session$sendCustomMessage("cy-add-node-selection", list(gene = selected_gene))
-      session$sendCustomMessage("highlight-row", list(gene = selected_gene))
+      session$sendCustomMessage("cy-add-node-selection", list(gene = selectedRow))
+      session$sendCustomMessage("highlight-row", list(gene = selectedRow))
     })
+    
+    
+    observe({
+      req(selected_nodes())
+      req(tissue_dt())
+      
+      if (length(selected_nodes()) > 0) {
+        message("subNetwork input: ", paste(selected_nodes(), collapse = ", "))
+        
+        subTissue_dt <- unique(tissue_dt()[feature_name %in% selected_nodes()])
+        message("##### subNettwork input: ", subTissue_dt)
+        
+        output$subNetwork_tab <- renderReactable({
+          message("Rendering Reactable for subNetwork")
+          reactable(subTissue_dt,
+                    columns = list(
+                      feature_name = colDef(name = "Gene name", maxWidth = 100),
+                      geneid = colDef(name = "Ensembl id", width = 140, show = F),
+                      refseq_id = colDef(name = "Refseq id", maxWidth = 80, show = F),
+                      fc = colDef(name = "FC", maxWidth = 100),
+                      log2FC = colDef(show = F),
+                      p_adj = colDef(show = F),
+                      all_kegg_paths_name = colDef(name = "Pathway name", minWidth = 140, resizable = TRUE),
+                      tissue = colDef(show = F),
+                      sample = colDef(show = F)
+                    ),
+                    defaultPageSize = 10,
+                    showPageSizeOptions = TRUE,
+                    pageSizeOptions = c(10, 20, 50, 100),
+                    striped = TRUE,
+                    wrap = FALSE,
+                    highlight = TRUE,
+                    outlined = TRUE)
+        })
+      } else {
+        message("No nodes selected, no subnetwork table needed.")
+        output$subNetwork_tab <- renderReactable({
+          message("Rendering empty Reactable for subNetwork")
+          reactable(data.frame())
+        })
+      }
+    })
+    
+
     
   })
 }
