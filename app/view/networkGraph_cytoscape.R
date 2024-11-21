@@ -50,27 +50,38 @@ ui <- function(id) {
     fluidRow(
       column(6,
         fluidRow(
-          column(5,
-                 pickerInput(ns("selected_pathway"), "Pathway", choices = get_pathway_list(), options = list(`live-search` = TRUE))),
-          column(4,
+          column(3,
+                 div(pickerInput(ns("selected_pathway"), "Pathway", choices = get_pathway_list(), options = list(`live-search` = TRUE)), style = "width: 75%")),
+          column(3,
             div(prettySwitch(ns("selectedVariants"), label = "Add possibly pathogenic variants", status = "primary", slim = TRUE)),
-            div(prettySwitch(ns("selectedFusions"), label = "Add selected fusions", status = "primary", slim = TRUE)))
+            div(prettySwitch(ns("selectedFusions"), label = "Add selected fusions", status = "primary", slim = TRUE))),
+          column(2,
+                 selectInput(ns("selected_layout"),"Choose layout: ", choices = c("cola","cose","fcose"),selected = "cola",width = "65%"))
         )
       ),
-      column(6,
+      column(1,),
+      column(5,
          fluidRow(
            column(2,),
-           column(4,
-                  textAreaInput(ns("select_geneList"), "List of genes", placeholder = "BRCA1,E2F1,NOTCH3,TP53", rows = 1, resize = "both")), # "BRCA1\nE2F1\nNOTCH3\nTP53"
-          column(1,
-                 div(actionButton(ns("add_genes_btn"), label = NULL, icon = icon("plus"))),
-                 div(actionButton(ns("remove_genes_btn"), label = NULL, icon = icon("trash-can")))),
+           # column(4,
+                  # textAreaInput(ns("select_geneList"), "List of genes", placeholder = "BRCA1,E2F1,NOTCH3,TP53", rows = 1, resize = "both")
+                  # ),
+          # column(1,
+          #        div(actionButton(ns("add_genes_btn"), label = NULL, icon = icon("plus"))),
+          #        div(actionButton(ns("remove_genes_btn"), label = NULL, icon = icon("trash-can")))),
           column(4,
-                 div(hidden(textAreaInput(ns("new_genes"), label = "Add new genes (comma-separated):", placeholder = "Enter gene names here...", rows = 4, resize = "none")), style = "width: 90%;"),
-                 div(hidden(actionButton(ns("confirm_new_genes_btn"), label = "Add Genes", icon = icon("check"), style = "margin-bottom: 10px; width: 90%;"))),
-                 div(hidden(pickerInput(ns("remove_genes"), "Remove genes:", choices = NULL, multiple = TRUE, options = list(`live-search` = TRUE, `actions-box` = TRUE,`multiple-separator` = ", ", `none-selected-text` = "", size = 5, `width` = "100%", `virtual-scroll` = 10,`tick-icon` = "fa fa-times")))
-                     ,style = "margin-top: 35px;"),
-                 div(hidden(actionButton(ns("confirm_remove_genes_btn"), label = "Remove genes", icon = icon("trash-can"), style = "margin-bottom: 10px; width: 90%;"))))
+                 div(textAreaInput(ns("new_genes"), label = "Add new genes (comma-separated):", placeholder = "Enter gene names here...", rows = 1, resize = "both",width = "100%"), style = "width: 75%;"),
+                 div(actionButton(ns("confirm_new_genes_btn"), label = "Add Genes", icon = icon("check"), width = "100%"), style = "margin-bottom: 10px; width: 75%;")),
+          column(4,
+                 div(pickerInput(ns("remove_genes"), "Remove genes:", choices = NULL, multiple = TRUE, options = list(`live-search` = TRUE, `actions-box` = TRUE,`multiple-separator` = ", ", `none-selected-text` = "Select gene name", 
+                                                                                                                      size = 5, `width` = "100%", `virtual-scroll` = 10,`tick-icon` = "fa fa-times")),style = "width: 75%;"),
+                 div(actionButton(ns("confirm_remove_genes_btn"), label = "Remove genes", icon = icon("trash-can"),width = "100%"), style = "margin-bottom: 10px; width: 75%;"))
+          # column(4,
+          #        div(hidden(textAreaInput(ns("new_genes"), label = "Add new genes (comma-separated):", placeholder = "Enter gene names here...", rows = 4, resize = "both")), style = "width: 90%;"),
+          #        div(hidden(actionButton(ns("confirm_new_genes_btn"), label = "Add Genes", icon = icon("check"), style = "margin-bottom: 10px; width: 90%;"))),
+          #        div(hidden(pickerInput(ns("remove_genes"), "Remove genes:", choices = NULL, multiple = TRUE, options = list(`live-search` = TRUE, `actions-box` = TRUE,`multiple-separator` = ", ", `none-selected-text` = "", size = 5, `width` = "100%", `virtual-scroll` = 10,`tick-icon` = "fa fa-times")))
+          #            ,style = "margin-top: 35px;"),
+          #        div(hidden(actionButton(ns("confirm_remove_genes_btn"), label = "Remove genes", icon = icon("trash-can"), style = "margin-bottom: 10px; width: 90%;"))))
          )
      )
    ),
@@ -80,15 +91,20 @@ ui <- function(id) {
     #   column(2,hidden(actionButton(ns("confirm_remove_genes_btn"), label = "Remove genes", icon = icon("trash-can"), style = "margin-top: 10px; width: 75%;")))
     # ),
     
-    selectInput(ns("selected_layout"),"Choose layout: ", choices = c("cola","cose","fcose"),selected = "cola"),
+   
 
     uiOutput(ns("js_namespace")),
-    actionButton(ns("clearSelection_btn"), label = "Clear selection", icon = icon("eraser")),
-    actionButton(ns("selectNeighbors_btn"), label = "Select first neighbors"),
-    actionButton(ns("fitGraph_btn"), label = "Fit graph"),
-    
     fluidRow(
-      column(7,div(id = ns("cyContainer"), style = "width: 100%; height: 600px;")),
+      column(6,
+          div(style = "display: flex; justify-content: center;",
+            actionButton(ns("clearSelection_btn"), label = "Clear selection", icon = icon("eraser")),
+            actionButton(ns("selectNeighbors_btn"), label = "Select first neighbors"),
+            actionButton(ns("fitGraph_btn"), label = "Fit graph")))
+    ),
+       
+    fluidRow(
+      column(6,div(id = ns("cyContainer"), style = "width: 100%; height: 600px;")),
+      column(1,),
       column(5,div(id = ns("cySubsetContainer"), style = "width: 100%; height: 600px;"))
     ),
    fluidRow(
@@ -221,73 +237,99 @@ server <- function(id) {
         
         # Vymazání a skrytí textového pole pro nové geny
         updateTextAreaInput(session, "new_genes", value = "")
-        hide("new_genes")
-        hide("confirm_new_genes_btn")
+        # hide("new_genes")
+        # hide("confirm_new_genes_btn")
       }
     })
 
-    
-    # Sleduje změny ve vstupu select_geneList a aktualizuje pickerInput pro odstraňování genů
-    observeEvent(input$select_geneList, {
-      # Kontrola nulového vstupu a zpracování pouze, pokud je vstup neprázdný
-      if (!is.null(input$select_geneList) && nzchar(input$select_geneList)) {
-        # Získání seznamu genů z textového pole a odstranění prázdných hodnot
-        selected_genes <- trimws(unlist(strsplit(input$select_geneList, "\n")))
-        selected_genes <- selected_genes[selected_genes != ""]  # Odstraní prázdné hodnoty
-        
-        # Aktualizace pickerInput s aktuálními geny, které lze odstranit
-        updatePickerInput(session, "remove_genes", choices = selected_genes)
-      } else {
-        # Když je vstup prázdný, nastaví pickerInput na prázdné hodnoty
-        updatePickerInput(session, "remove_genes", choices = character(0))
-      }
-    })
-    
-    observeEvent(input$add_genes_btn, {
-      toggle("new_genes")
-      toggle("confirm_new_genes_btn")
-    })
-    
-    # Zobrazení a nastavení výběru pro pickerInput s možností potvrzení
-    observeEvent(input$remove_genes_btn, {
-      # Nastaví všechny aktuálně vybrané geny pro odstranění
-      current_genes <- trimws(unlist(strsplit(input$select_geneList, "\n")))
-      current_genes <- current_genes[current_genes != ""]  # Odstraní prázdné hodnoty
-      
-      updatePickerInput(session, "remove_genes", choices = current_genes, selected = NULL)
-      
-      # Zobrazí pickerInput pro výběr genů k odstranění a tlačítko pro potvrzení
-      toggle("remove_genes")
-      toggle("confirm_remove_genes_btn")
-    })
-    
-    # Zpracování odstranění vybraných genů po potvrzení
-    observeEvent(input$confirm_remove_genes_btn, {
-      # Načtení vybraných genů pro odstranění
-      genes_to_remove <- input$remove_genes
-      
-      if (!is.null(genes_to_remove) && length(genes_to_remove) > 0) {
-        # Získání aktuálního seznamu genů z textového pole
-        current_genes <- trimws(unlist(strsplit(input$select_geneList, "\n")))
-        current_genes <- current_genes[current_genes != ""]  # Odstraní prázdné hodnoty
-        
-        # Vytvoření seznamu genů, které zůstanou po odstranění
-        remaining_genes <- setdiff(current_genes, genes_to_remove)
-        
-        # Aktualizace `selected_genes` s novým seznamem
-        selected_genes(remaining_genes)
-        
-        # Aktualizace textAreaInput s upraveným seznamem genů
-        updateTextAreaInput(session, "select_geneList", value = paste(remaining_genes, collapse = "\n"))
-        updatePickerInput(session, "remove_genes", choices = remaining_genes, selected = NULL)
-        # Odebere výběr odstraněných uzlů z hlavního grafu
-        session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = remaining_genes))
-        
-        # Skrytí pickerInput a potvrzovacího tlačítka
-        hide("remove_genes")
-        hide("confirm_remove_genes_btn")
-      }
-    })
+   # Aktualizace pickerInput na základě aktuálně vybraných genů
+   observe({
+     req(selected_genes()) # Kontrola, zda jsou vybrané geny
+     current_genes <- selected_genes()
+     
+     # Aktualizace pickerInput s aktuálně dostupnými geny k odstranění
+     updatePickerInput(session, "remove_genes", choices = current_genes, selected = NULL)
+   })
+   
+   
+   # Odebrání vybraných genů z pickerInput
+   observeEvent(input$confirm_remove_genes_btn, {
+     genes_to_remove <- input$remove_genes
+     
+     if (!is.null(genes_to_remove) && length(genes_to_remove) > 0) {
+       # Odebrání genů z aktuálního seznamu
+       remaining_genes <- setdiff(selected_genes(), genes_to_remove)
+       selected_genes(remaining_genes)
+       
+       # Aktualizace grafu
+       session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = remaining_genes))
+     } else {
+       message("No genes selected for removal.")
+     }
+   })
+   
+    # 
+    # # Sleduje změny ve vstupu select_geneList a aktualizuje pickerInput pro odstraňování genů
+    # observeEvent(input$select_geneList, {
+    #   # Kontrola nulového vstupu a zpracování pouze, pokud je vstup neprázdný
+    #   if (!is.null(input$select_geneList) && nzchar(input$select_geneList)) {
+    #     # Získání seznamu genů z textového pole a odstranění prázdných hodnot
+    #     selected_genes <- trimws(unlist(strsplit(input$select_geneList, "\n")))
+    #     selected_genes <- selected_genes[selected_genes != ""]  # Odstraní prázdné hodnoty
+    #     
+    #     # Aktualizace pickerInput s aktuálními geny, které lze odstranit
+    #     updatePickerInput(session, "remove_genes", choices = selected_genes)
+    #   } else {
+    #     # Když je vstup prázdný, nastaví pickerInput na prázdné hodnoty
+    #     updatePickerInput(session, "remove_genes", choices = character(0))
+    #   }
+    # })
+    # 
+    # observeEvent(input$add_genes_btn, {
+    #   toggle("new_genes")
+    #   toggle("confirm_new_genes_btn")
+    # })
+    # 
+    # # Zobrazení a nastavení výběru pro pickerInput s možností potvrzení
+    # observeEvent(input$remove_genes_btn, {
+    #   # Nastaví všechny aktuálně vybrané geny pro odstranění
+    #   current_genes <- trimws(unlist(strsplit(input$select_geneList, "\n")))
+    #   current_genes <- current_genes[current_genes != ""]  # Odstraní prázdné hodnoty
+    # 
+    #   updatePickerInput(session, "remove_genes", choices = current_genes, selected = NULL)
+    # 
+    #   # Zobrazí pickerInput pro výběr genů k odstranění a tlačítko pro potvrzení
+    #   toggle("remove_genes")
+    #   toggle("confirm_remove_genes_btn")
+    # })
+    # 
+    # # Zpracování odstranění vybraných genů po potvrzení
+    # observeEvent(input$confirm_remove_genes_btn, {
+    #   # Načtení vybraných genů pro odstranění
+    #   genes_to_remove <- input$remove_genes
+    #   
+    #   if (!is.null(genes_to_remove) && length(genes_to_remove) > 0) {
+    #     # Získání aktuálního seznamu genů z textového pole
+    #     current_genes <- trimws(unlist(strsplit(input$select_geneList, "\n")))
+    #     current_genes <- current_genes[current_genes != ""]  # Odstraní prázdné hodnoty
+    #     
+    #     # Vytvoření seznamu genů, které zůstanou po odstranění
+    #     remaining_genes <- setdiff(current_genes, genes_to_remove)
+    #     
+    #     # Aktualizace `selected_genes` s novým seznamem
+    #     selected_genes(remaining_genes)
+    #     
+    #     # Aktualizace textAreaInput s upraveným seznamem genů
+    #     updateTextAreaInput(session, "select_geneList", value = paste(remaining_genes, collapse = "\n"))
+    #     updatePickerInput(session, "remove_genes", choices = remaining_genes, selected = NULL)
+    #     # Odebere výběr odstraněných uzlů z hlavního grafu
+    #     session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = remaining_genes))
+    #     
+    #     # Skrytí pickerInput a potvrzovacího tlačítka
+    #     # hide("remove_genes")
+    #     # hide("confirm_remove_genes_btn")
+    #   }
+    # })
     
     #### buttons ###
     

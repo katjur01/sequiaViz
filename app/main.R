@@ -153,8 +153,9 @@ ui <- function(id){
 
               ),
               tabItem(h1("Gene Interactions Network"),tabName = ns("network_graph"),
-                      fluidPage(
-                        networkGraph_cytoscape$ui(ns("network_graph")))
+                      bs4Card(width = 12,headerBorder = FALSE, collapsible = FALSE,
+                        fluidPage(
+                          networkGraph_cytoscape$ui(ns("network_graph"))))
               ),
               tabItem(tabName = ns("hidden_igv"),
                       tags$style(HTML("
