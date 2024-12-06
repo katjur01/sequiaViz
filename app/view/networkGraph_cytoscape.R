@@ -3,7 +3,7 @@
 
 box::use(
   shiny[NS, moduleServer, observeEvent, observe, tagList, fluidPage, fluidRow, column, textInput, updateTextInput, actionButton, selectInput, reactive, req,reactiveVal,conditionalPanel,verbatimTextOutput,
-        renderPrint,renderText,textOutput,htmlOutput,uiOutput,renderUI,icon,textAreaInput,updateTextAreaInput,isolate,isTruthy],
+        renderPrint,renderText,textOutput,htmlOutput,uiOutput,renderUI,icon,textAreaInput,updateTextAreaInput,isolate,isTruthy,debounce],
   httr[GET, status_code, content],
   htmltools[h3, h4, tags, div,HTML,p],
   jsonlite[fromJSON, toJSON,read_json],
@@ -105,7 +105,8 @@ server <- function(id) {
   moduleServer(id, function(input, output, session) {
     interactions <- reactiveVal(NULL)
     synchronized_nodes <- reactiveVal(character(0))
-
+    new_genes_var <- reactiveVal(NULL)
+    remove_genes_var <- reactiveVal(NULL)
     
     
     ns <- session$ns
@@ -174,18 +175,22 @@ server <- function(id) {
     
     
     ###### network observeEvents #####
-                              
-    observeEvent(list(input$cySelectedNodes, input$confirm_new_genes_btn, input$confirm_remove_genes_btn, input$clearSelection_btn), {
+                          
+    
+    
+    observeEvent(list(input$cySelectedNodes, input$confirm_new_genes_btn, input$confirm_remove_genes_btn, new_genes_var(),remove_genes_var()), {
 
       message("nodes_from_graph: ", paste(input$cySelectedNodes, collapse = ", "))
       message("current_genes: ", paste(synchronized_nodes(), collapse = ", "))
-      message("hlavní observeEvent, new_genes: ", paste(input$new_genes, collapse = ", "))
+      message("new_genes: ", paste(new_genes_var(), collapse = ", "))
+      message("remove_genes: ", paste(remove_genes_var(), collapse = ", "))
       
       result <- sync_nodes(
         nodes_from_graph = input$cySelectedNodes,
         current_genes = synchronized_nodes(),
-        add_genes = input$new_genes,
-        remove_genes = input$remove_genes
+        add_genes = new_genes_var(),
+        remove_genes = remove_genes_var()
+        # remove_genes = input$remove_genes
       )
       
       updated_nodes <- result$updated_nodes
@@ -239,11 +244,14 @@ server <- function(id) {
     # Přidání nových genů do pickerInput po stisknutí tlačítka "Add Genes"
       observeEvent(input$confirm_new_genes_btn, {
         new_genes <- input$new_genes
+
         if (!is.null(new_genes) && length(new_genes) > 0 && is.character(new_genes)) {
           new_genes <- trimws(unlist(strsplit(new_genes, ",")))
           new_genes <- new_genes[new_genes != ""]
+          new_genes_var(new_genes)
           updateTextAreaInput(session, "new_genes", value = "")
         } else {
+          new_genes_var(NULL)
           message("Žádné nové geny nebyly zadány.")
         }
         message("# konec eventu confirm_new_genes_btn")
@@ -255,8 +263,10 @@ server <- function(id) {
         genes_to_remove <- input$remove_genes
         
         if (!is.null(genes_to_remove) && length(genes_to_remove) > 0) {
+          remove_genes_var(genes_to_remove)
           updatePickerInput(session, "remove_genes", choices = synchronized_nodes(), selected = NULL)
         } else {
+          remove_genes_var(NULL)
           message("Žádné geny nebyly vybrány k odebrání.")
         }
         message("# konec eventu confirm_remove_genes_btn.")
@@ -268,18 +278,23 @@ server <- function(id) {
     observeEvent(input$selected_layout, {
       session$sendCustomMessage("cy-layout",input$selected_layout)
     })
-# 
-#     observeEvent(input$clearSelection_btn, {
-#       message("Clearing all selections...")
-# 
-#       synchronized_nodes(character(0))
-#       session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = list()))
-#       updatePickerInput(session, "remove_genes", choices = character(0), selected = NULL)
-#       empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
-#       session$sendCustomMessage("cy-subset", empty_json)
-#       session$sendCustomMessage("cy-reset", list())
-#       message("All selections cleared.")
-#     })
+
+    observeEvent(input$clearSelection_btn, {
+      # Nastavíme proměnné na výchozí hodnoty
+      new_genes_var(NULL)
+      remove_genes_var(NULL)
+      synchronized_nodes(character(0))  # Jasně nastaví stav synchronizovaných uzlů
+      
+      # Explicitní aktualizace UI komponent
+      session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = list()))
+      session$sendCustomMessage("cy-subset", toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE))
+      updatePickerInput(session, "remove_genes", choices = character(0), selected = NULL)
+      updateTextAreaInput(session, "new_genes", value = "")
+      
+      message("All selections cleared.")
+    })
+    
+    
 
 
 
