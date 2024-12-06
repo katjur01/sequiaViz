@@ -90,47 +90,66 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
             console.log("Vybrané uzly:", selectedNodes);
             
             Shiny.setInputValue(ns + 'cySelectedNodes', selectedNodes, { priority: "event" });  // Nastavení hodnoty pro Shiny pomocí správného ID
-            
-             if (evt.type === 'unselect') {
+             /*if (evt.type === 'unselect') {
               const cyUnselectedNodes = evt.target.data('id');  // Nebo použijte jiný atribut podle potřeby
               console.log("Odznačený uzel:", cyUnselectedNodes);
 
               Shiny.setInputValue(ns + 'cyUnselectedNodes', cyUnselectedNodes, { priority: "event" });  // Nastavení hodnoty pro Shiny s odznačeným uzlem
-            } 
+            } */
         });
 
         // Synchronizace vybraných uzlů s hlavním grafem
-        Shiny.addCustomMessageHandler('update-selected-from-gene-list', function(data) {
-            const selectedNodes = data.selected_nodes;
-        
-            if (!selectedNodes || !Array.isArray(selectedNodes)) {
-                console.warn("Selected_nodes is not valid or undefined.");
-                return;
-            }
-        
-            console.log("Selected nodes to update:", selectedNodes);
-        
-            if (selectedNodes.length === 0) {            // Odznačení všech aktuálních uzlů, pokud je seznam `selectedNodes` prázdný
-                cy.nodes(':selected').unselect();
-                console.log("All nodes deselected.");
-                return;
-            }
-        
-            const currentlySelectedNodes = cy.$('node:selected').map(node => node.data('id'));            // Získání aktuálně vybraných uzlů v hlavním grafu
-            cy.nodes(':selected').unselect();            // Odznačení všech aktuálních uzlů
-        
-            selectedNodes.forEach(nodeId => {     // Označení uzlů
-                const node = cy.getElementById(nodeId);
-                if (node && node.length > 0) {
-                    node.select();
-                    console.log("Uzly byly označeny:", nodeId);
-                } else {
-                    console.warn("Uzel nebyl nalezen v hlavním grafu:", nodeId);
-                }
-            });
-        
-            console.log("Aktualizované vybrané uzly v hlavním grafu: ", selectedNodes);
-        });
+    Shiny.addCustomMessageHandler('update-selected-from-gene-list', function(data) {
+    let selectedNodes = data.selected_nodes;
+
+    // Ověření, že selected_nodes je pole
+    if (typeof selectedNodes === 'string') {
+        selectedNodes = [selectedNodes]; // Převod na pole, pokud je string
+    } else if (!Array.isArray(selectedNodes)) {
+        console.warn("Expected an array for selected_nodes, received:", selectedNodes);
+        return;
+    }
+
+    console.log("Selected nodes to update:", selectedNodes);
+
+    // Získání aktuálně vybraných uzlů z Cytoscape
+    const currentlySelectedNodes = cy.$('node:selected').map(node => node.data('id'));
+
+    console.log("Currently selected nodes in Cytoscape:", currentlySelectedNodes);
+
+    // Kontrola, zda se výběr skutečně změnil
+    if (arraysEqual(selectedNodes, currentlySelectedNodes)) {
+        console.log("Selection is already up to date. No changes needed.");
+        return;
+    }
+
+    // Označení uzlů, které mají být vybrány
+    selectedNodes.forEach(nodeId => {
+        const node = cy.getElementById(nodeId);
+        if (node && node.length > 0 && !node.selected()) {
+            node.select();
+            console.log("Node selected:", nodeId);
+        } else if (!node || node.length === 0) {
+            console.warn("Node not found in the main graph:", nodeId);
+        }
+    });
+
+    // Odznačení uzlů, které nemají být vybrány
+    cy.nodes(':selected').forEach(node => {
+        if (!selectedNodes.includes(node.data('id'))) {
+            node.unselect();
+            console.log("Node unselected:", node.data('id'));
+        }
+    });
+
+    console.log("Updated selected nodes in main graph:", selectedNodes);
+});
+
+
+function arraysEqual(array1, array2) {
+    if (array1.length !== array2.length) return false;
+    return array1.every((value, index) => array2.includes(value));
+}
 
         Shiny.addCustomMessageHandler('cy-add-node-selection', function(data) {
             // Najděte uzel odpovídající vybranému genu
@@ -223,6 +242,13 @@ Shiny.addCustomMessageHandler('fit-selected-nodes', function(data) {
         console.log("Fitting view to the entire graph.");
     }
 });
+/*
+Shiny.addCustomMessageHandler('cy-reset', function(data) {
+    console.log("Resetting graph selection...");
+    cy.nodes(':selected').unselect(); // Odznačí všechny vybrané uzly
+    console.log("Graph selection cleared.");
+});
+*/
 
 // Handler for plotting main Network (graph)
 Shiny.addCustomMessageHandler('cy-init', function(data) {
