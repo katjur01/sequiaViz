@@ -2,8 +2,8 @@
 
 
 box::use(
-  shiny[NS, moduleServer, observeEvent, observe, tagList, fluidPage, fluidRow, column, textInput, updateTextInput, actionButton, selectInput, reactive, req,reactiveVal,conditionalPanel,verbatimTextOutput,
-        renderPrint,renderText,textOutput,htmlOutput,uiOutput,renderUI,icon,textAreaInput,updateTextAreaInput,isolate,isTruthy,debounce],
+  shiny[NS, moduleServer, observeEvent, observe, tagList, fluidPage, fluidRow, column, textInput, updateTextInput, actionButton, selectInput, reactive, req,reactiveVal,conditionalPanel,
+        verbatimTextOutput, renderPrint,renderText,textOutput,htmlOutput,uiOutput,renderUI,icon,textAreaInput,updateTextAreaInput,isolate,isTruthy,debounce],
   httr[GET, status_code, content],
   htmltools[h3, h4, tags, div,HTML,p],
   jsonlite[fromJSON, toJSON,read_json],
@@ -107,7 +107,7 @@ server <- function(id) {
     synchronized_nodes <- reactiveVal(character(0))
     new_genes_var <- reactiveVal(NULL)
     remove_genes_var <- reactiveVal(NULL)
-    
+    clear_all <- reactiveVal(FALSE)
     
     ns <- session$ns
     dt <- input_data("MR1507","all_genes")
@@ -148,18 +148,23 @@ server <- function(id) {
     
     #################################
     
-    sync_nodes <- function(nodes_from_graph, current_genes, add_genes = NULL, remove_genes = NULL) {
-      # Kombinace aktuálních stavů
-      combined <- unique(c(nodes_from_graph, current_genes))
+    sync_nodes <- function(nodes_from_graph, current_genes, add_genes = NULL, remove_genes = NULL, clear_all) {
       
-      # Přidání nových genů
-      if (!is.null(add_genes)) {
-        combined <- unique(c(combined, trimws(unlist(strsplit(add_genes, ",")))))
-      }
-      
-      # Odebrání genů
-      if (!is.null(remove_genes)) {
-        combined <- setdiff(combined, remove_genes)
+        if (clear_all) {
+          combined <- character(0)
+        } else {
+          combined <- unique(c(nodes_from_graph, current_genes))
+          
+        
+        # Přidání nových genů
+        if (!is.null(add_genes) && length(add_genes) > 0) {
+          combined <- unique(c(combined, add_genes))
+        }
+        
+        # Odebrání genů
+        if (!is.null(remove_genes) && length(remove_genes) > 0) {
+          combined <- setdiff(combined, remove_genes)
+        }
       }
       
       # Odstranění prázdných hodnot
@@ -174,23 +179,26 @@ server <- function(id) {
     
     
     
+    
+    
     ###### network observeEvents #####
                           
     
     
-    observeEvent(list(input$cySelectedNodes, input$confirm_new_genes_btn, input$confirm_remove_genes_btn, new_genes_var(),remove_genes_var()), {
+    observeEvent(list(input$cySelectedNodes, input$confirm_new_genes_btn, input$confirm_remove_genes_btn, input$clearSelection_btn, new_genes_var(),remove_genes_var()), {
 
       message("nodes_from_graph: ", paste(input$cySelectedNodes, collapse = ", "))
       message("current_genes: ", paste(synchronized_nodes(), collapse = ", "))
       message("new_genes: ", paste(new_genes_var(), collapse = ", "))
       message("remove_genes: ", paste(remove_genes_var(), collapse = ", "))
+      message("clear_all: ", clear_all())
       
       result <- sync_nodes(
         nodes_from_graph = input$cySelectedNodes,
         current_genes = synchronized_nodes(),
         add_genes = new_genes_var(),
-        remove_genes = remove_genes_var()
-        # remove_genes = input$remove_genes
+        remove_genes = remove_genes_var(),
+        clear_all = clear_all()
       )
       
       updated_nodes <- result$updated_nodes
@@ -207,6 +215,15 @@ server <- function(id) {
       # Reset vstupů pro přidání a odebrání genů
       updateTextAreaInput(session, "new_genes", value = "")
       updatePickerInput(session, "remove_genes", choices = synchronized_nodes(), selected = NULL)
+      
+      if (clear_all()) {
+        if (length(updated_nodes) == 0 && length(input$cySelectedNodes) == 0 && length(synchronized_nodes()) == 0 ) { 
+          clear_all(FALSE)
+          message("Clear selection completed. Resetting clear_all to FALSE.")
+        }
+      }
+      
+
       message("# konec hlavního observeEventu.")
     })
     
@@ -281,6 +298,7 @@ server <- function(id) {
 
     observeEvent(input$clearSelection_btn, {
       # Nastavíme proměnné na výchozí hodnoty
+      clear_all(TRUE)
       new_genes_var(NULL)
       remove_genes_var(NULL)
       synchronized_nodes(character(0))  # Jasně nastaví stav synchronizovaných uzlů
