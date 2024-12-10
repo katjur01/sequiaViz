@@ -5,6 +5,7 @@ box::use(
   readxl[read_excel],
   httr[GET, status_code, content],
   cyjShiny[dataFramesToJSON],
+  stats[setNames]
 )
 box::use(
   app/logic/load_data[get_inputs]
@@ -12,13 +13,14 @@ box::use(
 
 # Funkce pro získání interakcí mezi proteiny z STRING API
 #' @export
-get_string_interactions <- function(proteins, species = 9606, chunk_size = 100) {
+get_string_interactions <- function(proteins, species = 9606, chunk_size = 100, delay = 0.2) {
   # Funkce pro odesílání jednotlivých požadavků
   fetch_interactions <- function(protein_chunk) {
     base_url <- "https://string-db.org/api/json/network?"
     query <- paste0("identifiers=", paste(protein_chunk, collapse = "%0D"), "&species=", species)
     url <- paste0(base_url, query)
     
+    Sys.sleep(delay)
     response <- GET(url)
     
     if (status_code(response) == 200) {
@@ -36,34 +38,68 @@ get_string_interactions <- function(proteins, species = 9606, chunk_size = 100) 
   return(all_interactions)
 }
 
+# library(data.table)
+# library(httr)
+# library(jsonlite)
+# subTissue_dt <- fread("input_files/MOII_e117/RNAseq21_NEW/MR1507/Blood_all_genes_oneRow.tsv")
+# synchronized_nodes <- c("CS","TP53")
+# current_nodes <- c("CS","TP53")
+# synchronized_nodes <- c("TP53")
+# current_nodes <- c("TP53")
+# interactions <- get_string_interactions(unique(subTissue_dt[feature_name %in% synchronized_nodes,feature_name]))
+# proteins <- current_nodes
+# fc_values <- unique(subTissue_dt[feature_name %in% current_nodes, log2FC])
+# tab <- unique(subTissue_dt[feature_name %in% current_nodes, .(feature_name,log2FC)])
+
+
 #' @export
-prepare_cytoscape_network <- function(interactions, proteins, fc_values) {
-  # Získání uzlů z interakcí
-  interaction_nodes <- unique(c(interactions$preferredName_A, interactions$preferredName_B))
-  all_nodes <- unique(c(interaction_nodes, proteins))
-  
-  # Spočítání stupně (degree) pro každý uzel - singletony mají stupen 0
-  degrees <- table(c(interactions$preferredName_A, interactions$preferredName_B))
-  degree_values <- sapply(all_nodes, function(x) ifelse(x %in% names(degrees), degrees[x], 0))
-  
-  # Příprava uzlů včetně fold-change hodnot, fc a label
-  node_data <- data.frame(
-    id = all_nodes,
-    name = all_nodes,
-    label = all_nodes,
-    log2FC = ifelse(all_nodes %in% proteins, fc_values[match(all_nodes, proteins)], NA),  # Přidání sloupce fc
-    degree = degree_values,  # Přidání stupně (degree) uzlu
-    stringsAsFactors = FALSE
-  )
-  
-  # Příprava hran (interakcí)
-  edges <- data.frame(
-    source = interactions$preferredName_A,
-    target = interactions$preferredName_B,
-    interaction = "interaction",  # Obecný popis interakce
-    stringsAsFactors = FALSE
-  )
-  
+prepare_cytoscape_network <- function(interactions, tab, proteins = NULL) {
+
+    if(is.null(proteins)) proteins <- tab[,feature_name]
+
+    interaction_nodes <- unique(c(interactions$preferredName_A, interactions$preferredName_B))
+    all_nodes <- unique(c(interaction_nodes, proteins))
+
+    log2FC_map <- setNames(tab[,log2FC], tab[,feature_name])
+    log2FC_values <- sapply(all_nodes, function(node) {
+      if (node %in% names(log2FC_map)) {
+        log2FC_map[node]
+      } else {
+        NA  # Hodnota NA pro uzly mimo tabulku
+      }
+    }, USE.NAMES = FALSE)
+
+    names(log2FC_values) <- all_nodes
+    
+    # Spočítání stupně (degree) pro každý uzel - singletony mají stupen 0
+    degrees <- table(c(interactions$preferredName_A, interactions$preferredName_B))
+    degree_values <- sapply(all_nodes, function(x) ifelse(x %in% names(degrees), degrees[x], 0))
+
+    node_data <- data.frame(
+      id = all_nodes,
+      name = all_nodes,
+      label = all_nodes,
+      log2FC = log2FC_values,
+      degree = degree_values,  # Přidání stupně (degree) uzlu
+      stringsAsFactors = FALSE
+    )
+
+    if (is.null(interactions) || !is.data.frame(interactions) || nrow(interactions) == 0) {
+      edges <- data.frame(
+        source = character(0),
+        target = character(0),
+        interaction = character(0),
+        stringsAsFactors = FALSE
+      )
+    } else {
+      edges <- data.frame(
+        source = interactions$preferredName_A,
+        target = interactions$preferredName_B,
+        interaction = "interaction",
+        stringsAsFactors = FALSE
+      )
+    }
+    
   # Generování JSON pro cyjShiny
   # network_json <- toJSON(dataFramesToJSON(edges, node_data), auto_unbox = TRUE)
 

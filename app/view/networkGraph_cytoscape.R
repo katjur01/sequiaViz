@@ -104,6 +104,7 @@ ui <- function(id) {
 server <- function(id) {
   moduleServer(id, function(input, output, session) {
     interactions <- reactiveVal(NULL)
+    sub_interactions <- reactiveVal(NULL)
     synchronized_nodes <- reactiveVal(character(0))
     new_genes_var <- reactiveVal(NULL)
     remove_genes_var <- reactiveVal(NULL)
@@ -111,11 +112,18 @@ server <- function(id) {
     
     ns <- session$ns
     dt <- input_data("MR1507","all_genes")
-    
+    # subTissue_dt <- fread("input_files/MOII_e117/RNAseq21_NEW/MR1507/Blood_all_genes_oneRow.tsv")
     # pathway_dt <- unique(dt[grepl("Metabolic pathways", all_kegg_paths_name, fixed = TRUE),-c("all_kegg_gene_names","counts_tpm_round","size","mu","lower_than_p","higher_than_p","type","gene_definition")])
     # tissue_dt <- unique(pathway_dt[tissue == "Breast"])
     # interactions <- get_string_interactions(tissue_dt[, feature_name])
     # network_json <- prepare_cytoscape_network(interactions, tissue_dt[, feature_name], tissue_dt[, log2FC])
+
+    
+    subTissue_dt <- reactive({
+      req(input$selected_tissue)
+      req(dt)
+      unique(dt[tissue == input$selected_tissue])
+    })
 
 
     pathway_dt <- reactive({
@@ -137,52 +145,70 @@ server <- function(id) {
     
     network_json <- reactive({      # Prepare the Cytoscape network using the fetched interactions and log2FC values
       req(tissue_dt(),interactions())
-      prepare_cytoscape_network(interactions(), tissue_dt()[, feature_name], tissue_dt()[, log2FC])
+      prepare_cytoscape_network(interactions(), unique(tissue_dt()[, .(feature_name,log2FC)]))
     })
   
     output$js_namespace <- renderUI({    # Předat jmenný prostor do JavaScriptu - umožní  používat ns v JS
       tags$script(HTML(sprintf("var ns = '%s';", ns(""))))
     })
-    
+  
     
     
     #################################
     
     sync_nodes <- function(nodes_from_graph, current_genes, add_genes = NULL, remove_genes = NULL, clear_all) {
       
-        if (clear_all) {
-          combined <- character(0)
-        } else {
-          combined <- unique(c(nodes_from_graph, current_genes))
-          
-        
-        # Přidání nových genů
-        if (!is.null(add_genes) && length(add_genes) > 0) {
-          combined <- unique(c(combined, add_genes))
-        }
-        
-        # Odebrání genů
-        if (!is.null(remove_genes) && length(remove_genes) > 0) {
-          combined <- setdiff(combined, remove_genes)
-        }
-      }
+      # if (clear_all) {
+      #   combined <- character(0)
+      # } else {
+      #   combined <- unique(c(nodes_from_graph, current_genes))
+      #   
+      ifelse(clear_all, combined <- character(0), combined <- unique(c(nodes_from_graph, current_genes)))
       
-      # Odstranění prázdných hodnot
-      combined <- combined[!is.na(combined) & combined != ""]
-      
-      # Kontrola změny
-      changed <- !setequal(synchronized_nodes(), combined)
-      
-      # Návrat aktualizovaných uzlů a informace o změně
-      return(list(updated_nodes = combined, changed = changed))
+      if (!is.null(add_genes) && length(add_genes) > 0) combined <- unique(c(combined, add_genes))  # Přidání nových genů
+      if (!is.null(remove_genes) && length(remove_genes) > 0) combined <- setdiff(combined, remove_genes)  # Odebrání genů
+
+      combined <- combined[!is.na(combined) & combined != ""]  # Odstranění prázdných hodnot
+      changed <- !setequal(synchronized_nodes(), combined)  # Kontrola změny
+
+      return(list(updated_nodes = combined, changed = changed))  # Návrat aktualizovaných uzlů a informace o změně
     }
     
     
-    
-    
-    
+
     ###### network observeEvents #####
-                          
+    
+    observeEvent(list(input$selected_pathway, input$selected_tissue), {
+      req(input$selected_pathway, input$selected_tissue)
+      message("Selected pathway: ", input$selected_pathway, ", Selected tissue: ", input$selected_tissue)
+      session$sendCustomMessage("cy-init", network_json())
+    })
+    
+    observe({      # Fetch STRING interactions for the current tissue
+      req(subTissue_dt())
+      message("Fetching STRING interactions")
+      sub_interactions(get_string_interactions(unique(subTissue_dt()[feature_name %in% synchronized_nodes(),feature_name])))
+    })
+    
+    observe({
+      current_nodes <- synchronized_nodes()
+      message("current_nodes v cy-subset eventu: ", paste(current_nodes, collapse = ", "))
+      
+      if (length(current_nodes) == 0) {
+        message("Žádné uzly nejsou vybrány. Odesílám prázdný podgraf.")
+        empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
+        session$sendCustomMessage("cy-subset", empty_json)
+        session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = list()))
+      } else {
+        message("Aktualizace podgrafu pro uzly: ", paste(current_nodes, collapse = ", "))
+        subnetwork_json <- prepare_cytoscape_network(sub_interactions(), unique(subTissue_dt()[feature_name %in% current_nodes, .(feature_name,log2FC)]), current_nodes)
+        session$sendCustomMessage("cy-subset", subnetwork_json)
+        session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = current_nodes))
+      }
+      message("# konec cy-subset eventu.")
+    })
+    
+    ##########################
     
     
     observeEvent(list(input$cySelectedNodes, input$confirm_new_genes_btn, input$confirm_remove_genes_btn, input$clearSelection_btn, new_genes_var(),remove_genes_var()), {
@@ -223,38 +249,7 @@ server <- function(id) {
         }
       }
       
-
       message("# konec hlavního observeEventu.")
-    })
-    
-    
-    
-    observeEvent(list(input$selected_pathway, input$selected_tissue), {
-      req(input$selected_pathway, input$selected_tissue)
-      message("Selected pathway: ", input$selected_pathway, ", Selected tissue: ", input$selected_tissue)
-      session$sendCustomMessage("cy-init", network_json())
-    })
-    
-    observe({
-      current_nodes <- synchronized_nodes()
-      message("current_nodes v cy-subset eventu: ", paste(current_nodes, collapse = ", "))
-      if (length(current_nodes) == 0) {
-        message("Žádné uzly nejsou vybrány. Odesílám prázdný podgraf.")
-        empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
-        session$sendCustomMessage("cy-subset", empty_json)
-        session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = list()))
-        message("v cy-subset eventu nejsou žádné uzly, empty_json je aplikován.")
-      } else {
-        message("Aktualizace podgrafu pro uzly: ", paste(current_nodes, collapse = ", "))
-        subnetwork_json <- prepare_cytoscape_network(
-          interactions(),
-          current_nodes,
-          tissue_dt()[feature_name %in% current_nodes, log2FC]
-        )
-        session$sendCustomMessage("cy-subset", subnetwork_json)
-        session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = current_nodes))
-      }
-      message("# konec cy-subset eventu.")
     })
     
     
@@ -334,74 +329,8 @@ server <- function(id) {
     })
 
 
-    tab_server("tab", tissue_dt = tissue_dt, selected_nodes = synchronized_nodes)
-    
-    
-    # 
-        # observeEvent(list(selected_genes(), input$selected_pathway, input$selected_tissue, input$cySelectedNodes), {
-        #   req(interactions())
-        # 
-        #   # Získání aktuálního výběru z grafu a ručně přidaných genů
-        #   nodes_from_graph <- unique(input$cySelectedNodes[!is.na(input$cySelectedNodes)])
-        #   current_genes <- unique(selected_genes()[!is.na(selected_genes())])
-        #   combined_genes <- unique(c(nodes_from_graph, current_genes))
-        # 
-        #   message("Vybrané uzly z hlavního grafu (cySelectedNodes): ", paste(nodes_from_graph, collapse = ", "))
-        #   message("Aktuální výběr genů (selected_genes): ", paste(current_genes, collapse = ", "))
-        #   message("Kombinované vybrané geny: ", paste(combined_genes, collapse = ", "))
-        # 
-        #   # Kontrola, zda došlo ke změně
-        #   previous_genes <- previous_selected_nodes()
-        #   if (identical(previous_genes, combined_genes)) {
-        #     message("Výběr genů se nezměnil. Aktualizace není potřeba.")
-        #     return()
-        #   }
-        # 
-        #   # Aktualizace stavu pro další kontrolu
-        #   previous_selected_nodes(combined_genes)
-        # 
-        #   if (length(combined_genes) == 0) {
-        #     message("Žádné geny nejsou vybrány. Odesílám prázdný podgraf.")
-        #     empty_json <- toJSON(list(elements = list(nodes = list(), edges = list())), auto_unbox = TRUE)
-        #     session$sendCustomMessage("cy-subset", empty_json)
-        #     session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = list()))
-        #   } else {
-        #     message("Připravuji podgraf pro vybrané geny: ", paste(combined_genes, collapse = ", "))
-        #     subnetwork_json <- prepare_cytoscape_network(interactions(), combined_genes, tissue_dt()[feature_name %in% combined_genes, log2FC])
-        #     session$sendCustomMessage("cy-subset", subnetwork_json)
-        #     session$sendCustomMessage("update-selected-from-gene-list", list(selected_nodes = combined_genes))
-        #   }
-        # })
-    #     
-    # 
-    #     
-    #     observeEvent(input$cySelectedNodes, {
-    #       selected_genes_from_graph <- unique(input$cySelectedNodes[!is.na(input$cySelectedNodes)])
-    #       current_genes <- selected_genes()
-    #       
-    #       updated_genes <- intersect(current_genes, selected_genes_from_graph)# Odebrání uzlů, které byly zrušeny v hlavním grafu
-    #       updated_genes <- unique(c(updated_genes, selected_genes_from_graph)) # Přidání nových uzlů
-    #       
-    #       message("Vybrané uzly z hlavního grafu (cySelectedNodes): ", paste(selected_genes_from_graph, collapse = ", "))
-    #       message("Aktualizovaný seznam genů (selected_genes): ", paste(updated_genes, collapse = ", "))
-    #       
-    #       # Aktualizace stavu
-    #       selected_genes(updated_genes)
-    #     })
-    #     
-    #    observe({
-    #      current_genes <- synchronized_nodes()
-    #      if (!is.null(current_genes) && length(current_genes) > 0) {
-    #        updatePickerInput(session, "remove_genes", choices = current_genes, selected = NULL)
-    #      } else {
-    #        updatePickerInput(session, "remove_genes", choices = character(0), selected = NULL)
-    #      }
-    #    })
-    # 
-    #    
-    # 
-    #     #########
-    # 
+    tab_server("tab", tissue_dt, subTissue_dt, selected_nodes = synchronized_nodes)
+
   })
 }
 
@@ -415,7 +344,7 @@ tab_UI <- function(id){
     column(5,reactableOutput(ns("subNetwork_tab")))
   )
 }
-tab_server <- function(id,tissue_dt,selected_nodes) {
+tab_server <- function(id,tissue_dt,subTissue_dt,selected_nodes) {
   moduleServer(id, function(input, output, session) {
     
     ##### reactable calling #####
@@ -459,17 +388,12 @@ tab_server <- function(id,tissue_dt,selected_nodes) {
     
     observe({
       req(selected_nodes())
-      req(tissue_dt())
+      req(subTissue_dt())
       
       if (length(selected_nodes()) > 0) {
-        # message("subNetwork input: ", paste(selected_nodes(), collapse = ", "))
-        
-        subTissue_dt <- unique(tissue_dt()[feature_name %in% selected_nodes()])
-        # message("##### subNettwork input: ", subTissue_dt)
-        
         output$subNetwork_tab <- renderReactable({
           message("Rendering Reactable for subNetwork")
-          reactable(subTissue_dt,
+          reactable(unique(subTissue_dt()[feature_name %in% selected_nodes()]),
                     columns = list(
                       feature_name = colDef(name = "Gene name", maxWidth = 100),
                       geneid = colDef(name = "Ensembl id", width = 140, show = F),
@@ -497,8 +421,6 @@ tab_server <- function(id,tissue_dt,selected_nodes) {
         })
       }
     })
-    
-
     
   })
 }
