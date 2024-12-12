@@ -158,11 +158,6 @@ server <- function(id) {
     
     sync_nodes <- function(nodes_from_graph, current_genes, add_genes = NULL, remove_genes = NULL, clear_all) {
       
-      # if (clear_all) {
-      #   combined <- character(0)
-      # } else {
-      #   combined <- unique(c(nodes_from_graph, current_genes))
-      #   
       ifelse(clear_all, combined <- character(0), combined <- unique(c(nodes_from_graph, current_genes)))
       
       if (!is.null(add_genes) && length(add_genes) > 0) combined <- unique(c(combined, add_genes))  # Přidání nových genů

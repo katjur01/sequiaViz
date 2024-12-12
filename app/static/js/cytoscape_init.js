@@ -25,11 +25,22 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
                     "text-valign": "center",
                     "text-halign": "center",
                     "font-size": "40",
-                    "border-color": "black",
+                  //  "border-color": "purple",
                     "content": "data(label)",
-                    "border-width": "1px",
+                  //  "border-width": "1px",
                     "width": "mapData(degree, 0, 20, 100, 300)",
-                    "height": "mapData(degree, 0, 20, 100, 300)"
+                    "height": "mapData(degree, 0, 20, 100, 300)",
+                    
+                      // Vnitřní hrana
+                "border-width": 16,                // Šířka vnitřní hrany
+                "border-color": "purple",         // Barva vnitřní hrany
+                "border-style": "solid",          // Styl vnitřní hrany
+
+                // Vnější hrana
+                "outline-width": 12,              // Šířka vnější hrany
+                "outline-color": "orange",        // Barva vnější hrany
+                "outline-offset": 4,              // Vzdálenost od vnitřní hrany
+                "outline-style": "solid",         // Styl vnější hrany
                 }
             },
             {
