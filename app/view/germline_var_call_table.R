@@ -11,7 +11,7 @@
 box::use(
   shiny[moduleServer,NS,h2,h3,tagList,div,tabsetPanel,tabPanel,observeEvent,fluidPage,fluidRow, reactive,icon,textInput,isTruthy,verbatimTextOutput,
         sliderInput,showModal,modalDialog,column,uiOutput,renderUI,textOutput,renderText,reactiveVal,req,observe,outputOptions,checkboxInput,
-        renderPrint],
+        renderPrint,getDefaultReactiveDomain],
   bs4Dash[actionButton, box,popover,addPopover],
   reactable,
   reactable[reactable,reactableOutput,renderReactable,colDef,colGroup,JS,getReactableState],
@@ -38,6 +38,7 @@ input_data <- function(sample){
   return(data)
 }
 
+
 ui <- function(id) {
   ns <- NS(id)
   tagList(
@@ -48,6 +49,7 @@ ui <- function(id) {
         }
       ")),
     use_spinner(reactableOutput(ns("germline_var_call_tab"))),
+
     tags$br(),
     tags$div(id = ns("checkbox_popover"), style = "width:245px; position: absolute; right: 10;", #margin-top: 13.5px;
              checkboxInput(ns("fullTable_checkbox"),label = "Keep pre-filtered variant table",value = TRUE)),
@@ -56,16 +58,16 @@ ui <- function(id) {
     #             placeholder = "variant name", btnSearch = icon("plus"),
     #             btnClass = "btn-default btn-outline-secondary"),
     # 
-    actionButton(ns("selectPathogenic_button"), "Select variantu as posibly patogenic"),
+    actionButton(ns("selectPathogenic_button"), "Select variants as posibly patogenic"),
     actionButton(ns("delete_button"), "Delete variants"),
     reactableOutput(ns("selectPathogenic_tab"))
 
   )
 }
 
-server <- function(id, selected_samples, selected_columns, column_mapping, selection_enabled) {
+server <- function(id, selected_samples, selected_columns, column_mapping, selection_enabled, shared_data) {
   moduleServer(id, function(input, output, session) {
-
+    
     # Call loading function to load data
     data <- reactive({
       message("Loading input data for germline")
@@ -142,13 +144,13 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
     # Sledování vybraného řádku a varianty
     selected_variant <- reactive({
       selected_row <- getReactableState("germline_var_call_tab", "selected")
-      if (!is.null(selected_row)) {
+      req(selected_row)
+      
         filtered_data()[selected_row, c("var_name","Gene_symbol")]  # Získání varianty z vybraného řádku
+        message("data germline tab: ", filtered_data()[selected_row, c("var_name","Gene_symbol")])
         # var <- filtered_data()[selected_row, c("var_name","Gene_symbol")]  # Získání varianty z vybraného řádku
         # var$remove <- NA
-      } else {
-        NULL
-      }
+    
     })
     
     # Akce po kliknutí na tlačítko pro přidání varianty
@@ -163,6 +165,8 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
 
       if (nrow(new_unique_variants) > 0) {      # Přidáme pouze unikátní varianty
         selected_variants(rbind(current_variants, new_unique_variants))
+        shared_data$germline_data(selected_variants())
+        message("Updated germline_data in shared_data:", shared_data$germline_data())
       }
     })
     
@@ -196,6 +200,8 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
       current_variants <- selected_variants()
       updated_variants <- current_variants[-rows, ]
       selected_variants(updated_variants)
+      
+      session$sendCustomMessage("resetReactableSelection",selected_variants())
     })
     
     addPopover(id = "checkbox_popover",

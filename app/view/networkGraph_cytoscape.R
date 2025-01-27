@@ -5,14 +5,15 @@ box::use(
   shiny[NS, moduleServer, observeEvent, observe, tagList, fluidPage, fluidRow, column, textInput, updateTextInput, actionButton, selectInput, reactive, req,reactiveVal,conditionalPanel,
         verbatimTextOutput, renderPrint,renderText,textOutput,htmlOutput,uiOutput,renderUI,icon,textAreaInput,updateTextAreaInput,isolate,isTruthy,debounce],
   httr[GET, status_code, content],
-  htmltools[h3, h4, tags, div,HTML,p],
+  htmltools[h3, h4, h6, tags, div,HTML,p],
   jsonlite[fromJSON, toJSON,read_json],
   cyjShiny[cyjShinyOutput, renderCyjShiny, cyjShiny, dataFramesToJSON, selectNodes,setNodeAttributes,selectFirstNeighbors,fit,fitSelected,clearSelection,getSelectedNodes],
-  data.table[fread,setnames],
+  data.table[fread,setnames,as.data.table,data.table,copy,rbindlist],
+  stats[aggregate,rnorm],
   readxl[read_excel],
   graph[nodes],
   reactable[reactable,colDef,renderReactable,reactableOutput,JS],
-  shinyWidgets[radioGroupButtons,pickerInput,searchInput,updatePickerInput,prettySwitch],
+  shinyWidgets[radioGroupButtons,pickerInput,searchInput,updatePickerInput,prettySwitch,dropdown],
   shinyjs[hidden,useShinyjs,toggle,hide]
 )
 
@@ -37,6 +38,7 @@ ui <- function(id) {
   useShinyjs()
   tagList(
     tags$head(
+      tags$style(HTML(".resizable-box {resize: both; overflow: auto; border: 1px solid; padding: 5px; height: 125px; width: 100%; max-width: 100%;}")),
       tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.1/cytoscape.min.js"),
       tags$script(src = "https://cdn.jsdelivr.net/npm/webcola@3.4.0/WebCola/cola.min.js"),
       tags$script(src = "https://cdn.jsdelivr.net/npm/cytoscape-cola@2.5.1/cytoscape-cola.min.js"),
@@ -53,12 +55,34 @@ ui <- function(id) {
       column(6,
         fluidRow(
           column(3,
-                 div(pickerInput(ns("selected_pathway"), "Pathway", choices = get_pathway_list(), options = list(`live-search` = TRUE)), style = "width: 75%")),
-          column(3,
-            div(prettySwitch(ns("selectedVariants"), label = "Add possibly pathogenic variants", status = "primary", slim = TRUE)),
-            div(prettySwitch(ns("selectedFusions"), label = "Add selected fusions", status = "primary", slim = TRUE))),
-          column(2,
-                 selectInput(ns("selected_layout"),"Choose layout: ", choices = c("cola","cose","fcose"),selected = "cola",width = "65%"))
+                 div(pickerInput(ns("selected_pathway"), "Pathway", selected = "EGFR tyrosine kinase inhibitor resistance",choices = get_pathway_list(), options = list(`live-search` = TRUE)),
+                      selectInput(ns("selected_layout"),"Choose layout: ", choices = c("cola","cose","fcose"),selected = "cola",width = "65%")
+                     , style = "width: 75%")),
+          # column(2,
+          #        selectInput(ns("selected_layout"),"Choose layout: ", choices = c("cola","cose","fcose"),selected = "cola",width = "65%")),
+          column(4,
+            div(style = "display: flex; align-items: center; gap: 10px;",
+                prettySwitch(ns("selectedSomVariants"), label = "Add possibly pathogenic somatic variants", status = "primary", slim = TRUE),
+                # dropdown(label = NULL,style = "material-flat", size = "xs", color = "black",icon = icon("table-cells"))
+                ),
+            div(style = "display: flex; align-items: center; gap: 10px;",
+                prettySwitch(ns("selectedGermVariants"), label = "Add possibly pathogenic germline variants", status = "primary", slim = TRUE),
+                # dropdown(label = NULL,style = "material-flat", size = "xs",color = "black",icon = icon("table-cells"))
+                ),
+            div(style = "display: flex; align-items: center; gap: 10px;",
+                prettySwitch(ns("selectedFusions"), label = "Add selected fusions", status = "primary", slim = TRUE),
+                # dropdown(label = NULL,style = "material-flat", size = "xs",color = "black",icon = icon("table-cells"))
+                )), # right = TRUE, #width = "240px"
+         column(5,
+                # conditionalPanel(
+                  h6("Selected variant and fusions:"),
+                  # condition = "output.hasData",
+                  div(class = "resizable-box",#reactableOutput(ns("dynamic_table")
+                      selectedTab_UI(ns("tab"))            
+                                                              ))
+                # )
+              # )                   
+                             
         )
       ),
       column(1,),
@@ -101,7 +125,7 @@ ui <- function(id) {
   )
 }
 
-server <- function(id) {
+server <- function(id,shared_data) {
   moduleServer(id, function(input, output, session) {
     interactions <- reactiveVal(NULL)
     sub_interactions <- reactiveVal(NULL)
@@ -109,16 +133,99 @@ server <- function(id) {
     new_genes_var <- reactiveVal(NULL)
     remove_genes_var <- reactiveVal(NULL)
     clear_all <- reactiveVal(FALSE)
+    result_dt <- reactiveVal(NULL)
+    selected_dt <- reactiveVal(NULL)
+    
+    observe({
+      germ_vars <- as.data.table(shared_data$germline_data())
+      fusions <- as.data.table(shared_data$fusion_data())
+      tissue_table <- copy(tissue_dt())  # Výchozí tabulka
+      
+      # Výchozí hodnota pro selected_dt
+      selected_dt(NULL)
+      
+      if ((is.null(germ_vars) || nrow(germ_vars) == 0) &&
+          (is.null(fusions) || nrow(fusions) == 0)) {
+        # Ani varianty, ani fúze nejsou vybrány
+        message("No germline variants or fusions selected.")
+        result_dt(tissue_table)
+      } else {
+        # Kombinujeme varianty a fúze do základní tabulky
+        if (!is.null(germ_vars) && nrow(germ_vars) > 0) {
+          # Zpracování germline variant
+          selected_variants <- germ_vars[, .(Gene_symbol, variant = var_name)]
+          selected_variants <- unique(selected_variants, by = "Gene_symbol")
+          tissue_table <- merge(tissue_table, selected_variants, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
+        }
+        
+        if (!is.null(fusions) && nrow(fusions) > 0) {
+          # Zpracování fúzí
+          fusions <- fusions[, .(Gene_symbol = c(gene1, gene2), fusion = paste(paste(gene1, gene2, sep = "-"), collapse = ", "))]
+          fusions <- unique(fusions, by = "Gene_symbol")
+          tissue_table <- merge(tissue_table, fusions, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
+        }
+        
+        # Aktualizace result_dt
+        result_dt(tissue_table)
+        message("Updated result_dt with germline variants and/or fusions.")
+      }
+      
+      # Vytvoření selected_dt
+      if ((!is.null(germ_vars) && nrow(germ_vars) > 0) || (!is.null(fusions) && nrow(fusions) > 0)) {
+        selected_variants <- if (!is.null(germ_vars) && nrow(germ_vars) > 0) {
+          unique(germ_vars[,var_name := "yes"])
+        } else {
+          data.frame(Gene_symbol = character(0))
+        }
+        
+        selected_fusions <- if (!is.null(fusions) && nrow(fusions) > 0) {
+          unique(fusions[,fusion := "yes"])
+        } else {
+          data.frame(Gene_symbol = character(0))
+        }
+        combined_selected <- merge(selected_variants, selected_fusions,by = "Gene_symbol", all = TRUE)
+        selected_dt(unique(combined_selected, by = "Gene_symbol"))
+      } else {
+        selected_dt(NULL)
+      }
+    })
+    
+
+    observeEvent(list(input$selectedGermVariants, input$selectedFusions, input$selected_pathway, input$selected_tissue), {
+      # Aktualizace pro germline varianty
+      if (input$selectedGermVariants) {
+        germline_nodes <- result_dt()[!is.na(var_name), Gene_symbol]
+        message("Adding border for germline variant nodes:", paste(germline_nodes, collapse = ", "))
+        session$sendCustomMessage("variant-border", list(type = "germline", nodes = as.list(germline_nodes)))
+      } else {
+        message("Removing border for germline variant nodes.")
+        session$sendCustomMessage("variant-border", list(type = "germline", nodes = character(0)))
+      }
+      
+      # Aktualizace pro fúze
+      if (input$selectedFusions) {
+        fusion_nodes <- result_dt()[!is.na(fusion), feature_name]
+        message("Adding border for fusion nodes:", paste(fusion_nodes, collapse = ", "))
+        session$sendCustomMessage("variant-border", list(type = "fusion", nodes = as.list(fusion_nodes)))
+      } else {
+        message("Removing border for fusion nodes.")
+        session$sendCustomMessage("variant-border", list(type = "fusion", nodes = character(0)))
+      }
+    })
+    
+    
+    
     
     ns <- session$ns
     dt <- input_data("MR1507","all_genes")
-    # subTissue_dt <- fread("input_files/MOII_e117/RNAseq21_NEW/MR1507/Blood_all_genes_oneRow.tsv")
+    # # subTissue_dt <- fread("input_files/MOII_e117/RNAseq21_NEW/MR1507/Blood_all_genes_oneRow.tsv")
+    # dt <- fread("input_files/MOII_e117/RNAseq21_NEW/MR1507/Blood_all_genes_oneRow.tsv")
     # pathway_dt <- unique(dt[grepl("Metabolic pathways", all_kegg_paths_name, fixed = TRUE),-c("all_kegg_gene_names","counts_tpm_round","size","mu","lower_than_p","higher_than_p","type","gene_definition")])
     # tissue_dt <- unique(pathway_dt[tissue == "Breast"])
     # interactions <- get_string_interactions(tissue_dt[, feature_name])
     # network_json <- prepare_cytoscape_network(interactions, tissue_dt[, feature_name], tissue_dt[, log2FC])
-
-    
+    # 
+    # 
     subTissue_dt <- reactive({
       req(input$selected_tissue)
       req(dt)
@@ -152,8 +259,7 @@ server <- function(id) {
       tags$script(HTML(sprintf("var ns = '%s';", ns(""))))
     })
   
-    
-    
+
     #################################
     
     sync_nodes <- function(nodes_from_graph, current_genes, add_genes = NULL, remove_genes = NULL, clear_all) {
@@ -324,12 +430,18 @@ server <- function(id) {
     })
 
 
-    tab_server("tab", tissue_dt, subTissue_dt, selected_nodes = synchronized_nodes)
+    tab_server("tab", tissue_dt = reactive(result_dt()), subTissue_dt, selected_nodes = synchronized_nodes, selected_dt)
 
   })
 }
 
 
+selectedTab_UI <- function(id){
+  ns <- NS(id)
+  tagList(
+    reactableOutput(ns("dynamic_table"))
+  )
+}
 
 tab_UI <- function(id){
   ns <- NS(id)
@@ -339,8 +451,10 @@ tab_UI <- function(id){
     column(5,reactableOutput(ns("subNetwork_tab")))
   )
 }
-tab_server <- function(id,tissue_dt,subTissue_dt,selected_nodes) {
+tab_server <- function(id, tissue_dt, subTissue_dt, selected_nodes,selected_dt) {
   moduleServer(id, function(input, output, session) {
+
+    
     
     ##### reactable calling #####
     output$network_tab <- renderReactable({
@@ -416,6 +530,30 @@ tab_server <- function(id,tissue_dt,subTissue_dt,selected_nodes) {
         })
       }
     })
+    
+    # observe({
+    #   req(selected_dt)
+    #   if (length(selected_dt()) > 0) {
+        output$dynamic_table <- renderReactable({
+          reactable(
+            selected_dt(),
+            # columns = list(
+            #   Gene_symbol = colDef(name = "Gene Symbol"),
+            #   var_name = colDef(name = "Variant"),
+            #   fusion = colDef(name = "Fusion"),
+            #   all_kegg_paths_name = colDef(name = "Pathway")
+            # ),
+            resizable = TRUE,
+            highlight = TRUE
+          )
+        })
+      # } else {
+      #   message("No variants or fusion selected, no table needed.")
+      #   output$dynamic_table <- renderReactable({
+      #     reactable(data.frame())
+      #   })
+      # }
+    # })
     
   })
 }

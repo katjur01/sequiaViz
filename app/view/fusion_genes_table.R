@@ -2,11 +2,11 @@
 
 box::use(
   shiny[moduleServer,NS,h3,tagList,div,textInput,renderPrint,reactive,observe,observeEvent,icon,mainPanel,titlePanel,isolate,
-        uiOutput,renderUI,HTML,req],
+        uiOutput,renderUI,HTML,req,reactiveVal],
   reactable,
-  reactable[colDef],
-  htmltools[tags],
-  bs4Dash[actionButton],
+  reactable[reactable,colDef,reactableOutput,renderReactable,JS,getReactableState],
+  htmltools[tags,p],
+  bs4Dash[actionButton,bs4Card],
   shinyjs[useShinyjs,runjs],
   reactablefmtr[pill_buttons,icon_assign],
   data.table[fifelse,setcolorder]
@@ -40,16 +40,22 @@ ui <- function(id) {
   tagList(
     # div(
     #   class = "fusion-table-contant",
-      use_spinner(reactable$reactableOutput(ns("fusion_genes_tab")))
+      use_spinner(reactable$reactableOutput(ns("fusion_genes_tab"))),
     # )
+    tags$br(),
+    actionButton(ns("selectFusion_button"), "Select fusion as causal"),
+    actionButton(ns("delete_button"), "Delete fusion"),
+    reactableOutput(ns("selectFusion_tab")),
+    
   )
 
 }
 
 #' @export
-server <- function(id, selected_samples, selected_columns,column_mapping) {
+server <- function(id, selected_samples, selected_columns, column_mapping, shared_data) {
   moduleServer(id, function(input, output, session) {
     # prepare_arriba_images(selected_samples)
+
     
   # Call loading function to load data
     dt <- reactive({
@@ -64,15 +70,20 @@ server <- function(id, selected_samples, selected_columns,column_mapping) {
       generate_columnsDef(names(dt()), selected_columns(), "fusion", column_mapping, session)
     })
     
-    output$fusion_genes_tab <- reactable$renderReactable({
+    # # Reactive value to store selected rows
+    selected_fusions <- reactiveVal(data.frame(gene1 = character(), gene2 = character()))
+    
+    output$fusion_genes_tab <- renderReactable({
+      pathogenic_fusions <- selected_fusions() # seznam fúzí, které byly označeny jako patogenní
+      
       message("Rendering Reactable for fusion")
-      reactable$reactable(dt(),
+      reactable(dt(),
                           columns = column_defs(),
                           class = "fusion-table",
                           resizable = TRUE,
                           showPageSizeOptions = TRUE,
                           pageSizeOptions = c(10, 20, 50, 100),
-                          defaultPageSize = 20,
+                          defaultPageSize = 10,
                           striped = TRUE,
                           wrap = FALSE,
                           highlight = TRUE,
@@ -100,10 +111,78 @@ server <- function(id, selected_samples, selected_columns,column_mapping) {
                               }
                             )
                           },
-                          onClick = "expand",
+                          #onClick = "expand",
+                          selection = "multiple",
+                          onClick = JS("function(rowInfo) {
+                                      rowInfo.toggleRowExpanded();
+                                      rowInfo.toggleRowSelected();
+                          }"),
                           elementId = "tbl-fusion"
         )
   })
+    
+    
+    # Sledování vybraného řádku a varianty
+    selected_fusion <- reactive({
+      selected_row <- getReactableState("fusion_genes_tab", "selected")
+      req(selected_row)
+      
+      dt()[selected_row, c("gene1","gene2")]  # Získání fúze z vybraného řádku
+      message("data fusion tab: ", dt()[selected_row, c("gene1","gene2")])
+      # var <- filtered_data()[selected_row, c("var_name","Gene_symbol")]  # Získání varianty z vybraného řádku
+      # var$remove <- NA
+      
+    })
+    
+    # Akce po kliknutí na tlačítko pro přidání fúze
+    observeEvent(input$selectFusion_button, {
+      selected_rows <- getReactableState("fusion_genes_tab", "selected")
+      req(selected_rows)
+      
+      new_variants <- dt()[selected_rows, c("gene1","gene2")]  # Získání vybraných fúzí
+      current_variants <- selected_fusions()  # Stávající přidané varianty
+      new_unique_variants <- new_variants[!(new_variants$gene1 %in% current_variants$gene1 &       # Porovnání - přidáme pouze ty varianty, které ještě nejsou v tabulce
+                                              new_variants$gene2 %in% current_variants$gene2), ]
+      
+      if (nrow(new_unique_variants) > 0) {      # Přidáme pouze unikátní varianty
+        selected_fusions(rbind(current_variants, new_unique_variants))
+        shared_data$fusion_data(selected_fusions())
+        message("Updated fusion_data in shared_data:", shared_data$fusion_data())
+      }
+    })
+    
+    output$selectFusion_tab <- renderReactable({
+      variants <- selected_fusions()
+      if (nrow(variants) == 0) {
+        return(NULL)
+      }
+      
+      reactable(
+        variants,
+        columns = list(
+          gene1 = colDef(name = "Gene1"),
+          gene2 = colDef(name = "Gene1")
+          # remove = colDef(
+          #   name = "",
+          #   cell = function(value, index) {
+          #     # actionButton(session$ns("delete"), label = "", class = "btn btn-danger btn-sm", icon = icon("remove"))
+          #     # actionButton(session$ns(paste0("remove_", index)), label = "", class = "btn btn-danger btn-sm", icon = icon("remove"))
+          #   })
+        ),
+        selection = "multiple", onClick = "select",
+        width = "30%"
+      )
+    })
+    
+    observeEvent(input$delete_button, {
+      rows <- getReactableState("selectFusion_tab", "selected")
+      req(rows)
+      current_variants <- selected_fusions()
+      updated_variants <- current_variants[-rows, ]
+      selected_fusions(updated_variants)
+      
+      session$sendCustomMessage("resetReactableSelection",selected_fusions())
+    })
     
     # observeEvent(input$igvButton_click, {
     #   runjs("

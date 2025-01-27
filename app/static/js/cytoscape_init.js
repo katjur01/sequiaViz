@@ -29,18 +29,7 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
                     "content": "data(label)",
                   //  "border-width": "1px",
                     "width": "mapData(degree, 0, 20, 100, 300)",
-                    "height": "mapData(degree, 0, 20, 100, 300)",
-                    
-                      // Vnitřní hrana
-                "border-width": 16,                // Šířka vnitřní hrany
-                "border-color": "purple",         // Barva vnitřní hrany
-                "border-style": "solid",          // Styl vnitřní hrany
-
-                // Vnější hrana
-                "outline-width": 12,              // Šířka vnější hrany
-                "outline-color": "orange",        // Barva vnější hrany
-                "outline-offset": 4,              // Vzdálenost od vnitřní hrany
-                "outline-style": "solid",         // Styl vnější hrany
+                    "height": "mapData(degree, 0, 20, 100, 300)"
                 }
             },
             {
@@ -61,7 +50,7 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
                 selector: 'node:selected',
                 style: {
                     'label': 'data(name)',
-                    "background-color": "#B8E788"
+                    'background-color': '#B8E788'
                 }
             },
             {
@@ -70,6 +59,25 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
                     'background-color': 'yellow',
                     'border-color': 'yellow',
                     'border-width': '4px'
+                }
+            },
+            {
+                selector: 'node.germVariantBorder',
+                style: {
+                    // Vnitřní hrana
+                    'border-width': 16,                // Šířka vnitřní hrany
+                    'border-color': 'purple',         // Barva vnitřní hrany
+                    'border-style': 'solid',          // Styl vnitřní hrany
+                }
+            },
+            {
+                selector: 'node.fusionBorder',
+                style: {
+                    // Vnější hrana
+                    "outline-width": 12,              // Šířka vnější hrany
+                    "outline-color": "orange",        // Barva vnější hrany
+                    "outline-offset": 4,              // Vzdálenost od vnitřní hrany
+                    "outline-style": "solid",         // Styl vnější hrany
                 }
             },
             {
@@ -109,58 +117,144 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
             } */
         });
 
-        // Synchronizace vybraných uzlů s hlavním grafem
-    Shiny.addCustomMessageHandler('update-selected-from-gene-list', function(data) {
-    let selectedNodes = data.selected_nodes;
+            // Synchronizace vybraných uzlů s hlavním grafem
+        Shiny.addCustomMessageHandler('update-selected-from-gene-list', function(data) {
+          let selectedNodes = data.selected_nodes;
+      
+          // Ověření, že selected_nodes je pole
+          if (typeof selectedNodes === 'string') {
+              selectedNodes = [selectedNodes]; // Převod na pole, pokud je string
+          } else if (!Array.isArray(selectedNodes)) {
+              console.warn("Expected an array for selected_nodes, received:", selectedNodes);
+              return;
+          }
+      
+          console.log("Selected nodes to update:", selectedNodes);
+      
+          // Získání aktuálně vybraných uzlů z Cytoscape
+          const currentlySelectedNodes = cy.$('node:selected').map(node => node.data('id'));
+      
+          console.log("Currently selected nodes in Cytoscape:", currentlySelectedNodes);
+      
+          // Kontrola, zda se výběr skutečně změnil
+          if (arraysEqual(selectedNodes, currentlySelectedNodes)) {
+              console.log("Selection is already up to date. No changes needed.");
+              return;
+          }
+      
+          // Označení uzlů, které mají být vybrány
+          selectedNodes.forEach(nodeId => {
+              const node = cy.getElementById(nodeId);
+              if (node && node.length > 0 && !node.selected()) {
+                  node.select();
+                  console.log("Node selected:", nodeId);
+              } else if (!node || node.length === 0) {
+                  console.warn("Node not found in the main graph:", nodeId);
+              }
+          });
+      
+          // Odznačení uzlů, které nemají být vybrány
+          cy.nodes(':selected').forEach(node => {
+              if (!selectedNodes.includes(node.data('id'))) {
+                  node.unselect();
+                  console.log("Node unselected:", node.data('id'));
+              }
+          });
+      
+          console.log("Updated selected nodes in main graph:", selectedNodes);
+        });
 
-    // Ověření, že selected_nodes je pole
-    if (typeof selectedNodes === 'string') {
-        selectedNodes = [selectedNodes]; // Převod na pole, pokud je string
-    } else if (!Array.isArray(selectedNodes)) {
-        console.warn("Expected an array for selected_nodes, received:", selectedNodes);
+
+        function arraysEqual(array1, array2) {
+            if (array1.length !== array2.length) return false;
+            return array1.every((value, index) => array2.includes(value));
+        }
+
+//////////////////////
+        // Přidání handleru pro přidání vnitřních hran uzlům s germline variantami
+/*
+Shiny.addCustomMessageHandler('germVariant-border', function(data) {
+    console.log('Received data for germVariant-border:', data);
+
+    // Odebrání třídy 'germVariantBorder' ze všech uzlů, které ji aktuálně mají
+    const allNodesWithBorder = cytoscapeInstance.nodes('.germVariantBorder');
+    if (allNodesWithBorder.length > 0) {
+        allNodesWithBorder.removeClass('germVariantBorder');
+        console.log("Removed germVariantBorder from all nodes.");
+    }
+
+    // Zpracování dat, pokud byla předána
+    if (Array.isArray(data) && data.length > 0) {
+        data.forEach(function(gene) {
+            const node = cytoscapeInstance.nodes().filter(function(ele) {
+                return ele.data('name') === gene; // Najít uzel podle atributu 'name'
+            });
+
+            if (node.length > 0) {
+                node.addClass('germVariantBorder'); // Přidání třídy
+                console.log("Added germVariantBorder to node:", node.data('id'));
+            } else {
+                console.warn("Node not found for gene:", gene);
+            }
+        });
+    } else {
+        // Pokud není předán žádný validní gen
+        console.log("No valid gene list provided or empty array.");
+        // Do budoucna: zde můžete přidat pop-up zprávu
+        Shiny.setInputValue("germVariantWarning", true); // Nastavení vstupu v Shiny pro pop-up
+    }
+});
+*/
+
+Shiny.addCustomMessageHandler('variant-border', function(data) {
+    console.log('Received data for variant-border:', data);
+
+    if (!data || !data.type || !Array.isArray(data.nodes)) {
+        console.warn("Invalid data provided to variant-border handler.");
         return;
     }
 
-    console.log("Selected nodes to update:", selectedNodes);
+    const type = data.type; // Typ dat ('germline' nebo 'fusion')
+    let className;
 
-    // Získání aktuálně vybraných uzlů z Cytoscape
-    const currentlySelectedNodes = cy.$('node:selected').map(node => node.data('id'));
-
-    console.log("Currently selected nodes in Cytoscape:", currentlySelectedNodes);
-
-    // Kontrola, zda se výběr skutečně změnil
-    if (arraysEqual(selectedNodes, currentlySelectedNodes)) {
-        console.log("Selection is already up to date. No changes needed.");
+    // Nastavení třídy na základě typu
+    if (type === 'germline') {
+        className = 'germVariantBorder';
+    } else if (type === 'fusion') {
+        className = 'fusionBorder';
+    } else {
+        console.warn("Unknown type provided:", type);
         return;
     }
 
-    // Označení uzlů, které mají být vybrány
-    selectedNodes.forEach(nodeId => {
-        const node = cy.getElementById(nodeId);
-        if (node && node.length > 0 && !node.selected()) {
-            node.select();
-            console.log("Node selected:", nodeId);
-        } else if (!node || node.length === 0) {
-            console.warn("Node not found in the main graph:", nodeId);
-        }
-    });
+    // Odebrání stávající třídy z uzlů
+    const allNodesWithBorder = cytoscapeInstance.nodes(`.${className}`);
+    if (allNodesWithBorder.length > 0) {
+        allNodesWithBorder.removeClass(className);
+        console.log(`Removed ${className} from all nodes.`);
+    }
 
-    // Odznačení uzlů, které nemají být vybrány
-    cy.nodes(':selected').forEach(node => {
-        if (!selectedNodes.includes(node.data('id'))) {
-            node.unselect();
-            console.log("Node unselected:", node.data('id'));
-        }
-    });
+    // Přidání třídy k uzlům, pokud jsou data validní
+    if (data.nodes.length > 0) {
+        data.nodes.forEach(function(gene) {
+            const node = cytoscapeInstance.nodes().filter(function(ele) {
+                return ele.data('name') === gene; // Najít uzel podle atributu 'name'
+            });
 
-    console.log("Updated selected nodes in main graph:", selectedNodes);
+            if (node.length > 0) {
+                node.addClass(className); // Přidání třídy
+                console.log(`Added ${className} to node:`, node.data('id'));
+            } else {
+                console.warn("Node not found for gene:", gene);
+            }
+        });
+    } else {
+        console.log("No valid nodes provided or empty array.");
+        Shiny.setInputValue(`${type}VariantWarning`, true); // Informace do Shiny, pokud nejsou uzly validní
+    }
 });
 
-
-function arraysEqual(array1, array2) {
-    if (array1.length !== array2.length) return false;
-    return array1.every((value, index) => array2.includes(value));
-}
+//////////////////////
 
         Shiny.addCustomMessageHandler('cy-add-node-selection', function(data) {
             // Najděte uzel odpovídající vybranému genu

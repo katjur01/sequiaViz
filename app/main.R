@@ -3,7 +3,7 @@
 # # rhino::pkg_remove("dplyr")
 #
 # ## when .js file added or changed, run this command:
-# # rhino::build_js()
+# rhino::build_js()
 # #
 # ## run this from console when the css style is changed ##
 # # rhino::build_sass()
@@ -18,13 +18,15 @@
 box::use(
   shiny[h1,h2,h3,bootstrapPage,div,moduleServer,NS,renderUI,tags,uiOutput,icon,observeEvent,observe,reactive,isTruthy,
         fluidRow,fluidPage,mainPanel,tabPanel,titlePanel,tagList,HTML,textInput,sidebarLayout,sidebarPanel,includeScript,
-        br,updateTabsetPanel, actionButton,imageOutput,renderImage,reactiveVal,req,fixedPanel],
+        br,updateTabsetPanel, actionButton,imageOutput,renderImage,reactiveVal,req,fixedPanel,reactiveValues],
   bs4Dash[dashboardPage, dashboardHeader, dashboardSidebar, dashboardBody, sidebarMenu, menuItem, menuSubItem, dashboardControlbar,tabItems, tabItem, bs4Card,infoBox,tabBox,tabsetPanel,bs4ValueBox,
-          controlbarMenu,controlbarItem,column,box,boxLabel,descriptionBlock,boxProfile,boxProfileItem,attachmentBlock,boxComment,userBlock,updateTabItems],
+          controlbarMenu,controlbarItem,column,box,boxLabel,descriptionBlock,boxProfile,boxProfileItem,attachmentBlock,boxComment,userBlock,updateTabItems,boxDropdown,boxDropdownItem,dropdownDivider],
   # plotly[plot_ly,plotlyOutput,renderPlotly,layout],
   # reactable,
   # reactable[colDef],
-  htmltools[tags]
+  htmltools[tags,p],
+  shinyWidgets[pickerInput],
+  shinyjs[useShinyjs, runjs]
   # data.table
   # openxlsx[read.xlsx]
 )
@@ -51,17 +53,20 @@ box::use(
 #' @export
 ui <- function(id){
   ns <- NS(id)
-  
+  useShinyjs()
   dashboardPage(
           header = dashboardHeader(),
           sidebar = dashboardSidebar( id = ns("sidebar"), collapsed = TRUE,
             h3( "MOII_e_117krve", style = "font-size: 20px; padding: 10px; color: #FFFFFF; "),
             sidebarMenu(id = ns("sidebar_menu"),
                         menuItem("Network graph", tabName = ns("network_graph"), icon = icon("diagram-project")),
-                        menuItem("Expression profile", tabName = ns("expression_profile"), icon = icon("chart-line")),
+                        menuItem("Fusion genes", tabName = ns("fusion_genes"), icon = icon("atom")),
                         menuItem("Variant calling", tabName = ns("variant_calling"), icon = icon("dna")),
 
-                        menuItem("Fusion genes", tabName = ns("fusion_genes"), icon = icon("atom")),
+                        menuItem("Expression profile", tabName = ns("expression_profile"), icon = icon("chart-line")),
+                      
+
+
                         menuItem("Hidden IGV Item", tabName = ns("hidden_igv"), icon = icon("eye-slash")),
                         menuItem("Summary",tabName = ns("summary"),icon = icon("id-card-clip"))
                   
@@ -105,6 +110,31 @@ ui <- function(id){
                       )),
               tabItem(tabName = ns("fusion_genes"),
                       bs4Card(width = 12,headerBorder = FALSE, collapsible = FALSE,
+                        # fluidRow(
+                        #   column(10,),
+                        #   column(2,
+                        #       box(
+                        #         title = "", 
+                        #         width = 12,
+                        #         status = "warning", 
+                        #         solidHeader = FALSE, 
+                        #         collapsible = TRUE,
+                        #         dropdownMenu = boxDropdown(
+                        #           inputId = "first",
+                        #           icon = icon("wrench", class = "fa-2x"),
+                        #           boxDropdownItem("Click me", id = "dropdownItem", icon = icon("heart")),
+                        #           boxDropdownItem("item 2", href = "https://www.google.com/"),
+                        #           dropdownDivider(),
+                        #           boxDropdownItem("item 3", icon = icon("table-cells"))
+                        #         ),
+                        #           fluidRow( actionButton("selectFusion_btnn", "Select fusion as causal"),
+                        #                     actionButton("delete_button", "Delete fusion")
+                        #                     ),
+                        #           pickerInput("selectedFusions", "",choices = c("BRCA","PIK3"), multiple = TRUE, 
+                        #                       options = list(`live-search` = TRUE, `actions-box` = TRUE,`multiple-separator` = ", ", `none-selected-text` = "Select gene name", 
+                        #                                       size = 5, `width` = "100%", `virtual-scroll` = 10,`tick-icon` = "fa fa-times")),
+                        #         # actionButton(inputId = "selectFusions_btn",label = "Select Fusions", icon = icon("table-cells")),
+                        #         ""),)),
                         fluidPage(
                           div(style = "width: 2.8%; position: absolute; right: 0; margin-top: 13.5px;",
                               uiOutput(ns("colFilter_dropdown_ui_fusion")))),
@@ -181,7 +211,11 @@ ui <- function(id){
 server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-
+    shared_data <- reactiveValues(germline_data = reactiveVal(NULL), fusion_data = reactiveVal(NULL))
+    
+    
+  
+    
 ## run summary module
     summary_table$summaryServer("summaryUI", session)
 
@@ -209,7 +243,7 @@ server <- function(id) {
     samples_fuze <- set_patient_to_sample("fusion")
     selected_columns_fusion <- colFilterDropdown_server("colFilter_dropdown_fusion", all_colnames_val_fusion()$all_columns, all_colnames_val_fusion()$default_setting)
     lapply(names(samples_fuze), function(patient) {
-      fusion_genes_table$server(paste0("geneFusion_tab_", patient), samples_fuze[[patient]], selected_columns_fusion,columnName_map("fusion"))
+      fusion_genes_table$server(paste0("geneFusion_tab_", patient), samples_fuze[[patient]], selected_columns_fusion, columnName_map("fusion"), shared_data)
     })
 ##################
     
@@ -237,7 +271,7 @@ server <- function(id) {
     selected_columns_germ <- colFilterDropdown_server("colFilter_dropdown_germ", all_colnames_val_germline()$all_columns, all_colnames_val_germline()$default_setting)
     
     lapply(names(samples_germ), function(patient) {
-      germline_var_call_table$server(paste0("germline_tab_", patient), samples_germ[[patient]], selected_columns_germ, columnName_map("germline"), selection_enabled)
+      germline_var_call_table$server(paste0("germline_tab_", patient), samples_germ[[patient]], selected_columns_germ, columnName_map("germline"), selection_enabled, shared_data)
     })
 
 ##################
@@ -254,7 +288,7 @@ server <- function(id) {
 
 ##################    
     ## run network graph module    
-    networkGraph_cytoscape$server("network_graph")
+    networkGraph_cytoscape$server("network_graph",shared_data)
     
     
 
