@@ -3,18 +3,21 @@
 
 box::use(
   shiny[NS, moduleServer, observeEvent, observe, tagList, fluidPage, fluidRow, column, textInput, updateTextInput, actionButton, selectInput, reactive, req,reactiveVal,conditionalPanel,
-        verbatimTextOutput, renderPrint,renderText,textOutput,htmlOutput,uiOutput,renderUI,icon,textAreaInput,updateTextAreaInput,isolate,isTruthy,debounce],
+        verbatimTextOutput, renderPrint,renderText,textOutput,htmlOutput,uiOutput,renderUI,icon,textAreaInput,updateTextAreaInput,isolate,isTruthy,debounce,getDefaultReactiveDomain,
+        outputOptions],
   httr[GET, status_code, content],
+  bs4Dash[updateTabItems],
   htmltools[h3, h4, h6, tags, div,HTML,p],
   jsonlite[fromJSON, toJSON,read_json],
   cyjShiny[cyjShinyOutput, renderCyjShiny, cyjShiny, dataFramesToJSON, selectNodes,setNodeAttributes,selectFirstNeighbors,fit,fitSelected,clearSelection,getSelectedNodes],
-  data.table[fread,setnames,as.data.table,data.table,copy,rbindlist],
+  data.table[fread,setnames,as.data.table,data.table,copy,rbindlist,setDF],
   stats[aggregate,rnorm],
   readxl[read_excel],
   graph[nodes],
   reactable[reactable,colDef,renderReactable,reactableOutput,JS],
-  shinyWidgets[radioGroupButtons,pickerInput,searchInput,updatePickerInput,prettySwitch,dropdown],
-  shinyjs[hidden,useShinyjs,toggle,hide]
+  shinyWidgets[radioGroupButtons,pickerInput,searchInput,updatePickerInput,prettySwitch,dropdown,updatePrettySwitch],
+  shinyjs[hidden,useShinyjs,toggle,hide],
+  shinyalert[shinyalert,useShinyalert],
 )
 
 box::use(
@@ -36,9 +39,10 @@ input_data <- function(sample,expr_flag){
 ui <- function(id) {
   ns <- NS(id)
   useShinyjs()
+  #useShinyalert()
   tagList(
     tags$head(
-      tags$style(HTML(".resizable-box {resize: both; overflow: auto; border: 1px solid; padding: 5px; height: 125px; width: 100%; max-width: 100%;}")),
+     # tags$style(HTML(".resizable-box {resize: both; overflow: auto; border: 1px solid; padding: 5px; height: 125px; width: 100%; max-width: 100%;}")),
       tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.1/cytoscape.min.js"),
       tags$script(src = "https://cdn.jsdelivr.net/npm/webcola@3.4.0/WebCola/cola.min.js"),
       tags$script(src = "https://cdn.jsdelivr.net/npm/cytoscape-cola@2.5.1/cytoscape-cola.min.js"),
@@ -75,7 +79,6 @@ ui <- function(id) {
                 )), # right = TRUE, #width = "240px"
          column(5,
                 # conditionalPanel(
-                  h6("Selected variant and fusions:"),
                   # condition = "output.hasData",
                   div(class = "resizable-box",#reactableOutput(ns("dynamic_table")
                       selectedTab_UI(ns("tab"))            
@@ -125,8 +128,10 @@ ui <- function(id) {
   )
 }
 
-server <- function(id,shared_data) {
+server <- function(id, shared_data) {
   moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+    
     interactions <- reactiveVal(NULL)
     sub_interactions <- reactiveVal(NULL)
     synchronized_nodes <- reactiveVal(character(0))
@@ -184,9 +189,14 @@ server <- function(id,shared_data) {
           data.frame(Gene_symbol = character(0))
         }
         combined_selected <- merge(selected_variants, selected_fusions,by = "Gene_symbol", all = TRUE)
-        selected_dt(unique(combined_selected, by = "Gene_symbol"))
+        pathways_info <- subTissue_dt()[feature_name %in% combined_selected$Gene_symbol, .(Gene_symbol = feature_name, all_kegg_paths_name)]
+        combined_selected <- merge(combined_selected, pathways_info, by = "Gene_symbol", all.x = TRUE)
+        setDF(combined_selected)  # Převod na data frame
+        
+        # Aktualizace selected_dt
+        selected_dt(combined_selected)
       } else {
-        selected_dt(NULL)
+        selected_dt(data.frame(Gene_symbol = character(0), variant = character(0), fusion = character(0), all_kegg_paths_name = character(0)))
       }
     })
     
@@ -194,9 +204,45 @@ server <- function(id,shared_data) {
     observeEvent(list(input$selectedGermVariants, input$selectedFusions, input$selected_pathway, input$selected_tissue), {
       # Aktualizace pro germline varianty
       if (input$selectedGermVariants) {
-        germline_nodes <- result_dt()[!is.na(var_name), Gene_symbol]
-        message("Adding border for germline variant nodes:", paste(germline_nodes, collapse = ", "))
-        session$sendCustomMessage("variant-border", list(type = "germline", nodes = as.list(germline_nodes)))
+        if ("variant" %in% names(result_dt())) {
+          germline_nodes <- result_dt()[!is.na(variant), feature_name]
+          
+          if (length(germline_nodes) == 0) {
+            updatePrettySwitch(session, "selectedGermVariants", value = FALSE) # Reset prettySwitch na FALSE
+            
+            shinyalert(
+              title = "No variants selected",
+              text = "You don't have any variants selected.",
+              type = "warning",
+              showCancelButton = TRUE,
+              confirmButtonText = "OK",
+              cancelButtonText = "Go to variant",
+              callbackR = function(value) {
+                # value bude TRUE pro OK, FALSE pro "Go to variant"
+                if (!value) {
+                  # updateTabItems(session = session$userData$parent_session,  # použijeme parent session
+                  #                inputId = "sidebar_menu",  # bez namespace
+                  #                selected = "fusion_genes")
+                  }})
+          } else {
+            message("Adding border for germline variant nodes:", paste(germline_nodes, collapse = ", "))
+            session$sendCustomMessage("variant-border", list(type = "germline", nodes = as.list(germline_nodes)))
+          }
+        } else {
+          # Reset prettySwitch na FALSE
+          updatePrettySwitch(session, "selectedGermVariants", value = FALSE)
+          
+          shinyalert(
+            title = "No variants selected",
+            text = "No germline variants are currently selected as possibly pathogenic.",
+            type = "warning",
+            showCancelButton = TRUE,
+            confirmButtonText = "OK",
+            cancelButtonText = "Go to variant",
+            callbackR = function(value) {
+              if (!value) {}})
+        }
+        
       } else {
         message("Removing border for germline variant nodes.")
         session$sendCustomMessage("variant-border", list(type = "germline", nodes = character(0)))
@@ -204,9 +250,38 @@ server <- function(id,shared_data) {
       
       # Aktualizace pro fúze
       if (input$selectedFusions) {
-        fusion_nodes <- result_dt()[!is.na(fusion), feature_name]
-        message("Adding border for fusion nodes:", paste(fusion_nodes, collapse = ", "))
-        session$sendCustomMessage("variant-border", list(type = "fusion", nodes = as.list(fusion_nodes)))
+        # Kontrola existence sloupce fusion
+        if ("fusion" %in% names(result_dt())) {
+          fusion_nodes <- result_dt()[!is.na(fusion), feature_name]
+          
+          if (length(fusion_nodes) == 0) {
+            updatePrettySwitch(session, "selectedFusions", value = FALSE)
+            shinyalert(
+              title = "No fusions selected",
+              text = "You don't have any fusions selected.",
+              type = "warning",
+              showCancelButton = TRUE,
+              confirmButtonText = "OK",
+              cancelButtonText = "Go to fusion",
+              callbackR = function(value) {
+                if (!value) {}}
+            )
+          } else {
+            message("Adding border for fusion nodes:", paste(fusion_nodes, collapse = ", "))
+            session$sendCustomMessage("variant-border", list(type = "fusion", nodes = as.list(fusion_nodes)))
+          }
+        } else {
+          updatePrettySwitch(session, "selectedFusions", value = FALSE)
+          shinyalert(
+            title = "No fusions selected",
+            text = "No fusion genes are currently selected as possibly pathogenic.",
+            type = "warning",
+            showCancelButton = TRUE,
+            confirmButtonText = "OK",
+            cancelButtonText = "Go to fusion",
+            callbackR = function(value) {
+              if (!value) {}})
+        }
       } else {
         message("Removing border for fusion nodes.")
         session$sendCustomMessage("variant-border", list(type = "fusion", nodes = character(0)))
@@ -216,7 +291,7 @@ server <- function(id,shared_data) {
     
     
     
-    ns <- session$ns
+    
     dt <- input_data("MR1507","all_genes")
     # # subTissue_dt <- fread("input_files/MOII_e117/RNAseq21_NEW/MR1507/Blood_all_genes_oneRow.tsv")
     # dt <- fread("input_files/MOII_e117/RNAseq21_NEW/MR1507/Blood_all_genes_oneRow.tsv")
@@ -439,7 +514,13 @@ server <- function(id,shared_data) {
 selectedTab_UI <- function(id){
   ns <- NS(id)
   tagList(
-    reactableOutput(ns("dynamic_table"))
+    # conditionalPanel(
+    #   condition = sprintf("output['%s']", ns("hasData")),  # Dynamické volání výstupu modulu
+      h6("Selected variant and fusions:"),
+      div(#class = "resizable-box",
+          reactableOutput(ns("dynamic_table"))
+      )
+    # )
   )
 }
 
@@ -530,30 +611,38 @@ tab_server <- function(id, tissue_dt, subTissue_dt, selected_nodes,selected_dt) 
         })
       }
     })
+    # 
+    # # Kontrola, zda jsou data dostupná
+    # output$hasData <- reactive({
+    #   selected_data <- selected_dt()
+    #   return(!is.null(selected_data) && nrow(selected_data) > 0)
+    # })
+    # outputOptions(output, "hasData", suspendWhenHidden = FALSE)  # Reaktivní výstup musí být explicitně nastaven
+    # 
     
-    # observe({
-    #   req(selected_dt)
-    #   if (length(selected_dt()) > 0) {
+    observe({
+      if (!is.null(selected_dt()) && nrow(selected_dt()) > 0) {
         output$dynamic_table <- renderReactable({
           reactable(
             selected_dt(),
-            # columns = list(
-            #   Gene_symbol = colDef(name = "Gene Symbol"),
-            #   var_name = colDef(name = "Variant"),
-            #   fusion = colDef(name = "Fusion"),
-            #   all_kegg_paths_name = colDef(name = "Pathway")
-            # ),
+            columns = list(
+              Gene_symbol = colDef(name = "Gene name"),
+              var_name = colDef(name = "Variant"),
+              fusion = colDef(name = "Fusion"),
+              all_kegg_paths_name = colDef(name = "Pathway")
+            ),
             resizable = TRUE,
-            highlight = TRUE
+            showPagination = TRUE,
+            striped = TRUE,
+            wrap = FALSE,
+            highlight = TRUE,
+            outlined = TRUE
           )
         })
-      # } else {
-      #   message("No variants or fusion selected, no table needed.")
-      #   output$dynamic_table <- renderReactable({
-      #     reactable(data.frame())
-      #   })
-      # }
-    # })
+    } else {
+      message("No variants or fusion selected, no table needed.")
+    }
+    })
     
   })
 }
