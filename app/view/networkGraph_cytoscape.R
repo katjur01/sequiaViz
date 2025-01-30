@@ -6,7 +6,7 @@ box::use(
         verbatimTextOutput, renderPrint,renderText,textOutput,htmlOutput,uiOutput,renderUI,icon,textAreaInput,updateTextAreaInput,isolate,isTruthy,debounce,getDefaultReactiveDomain,
         outputOptions],
   httr[GET, status_code, content],
-  bs4Dash[updateTabItems],
+  bs4Dash[updateTabItems,addPopover],
   htmltools[h3, h4, h6, tags, div,HTML,p],
   jsonlite[fromJSON, toJSON,read_json],
   cyjShiny[cyjShinyOutput, renderCyjShiny, cyjShiny, dataFramesToJSON, selectNodes,setNodeAttributes,selectFirstNeighbors,fit,fitSelected,clearSelection,getSelectedNodes],
@@ -15,8 +15,8 @@ box::use(
   readxl[read_excel],
   graph[nodes],
   reactable[reactable,colDef,renderReactable,reactableOutput,JS],
-  shinyWidgets[radioGroupButtons,pickerInput,searchInput,updatePickerInput,prettySwitch,dropdown,updatePrettySwitch],
-  shinyjs[hidden,useShinyjs,toggle,hide],
+  shinyWidgets[radioGroupButtons,pickerInput,searchInput,updatePickerInput,prettySwitch,dropdown,updatePrettySwitch,actionBttn],
+  shinyjs[hidden,useShinyjs,toggle,hide,addClass,removeClass],
   shinyalert[shinyalert,useShinyalert],
 )
 
@@ -42,7 +42,7 @@ ui <- function(id) {
   #useShinyalert()
   tagList(
     tags$head(
-     # tags$style(HTML(".resizable-box {resize: both; overflow: auto; border: 1px solid; padding: 5px; height: 125px; width: 100%; max-width: 100%;}")),
+     tags$style(HTML(".resizable-box {resize: both; overflow: auto; border: none; padding: 5px; height: 125px; width: 100%; max-width: 100%;}")),
       tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.1/cytoscape.min.js"),
       tags$script(src = "https://cdn.jsdelivr.net/npm/webcola@3.4.0/WebCola/cola.min.js"),
       tags$script(src = "https://cdn.jsdelivr.net/npm/cytoscape-cola@2.5.1/cytoscape-cola.min.js"),
@@ -56,15 +56,18 @@ ui <- function(id) {
                                ns("cyContainer"), ns("cySubsetContainer"), ns("cySelectedNodes"))))
     ),
     fluidRow(
-      column(6,
+      column(8,
         fluidRow(
           column(3,
-                 div(pickerInput(ns("selected_pathway"), "Pathway", selected = "EGFR tyrosine kinase inhibitor resistance",choices = get_pathway_list(), options = list(`live-search` = TRUE)),
-                      selectInput(ns("selected_layout"),"Choose layout: ", choices = c("cola","cose","fcose"),selected = "cola",width = "65%")
-                     , style = "width: 75%")),
-          # column(2,
-          #        selectInput(ns("selected_layout"),"Choose layout: ", choices = c("cola","cose","fcose"),selected = "cola",width = "65%")),
-          column(4,
+                 div(style = "width: 75%;",
+                   div(style = "display: flex; flex-direction: column; width: 100%; align-items: flex-start;", 
+                     tags$label("Pathway:", style = "margin-bottom: 5px; align-self: flex-start;"),
+                     pickerInput(ns("selected_pathway"), NULL, selected = "EGFR tyrosine kinase inhibitor resistance",choices = get_pathway_list(), options = list(`live-search` = TRUE), width = "100%")),
+                   div(style = "display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 10px;", 
+                     tags$label("Choose layout:", style = "align-self: flex-start;"),
+                     tags$div(id = ns("helpPopover_layout"),tags$i(class = "fa fa-question fa-xs", style = "color: #2596be;"))),
+                   selectInput(ns("selected_layout"), NULL, choices = c("cola", "fcose"), selected = "cola", width = "100%"))),
+          column(3.3,
             div(style = "display: flex; align-items: center; gap: 10px;",
                 prettySwitch(ns("selectedSomVariants"), label = "Add possibly pathogenic somatic variants", status = "primary", slim = TRUE),
                 # dropdown(label = NULL,style = "material-flat", size = "xs", color = "black",icon = icon("table-cells"))
@@ -77,29 +80,30 @@ ui <- function(id) {
                 prettySwitch(ns("selectedFusions"), label = "Add selected fusions", status = "primary", slim = TRUE),
                 # dropdown(label = NULL,style = "material-flat", size = "xs",color = "black",icon = icon("table-cells"))
                 )), # right = TRUE, #width = "240px"
-         column(5,
-                # conditionalPanel(
-                  # condition = "output.hasData",
-                  div(class = "resizable-box",#reactableOutput(ns("dynamic_table")
-                      selectedTab_UI(ns("tab"))            
-                                                              ))
-                # )
-              # )                   
-                             
-        )
+         column(6, selectedTab_UI(ns("tab")))
+       )
       ),
-      column(1,),
-      column(5,
-         fluidRow(
-            column(2,),
-            column(4,
-                   div(textAreaInput(ns("new_genes"), label = "Add new genes (comma-separated):", placeholder = "Enter gene names here...", rows = 1, resize = "both",width = "100%"), style = "width: 75%;"),
-                   div(actionButton(ns("confirm_new_genes_btn"), label = "Add Genes", icon = icon("check"), width = "100%"), style = "margin-bottom: 10px; width: 75%;")),
-            column(4,
-                   div(pickerInput(ns("remove_genes"), "Remove genes:", choices = NULL, multiple = TRUE, options = list(`live-search` = TRUE, `actions-box` = TRUE,`multiple-separator` = ", ", `none-selected-text` = "Select gene name", 
-                                                                                                                        size = 5, `width` = "100%", `virtual-scroll` = 10,`tick-icon` = "fa fa-times")),style = "width: 75%;"),
-                   div(actionButton(ns("confirm_remove_genes_btn"), label = "Remove genes", icon = icon("trash-can"),width = "100%"), style = "margin-bottom: 10px; width: 75%;"))
-         )
+      # column(1,),
+      column(4,
+             fluidRow(
+               column(6,
+                      div(style = "display: flex; flex-direction: column; align-items: flex-start; width: 75%;",
+                        div(style = "display: flex; justify-content: space-between; align-items: center; width: 100%;",
+                          tags$label("Add new genes:"),
+                          tags$div(id = ns("helpPopover_addGene"),
+                                   tags$i(class = "fa fa-question fa-xs", style = "color: #2596be;")),
+                          ),
+                        textAreaInput(ns("new_genes"), NULL, placeholder = "Enter gene names here...", rows = 1, resize = "vertical", width = "100%"), 
+                        actionButton(ns("confirm_new_genes_btn"), label = "Add Genes", icon = icon("check"), width = "100%", style = "margin-top: 10px;"))),
+               column(6,
+                      div(style = "display: flex; flex-direction: column; align-items: flex-start; width: 75%;",
+                        tags$label("Remove genes:"),  
+                        div(style = "display: flex; flex-direction: column; width: 100%;",
+                          pickerInput(ns("remove_genes"), NULL, 
+                                      choices = NULL, multiple = TRUE, 
+                                      options = list(`live-search` = TRUE,`actions-box` = TRUE,`multiple-separator` = ", ",`none-selected-text` = "Select gene name",`width` = "100%",`virtual-scroll` = 10,`tick-icon` = "fa fa-times")), 
+                          actionButton(ns("confirm_remove_genes_btn"), label = "Remove genes", icon = icon("trash-can"), width = "100%", style = "margin-top: 10px;"))))
+           )
      )
    ),
 
@@ -507,6 +511,9 @@ server <- function(id, shared_data) {
 
     tab_server("tab", tissue_dt = reactive(result_dt()), subTissue_dt, selected_nodes = synchronized_nodes, selected_dt)
 
+    addPopover(id = "helpPopover_addGene",options = list(title = "Write comma-separated text:",content = "example: BRCA1, TP53, FOXO3",placement = "right",trigger = "hover"))
+    addPopover(id = "helpPopover_layout",options = list(title = "Layout options:",placement = "right",trigger = "hover",
+                                                        content = "cola – Ideal for hierarchical structures and smaller graphs.FCOSE – Best for large and complex networks."))
   })
 }
 
@@ -514,15 +521,29 @@ server <- function(id, shared_data) {
 selectedTab_UI <- function(id){
   ns <- NS(id)
   tagList(
-    # conditionalPanel(
-    #   condition = sprintf("output['%s']", ns("hasData")),  # Dynamické volání výstupu modulu
-      h6("Selected variant and fusions:"),
-      div(#class = "resizable-box",
-          reactableOutput(ns("dynamic_table"))
-      )
-    # )
+    tags$head(tags$style(HTML("
+      .selectedTab-hidden {
+        display: none !important; /* Skryjeme tabulku úplně, pokud není třeba */
+      }
+
+      .selectedTab-visible {
+        display: block !important;
+        resize: both; /* 🔥 Přidáme možnost změny velikosti */
+        overflow: auto;
+        border: none;
+        height: 155px;
+      }
+    "))),
+    
+    # 🔥 Musíme obalit reactableOutput() do `div()`, jinak nefunguje `class=`
+    div(
+      id = ns("selectedTab_container"),  # ID pro použití v JS
+      class = "selectedTab-hidden",  # Výchozí stav: skrytý
+      reactableOutput(ns("dynamic_table"))
+    )
   )
 }
+
 
 tab_UI <- function(id){
   ns <- NS(id)
@@ -611,37 +632,54 @@ tab_server <- function(id, tissue_dt, subTissue_dt, selected_nodes,selected_dt) 
         })
       }
     })
-    # 
-    # # Kontrola, zda jsou data dostupná
-    # output$hasData <- reactive({
-    #   selected_data <- selected_dt()
-    #   return(!is.null(selected_data) && nrow(selected_data) > 0)
-    # })
-    # outputOptions(output, "hasData", suspendWhenHidden = FALSE)  # Reaktivní výstup musí být explicitně nastaven
-    # 
+
     
     observe({
-      if (!is.null(selected_dt()) && nrow(selected_dt()) > 0) {
-        output$dynamic_table <- renderReactable({
-          reactable(
-            selected_dt(),
-            columns = list(
-              Gene_symbol = colDef(name = "Gene name"),
-              var_name = colDef(name = "Variant"),
-              fusion = colDef(name = "Fusion"),
-              all_kegg_paths_name = colDef(name = "Pathway")
-            ),
-            resizable = TRUE,
-            showPagination = TRUE,
-            striped = TRUE,
-            wrap = FALSE,
-            highlight = TRUE,
-            outlined = TRUE
-          )
-        })
-    } else {
-      message("No variants or fusion selected, no table needed.")
-    }
+      data <- selected_dt()
+      
+      has_data <- !is.null(data) && nrow(data) > 0
+      
+      # 🔥 Přidáme nebo odstraníme třídu na `div`, ne na `reactableOutput()`
+      if (has_data) {
+        shinyjs::addClass(selector = paste0("#", session$ns("selectedTab_container")), class = "selectedTab-visible")
+        shinyjs::removeClass(selector = paste0("#", session$ns("selectedTab_container")), class = "selectedTab-hidden")
+      } else {
+        shinyjs::addClass(selector = paste0("#", session$ns("selectedTab_container")), class = "selectedTab-hidden")
+        shinyjs::removeClass(selector = paste0("#", session$ns("selectedTab_container")), class = "selectedTab-visible")
+      }
+    })
+    
+    output$dynamic_table <- renderReactable({
+      data <- selected_dt()
+      
+      if (is.null(data) || nrow(data) == 0) {
+        return(NULL)
+      }
+      
+      required_columns <- c("Gene_symbol", "var_name", "fusion", "all_kegg_paths_name")
+      missing_columns <- setdiff(required_columns, colnames(data))
+      
+      for (col in missing_columns) {
+        data[[col]] <- ""
+      }
+      
+      reactable(
+        data,
+        columns = list(
+          Gene_symbol = colDef(name = "Gene name", minWidth = 120, maxWidth = 140),
+          var_name = colDef(name = "Variant", width = 100, show = any(data$var_name != "")),  
+          fusion = colDef(name = "Fusion", width = 100, show = any(data$fusion != "")),  
+          all_kegg_paths_name = colDef(name = "Pathway",minWidth = 180)
+        ),
+        resizable = TRUE,
+        pagination = FALSE,  
+        defaultPageSize = 3,  
+        bordered = TRUE,
+        highlight = TRUE,
+        striped = TRUE,
+        wrap = FALSE,
+        style = list(maxHeight = "400px", overflowY = "auto")  
+      )
     })
     
   })
