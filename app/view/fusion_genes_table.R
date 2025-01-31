@@ -111,6 +111,20 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
                               }
                             )
                           },
+                          rowStyle = function(index) {
+                            gene1_in_row <- dt()$gene1[index]
+                            gene2_in_row <- dt()$gene2[index]
+                            
+                            # Pokud je aktuální fúze v seznamu vybraných fúzí, obarvíme ji
+                            if ((gene1_in_row %in% pathogenic_fusions$gene1 & 
+                                 gene2_in_row %in% pathogenic_fusions$gene2) |
+                                (gene1_in_row %in% pathogenic_fusions$gene2 & 
+                                 gene2_in_row %in% pathogenic_fusions$gene1)) {
+                              list(backgroundColor = "#ffcccc", fontWeight = "bold")
+                            } else {
+                              NULL
+                            }
+                          },
                           #onClick = "expand",
                           selection = "multiple",
                           onClick = JS("function(rowInfo) {
@@ -179,7 +193,9 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       req(rows)
       current_variants <- selected_fusions()
       updated_variants <- current_variants[-rows, ]
+      
       selected_fusions(updated_variants)
+      shared_data$fusion_data(updated_variants)
       
       session$sendCustomMessage("resetReactableSelection",selected_fusions())
     })

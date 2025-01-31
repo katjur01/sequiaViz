@@ -200,7 +200,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
       current_variants <- selected_variants()
       updated_variants <- current_variants[-rows, ]
       selected_variants(updated_variants)
-      
+      shared_data$germline_data(updated_variants)
       session$sendCustomMessage("resetReactableSelection",selected_variants())
     })
     
