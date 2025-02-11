@@ -1,12 +1,12 @@
 box::use(  
   shiny[tags,tagList, icon, actionButton, textInput,HTML],
   reactable,
-  reactable[colDef,JS],
+  reactable[colDef,JS,colGroup,colFormat],
   htmltools[div,tags,tagAppendAttributes],
   stats[na.omit],
   bs4Dash[actionButton],
   reactablefmtr[pill_buttons,data_bars]
-  )
+)
 
 
 # Select input filter with an "All" default option
@@ -58,21 +58,26 @@ filterMinValue <- JS("(rows, columnId, filterValue) => {
 # Generate column definitions (colDef) for a reactable 
 #' @export
 generate_columnsDef <- function(column_names, selected_columns, tag, column_mapping,session) {
+
+  # never show this columns in table:
   if (tag == "fusion") {
     hide <- c("sample", "png_path", "svg_path")
   } else if (tag == "germline") {
+    hide <- c("sample")
+  } else if (tag == "expression") {
     hide <- c("sample")
   } else {
     hide <- c()
     print("No column has been selected for permanent hiding")
   }
-  custom_colDef <- custom_colDef_setting(tag,session)
+  custom_colDef <- custom_colDef_setting(tag,session,column_names)
   column_defs <- lapply(column_names, function(col) {
     if (col %in% hide) {
       return(colDef(show = FALSE))
     } else if (col %in% selected_columns) {
       header_name <- if (!is.null(column_mapping[[col]])) column_mapping[[col]] else col
       if (col %in% names(custom_colDef)) {
+        
         custom_def <- custom_colDef[[col]]
         custom_def$header <- header_name
         return(custom_def)
@@ -84,11 +89,123 @@ generate_columnsDef <- function(column_names, selected_columns, tag, column_mapp
     }
   })
   names(column_defs) <- column_names
+
   return(column_defs)
 }
 
+
+
 #' @export
-custom_colDef_setting <- function(tag, session = NULL, data = NULL){
+columnName_map <- function(tag, all_columns = NULL){
+  if (tag == "fusion"){
+    map_list <- list(
+      gene1 = "Gene 1",
+      gene2 = "Gene 2",
+      arriba.called = "Arriba called",
+      starfus.called = "StarFus called",
+      arriba.confidence = "Arriba confidence",
+      overall_support = "Overall support",
+      IGV = "IGV",
+      Visual_Check = "Visual check",
+      Notes = "Notes",
+      position1 = "Position 1",
+      position2 = "Position 2",
+      strand1 = "Strand 1",
+      strand2 = "Strand 2",
+      arriba.site1 = "Arriba site 1",
+      arriba.site2 = "Arriba site 2",
+      starfus.splice_type = "StarFus splice type",
+      DB_count = "DB count",
+      DB_list = "DB list",
+      arriba.split_reads = "Arriba split reads",
+      arriba.discordant_mates	= "Arriba discordant mates",
+      arriba.break_coverage	= "Arriba break coverage",
+      arriba.break2_coverage = "Arriba break coverage 2",
+      starfus.split_reads = "StarFus split reads",
+      starfus.discordant_mates = "StarFus discordant mates",
+      starfus.counter_fusion1 = "StarFus counter fusion 1",
+      starfus.counter_fusion2 = "StarFus counter fusion 2",
+      arriba.break_seq = "Arriba break sequence",
+      starfus.break_seq = "StarFus break sequence")
+  } else if (tag == "germline"){
+    map_list <- list(
+      var_name = "Variant name",
+      variant_freq = "Frequency",
+      in_library = "In library",
+      Gene_symbol = "Gene name",
+      coverage_depth = "Coverage",
+      gene_region = "Gene region",
+      gnomAD_NFE = "gnomAD NFE",
+      clinvar_sig = "Clinvar sig",
+      snpDB = "Clinvar ID",
+      Consequence = "Consequence",
+      HGVSc = "HGVSc",
+      HGVSp = "HGVSp",
+      all_full_annot_name = "Full annotation name",
+      occurance_in_cohort = "Occurence in cohort",
+      in_samples = "In samples",
+      alarm = "Alarm",
+      full_annot_name = "Full annotation name",
+      var_gen_coord = "Variant genomic coordinate",
+      variant_type = "Variant type",
+      genotype = "Genotype",
+      Called_by = "Called by",
+      `1000g_EUR_AF` = "1000g EUR AF",
+      COSMIC = "COSMIC",
+      HGMD = "HGMD",
+      NHLBI_ESP = "NHLBI ESP",
+      clinvar_DBN = "ClinVar DBN",
+      fOne = "fOne",
+      BRONCO = "BRONCO",
+      `md-anderson` = "MD Anderson",
+      trusight_genes = "Trusight genes",
+      CGC_Germline = "CGC Germline",
+      CGC_Tumour_Germline = "CGC tumour germline",
+      PolyPhen = "PolyPhen",
+      SIFT = "SIFT",
+      CADD_RAW = "CADD raw",
+      CADD_PHRED = "CADD phred",
+      IMPACT = "Impact",
+      SOMATIC = "Somatic",
+      PHENO = "Phenotype",
+      GENE_PHENO = "Gene phenotype",
+      PUBMED = "PubMed",
+      EXON = "Exon",
+      INTRON = "Intron",
+      Feature = "Feature",
+      Feature_type = "Feature type",
+      `Annotation source` = "Annotation source",
+      Gene = "Gene ID")
+  } else if (tag == "expression"){
+    map_list <- list(
+      feature_name = "Gene name",
+      geneid = "Gene ID",
+      refseq_id = "RefSeq ID",
+      type = "Type",
+      gene_definition = "Gene definition",
+      all_kegg_gene_names = "KEGG gene names",
+      all_kegg_paths_name = "Pathway",
+      num_of_paths = "Number of pathways"
+    )
+    
+    for (col in all_columns) {   # Přidání dynamických sloupců do map_list
+      if (grepl("^log2FC_", col)) {
+        map_list[[col]] <- "log2FC"
+      } else if (grepl("^p_value_", col)) {
+        map_list[[col]] <- "p-value"
+      } else if (grepl("^p_adj_", col)) {
+        map_list[[col]] <- "p-adj"
+      }
+    }
+    
+    
+  } else {
+    print("NOT germline, expression or fusion")
+  }
+  return(map_list)
+}
+
+custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
   if (tag == "fusion"){
     custom_colDef <- list(
       gene1 = colDef(minWidth = 120,filterable = TRUE,sticky = "left"),
@@ -211,67 +328,111 @@ custom_colDef_setting <- function(tag, session = NULL, data = NULL){
       `Annotation source` = colDef(minWidth = 170),
       Gene = colDef(minWidth = 150,filterable = TRUE)
     )
-
   } else if (tag == "expression") {
-
-      tissue_columns <- grep("Tissue_", names(data), value = TRUE)
-      scale_indices <- grep("^Scale_", names(data))
-      fc_indices <- grep("^FC_", names(data))
-
-      custom_colDef <- lapply(names(data), function(col) {
-        if (col %in% tissue_columns) {
-          colDef(show = FALSE)
-        } else if (grepl("^FC_", col)) {
-          colDef(
-            name = "FC",
-            maxWidth = 280,
-            cell = data_bars(
-              data,
-              fill_color = c("#42c2ca","#d9f2f4","#ffbaba","#ff7b7b"),
-              number_fmt = scales::number_format(accuracy = 0.01)
-            )
-            ,style = if (which(names(data) == col) == fc_indices[1]) list(borderRight = "1px dashed rgba(0, 0, 0, 0.3)") else NULL
-          )
-        } else if (grepl("^Scale_", col)) {
-          colDef(
-            name = "Scale",
-            maxWidth = 120
-            # align = "center"
-          )
-        } else if (col == "Gene") {
-          colDef(
-            maxWidth = 150
-          )
-        } else if (col == "Pathway") {
-          colDef(
-            minWidth = 200,
-            align = "left",
-            cell = pill_buttons(
-              data = data,
-              color_ref = "Color",
-              box_shadow = TRUE
-            ),
-            style = list(borderRight = "1px dashed rgba(0, 0, 0, 0.3)")
-          )
-        } else if (col == "Color") {
-          colDef(show = FALSE)
-        } else if (col == "Sample") {
-          colDef(show = FALSE)
-        } else {
-          colDef()
-        }
-      })
-
-      names(custom_colDef) <- names(data)
-
+    
+    # tissue_columns <- grep("log2FC_", names(data), value = TRUE)
+    # scale_indices <- grep("^Scale_", names(data))
+    # fc_indices <- grep("^FC_", names(data))
+    
+    # custom_colDef <- lapply(names(data), function(col) {
+    #   if (grepl("^log2FC_", col)) {
+    #     colDef(
+    #       name = "FC",
+    #       maxWidth = 280,
+    #       cell = data_bars(
+    #         data,
+    #         fill_color = c("#42c2ca","#d9f2f4","#ffbaba","#ff7b7b"),
+    #         number_fmt = scales::number_format(accuracy = 0.01)
+    #       )
+    #       ,style = if (which(names(data) == col) == fc_indices[1]) list(borderRight = "1px dashed rgba(0, 0, 0, 0.3)") else NULL
+    #     )
+    #   } else {
+    #     colDef()
+    #   }
+    # })
+    # 
+    # names(custom_colDef) <- names(data)
+    
+    custom_colDef <- list(
+      feature_name = colDef(minWidth = 150,filterable = TRUE),
+      geneid = colDef(maxWidth = 140,filterable = TRUE),
+      all_kegg_paths_name = colDef(minWidth = 150,filterable = TRUE),
+      num_of_paths = colDef(maxWidth = 100)
+    )
+    
+    dynamic_columns <- list()
+    
+    for (col in column_names) {
+      if (grepl("^log2FC_", col)) {
+        dynamic_columns[[col]] <- colDef(maxWidth = 130, format = colFormat(digits = 6))
+      } else if (grepl("^p_value_", col)) {
+        dynamic_columns[[col]] <- colDef(maxWidth = 130, format = colFormat(digits = 6), sortable = TRUE)
+      } else if (grepl("^p_adj_", col)) {
+        dynamic_columns[[col]] <- colDef(maxWidth = 130, format = colFormat(digits = 6), sortable = TRUE)
+      }
+    }
+    
+    # Spojení dynamických a statických sloupců
+    custom_colDef <- c(custom_colDef, dynamic_columns)
+    
+  # } else if (tag == "expression") {
+  # 
+  #     tissue_columns <- grep("Tissue_", names(data), value = TRUE)
+  #     scale_indices <- grep("^Scale_", names(data))
+  #     fc_indices <- grep("^FC_", names(data))
+  # 
+  #     custom_colDef <- lapply(names(data), function(col) {
+  #       if (col %in% tissue_columns) {
+  #         colDef(show = FALSE)
+  #       } else if (grepl("^FC_", col)) {
+  #         colDef(
+  #           name = "FC",
+  #           maxWidth = 280,
+  #           cell = data_bars(
+  #             data,
+  #             fill_color = c("#42c2ca","#d9f2f4","#ffbaba","#ff7b7b"),
+  #             number_fmt = scales::number_format(accuracy = 0.01)
+  #           )
+  #           ,style = if (which(names(data) == col) == fc_indices[1]) list(borderRight = "1px dashed rgba(0, 0, 0, 0.3)") else NULL
+  #         )
+  #       } else if (grepl("^Scale_", col)) {
+  #         colDef(
+  #           name = "Scale",
+  #           maxWidth = 120
+  #           # align = "center"
+  #         )
+  #       } else if (col == "Gene") {
+  #         colDef(
+  #           maxWidth = 150
+  #         )
+  #       } else if (col == "Pathway") {
+  #         colDef(
+  #           minWidth = 200,
+  #           align = "left",
+  #           cell = pill_buttons(
+  #             data = data,
+  #             color_ref = "Color",
+  #             box_shadow = TRUE
+  #           ),
+  #           style = list(borderRight = "1px dashed rgba(0, 0, 0, 0.3)")
+  #         )
+  #       } else if (col == "Color") {
+  #         colDef(show = FALSE)
+  #       } else if (col == "Sample") {
+  #         colDef(show = FALSE)
+  #       } else {
+  #         colDef()
+  #       }
+  #     })
+  # 
+  #     names(custom_colDef) <- names(data)
+  # 
   } else {
-    print("NOT fusion NOR germline")
+    print("NOT fusion, expression or germline")
   }
   return(custom_colDef)
 }
 
-                    
-    
       
 
 #' @export

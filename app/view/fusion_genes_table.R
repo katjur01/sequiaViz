@@ -13,10 +13,9 @@ box::use(
 )
 box::use(
   app/logic/load_data[get_inputs,load_data],
-  app/logic/prepare_table[prepare_fusion_genes_table,prepare_arriba_images,columnName_map], 
+  app/logic/prepare_table[prepare_fusion_genes_table,prepare_arriba_images], 
   app/logic/waiters[use_spinner],
-  app/logic/reactable_helpers[generate_columnsDef],
-  app/logic/prepare_table[colFilter]
+  app/logic/reactable_helpers[generate_columnsDef]
 )
 
 # Load and process data table

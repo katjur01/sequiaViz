@@ -2,6 +2,9 @@
 # # rhino::pkg_install("shiny")
 # # rhino::pkg_remove("dplyr")
 #
+# restart R session
+# rstudioapi::restartSession()  # Pokud používáš RStudio
+#
 # ## when .js file added or changed, run this command:
 # rhino::build_js()
 # #
@@ -10,7 +13,7 @@
 #
 # ## run shiny app with command:
 # # shiny::runApp()
-# # shiny::shinyAppDir(".")
+# # shiny::shinyAppDir(".", options = list(launch.browser = TRUE))
 #
 # script_dir <- dirname(rstudioapi::getSourceEditorContext()$path)
 # setwd(paste0(script_dir))
@@ -41,7 +44,8 @@ box::use(
   app/logic/patients_list[patients_list,set_patient_to_sample],
   app/view/IGV,
 #   app/logic/load_data[load_data,get_inputs],
-  app/logic/prepare_table[colFilter,columnName_map],
+  app/logic/prepare_table[colFilter],
+  app/logic/reactable_helpers[columnName_map],
   app/view/networkGraph_cytoscape
 #   
 )
@@ -59,11 +63,12 @@ ui <- function(id){
           sidebar = dashboardSidebar( id = ns("sidebar"), collapsed = TRUE,
             h3( "MOII_e_117krve", style = "font-size: 20px; padding: 10px; color: #FFFFFF; "),
             sidebarMenu(id = ns("sidebar_menu"),
+                        menuItem("Expression profile", tabName = ns("expression_profile"), icon = icon("chart-line")),
                         menuItem("Network graph", tabName = ns("network_graph"), icon = icon("diagram-project")),
                         menuItem("Fusion genes", tabName = ns("fusion_genes"), icon = icon("atom")),
                         menuItem("Variant calling", tabName = ns("variant_calling"), icon = icon("dna")),
 
-                        menuItem("Expression profile", tabName = ns("expression_profile"), icon = icon("chart-line")),
+
                       
 
 
@@ -110,31 +115,6 @@ ui <- function(id){
                       )),
               tabItem(tabName = ns("fusion_genes"),
                       bs4Card(width = 12,headerBorder = FALSE, collapsible = FALSE,
-                        # fluidRow(
-                        #   column(10,),
-                        #   column(2,
-                        #       box(
-                        #         title = "", 
-                        #         width = 12,
-                        #         status = "warning", 
-                        #         solidHeader = FALSE, 
-                        #         collapsible = TRUE,
-                        #         dropdownMenu = boxDropdown(
-                        #           inputId = "first",
-                        #           icon = icon("wrench", class = "fa-2x"),
-                        #           boxDropdownItem("Click me", id = "dropdownItem", icon = icon("heart")),
-                        #           boxDropdownItem("item 2", href = "https://www.google.com/"),
-                        #           dropdownDivider(),
-                        #           boxDropdownItem("item 3", icon = icon("table-cells"))
-                        #         ),
-                        #           fluidRow( actionButton("selectFusion_btnn", "Select fusion as causal"),
-                        #                     actionButton("delete_button", "Delete fusion")
-                        #                     ),
-                        #           pickerInput("selectedFusions", "",choices = c("BRCA","PIK3"), multiple = TRUE, 
-                        #                       options = list(`live-search` = TRUE, `actions-box` = TRUE,`multiple-separator` = ", ", `none-selected-text` = "Select gene name", 
-                        #                                       size = 5, `width` = "100%", `virtual-scroll` = 10,`tick-icon` = "fa fa-times")),
-                        #         # actionButton(inputId = "selectFusions_btn",label = "Select Fusions", icon = icon("table-cells")),
-                        #         ""),)),
                         fluidPage(
                           div(style = "width: 2.8%; position: absolute; right: 0; margin-top: 13.5px;",
                               uiOutput(ns("colFilter_dropdown_ui_fusion")))),
@@ -144,22 +124,25 @@ ui <- function(id){
                         )
                       ),
               tabItem(tabName = ns("expression_profile"),
-                    fluidPage(
-                      do.call(tabsetPanel, c(id = ns("expression_profile_patients"),
-                           lapply(names(set_patient_to_sample("expression")), function(patient) {
-                             tabPanel(title = patient,
-                                  tabBox(id = ns(paste0("expression_profile_tabs_", patient)), width = 12, collapsible = FALSE,
-                                       tabPanel("Genes of Interest",
-                                                tabName = ns("genesOfinterest_panel"), value = "genesOfinterest",
-                                                expression_profile_table$ui_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), patient)),
-                                       tabPanel("All Genes",
-                                                tabName = ns("allGenes_panel"), value = "allGenes",
-                                                expression_profile_table$ui_allGenes(ns(paste0("allGenes_tab_", patient)), patient)
-                                                )
-                                  )
-                             )
-                           })))
-                    )
+                      bs4Card(width = 12,headerBorder = FALSE, collapsible = FALSE,
+                        fluidPage(
+                          div(style = "width: 2.8%; position: absolute; right: 0; margin-top: 13.5px;",
+                              uiOutput(ns("colFilter_dropdown_ui_expression")))),
+                        fluidPage(
+                          do.call(tabsetPanel, c(id = ns("expression_profile_patients"),
+                               lapply(names(set_patient_to_sample("expression")), function(patient) {
+                                 tabPanel(title = patient,
+                                      tabBox(id = ns(paste0("expression_profile_tabs_", patient)), width = 12, collapsible = FALSE,
+                                             tabPanel("All Genes",
+                                                      tabName = ns("allGenes_panel"), value = "allGenes",
+                                                      expression_profile_table$ui_allGenes(ns(paste0("allGenes_tab_", patient)), patient)),
+                                             tabPanel("Genes of Interest",
+                                                      tabName = ns("genesOfinterest_panel"), value = "genesOfinterest",
+                                                      expression_profile_table$ui_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), patient))
+                                      )
+                                 )
+                               })))
+                        ))
 
                       # tabBox(id = "expression_profile_tabs", width = 12, collapsible = FALSE,
                       #        tabPanel("Genes of interest",tabName = "genesOfinterest_panel",value = "genesOfinterest",
@@ -273,14 +256,22 @@ server <- function(id) {
     })
 
 ##################
+    ## filter table columns dropdown button for fusion
+    all_colnames_val_expression <- getColFilterValues("expression")
+    output$colFilter_dropdown_ui_expression <- renderUI({
+      req(all_colnames_val_expression())
+      colFilterDropdown_ui(ns("colFilter_dropdown_expression"), all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting,columnName_map("expression"))
+    })
+    
     ## run expression profile module
     samples_expr <- set_patient_to_sample("expression")
     # lapply(names(samples_expr), function(patient) {
     #   expression_profile_table$server(paste0("exprProfile_tab_", patient), samples_expr[[patient]])
     # })
+    selected_columns_expression <- colFilterDropdown_server("colFilter_dropdown_expression", all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting)
     lapply(names(samples_expr), function(patient) {
       expression_profile_table$server_genesOfInterest(paste0("genesOfinterest_tab_", patient), samples_expr[[patient]])
-      expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]])
+      expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",all_colnames_val_expression()$all_columns))
     })
 
 

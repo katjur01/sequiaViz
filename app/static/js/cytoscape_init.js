@@ -172,39 +172,6 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
 
 //////////////////////
         // Přidání handleru pro přidání vnitřních hran uzlům s germline variantami
-/*
-Shiny.addCustomMessageHandler('germVariant-border', function(data) {
-    console.log('Received data for germVariant-border:', data);
-
-    // Odebrání třídy 'germVariantBorder' ze všech uzlů, které ji aktuálně mají
-    const allNodesWithBorder = cytoscapeInstance.nodes('.germVariantBorder');
-    if (allNodesWithBorder.length > 0) {
-        allNodesWithBorder.removeClass('germVariantBorder');
-        console.log("Removed germVariantBorder from all nodes.");
-    }
-
-    // Zpracování dat, pokud byla předána
-    if (Array.isArray(data) && data.length > 0) {
-        data.forEach(function(gene) {
-            const node = cytoscapeInstance.nodes().filter(function(ele) {
-                return ele.data('name') === gene; // Najít uzel podle atributu 'name'
-            });
-
-            if (node.length > 0) {
-                node.addClass('germVariantBorder'); // Přidání třídy
-                console.log("Added germVariantBorder to node:", node.data('id'));
-            } else {
-                console.warn("Node not found for gene:", gene);
-            }
-        });
-    } else {
-        // Pokud není předán žádný validní gen
-        console.log("No valid gene list provided or empty array.");
-        // Do budoucna: zde můžete přidat pop-up zprávu
-        Shiny.setInputValue("germVariantWarning", true); // Nastavení vstupu v Shiny pro pop-up
-    }
-});
-*/
 
 Shiny.addCustomMessageHandler('variant-border', function(data) {
     console.log('Received data for variant-border:', data);

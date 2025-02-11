@@ -7,8 +7,16 @@ box::use(
 )
 box::use(
   app/logic/load_data[get_inputs,load_data],
-  app/logic/prepare_arriba_pictures[pdf2png]
+  app/logic/prepare_arriba_pictures[pdf2png],
+  app/logic/load_data[get_inputs]
 )
+
+#' @export
+get_tissue_list <- function(){
+  input_files <- get_inputs("per_sample_file")
+  tissue_list <- sort(unique(gsub(".*/([^/]+?)_(all_genes|genes_of_interest).*", "\\1", input_files$expression.files)))
+  return(tissue_list)
+}
 
 replace_dot_with_na <- function(data) {
   for (col in names(data)) {
@@ -109,18 +117,6 @@ prepare_germline_table <- function(dt){
   return(dt)
 }
 
-#' @export
-get_tissues <- function(patient){  # patient = "DZ1601"
-  
-  input_files <- get_inputs("per_sample_file")
-  patient_files <- input_files$expression.files[grep(patient, input_files$expression.files)]
-  patient_files <- patient_files[grep("all_genes", patient_files)]
-  tissue_list <- lapply(patient_files, function(file) { # file <- patient_files[1]
-    tissue <-   gsub("^.*/|_all_genes\\.tsv$","",patient_files)
-  })
-  
-  return(tissue_list)
-}
 
 #' @export
 prepare_expression_table <- function(combined_dt,expr_flag){
@@ -135,11 +131,18 @@ prepare_expression_table <- function(combined_dt,expr_flag){
     }))
     wide_dt <- wide_dt[, c(ordered_columns, tissue_cols), with = FALSE]
   } else if (expr_flag == "all_genes"){
-
+    tissue_order <- unique(combined_dt$tissue)
     wide_dt <- dcast(combined_dt,
                      sample + feature_name + geneid + refseq_id + type + all_kegg_gene_names
                      + gene_definition + all_kegg_paths_name + num_of_paths ~ tissue,
                      value.var = c("log2FC", "p_value", "p_adj"))
+    
+    log2FC_cols <- paste0("log2FC_", tissue_order)
+    p_value_cols <- paste0("p_value_", tissue_order)
+    p_adj_cols <- paste0("p_adj_", tissue_order)
+    
+    column_order <- c("sample","feature_name","geneid","refseq_id","type","gene_definition","all_kegg_gene_names","all_kegg_paths_name", "num_of_paths",as.vector(rbind(log2FC_cols, p_value_cols, p_adj_cols)))
+    wide_dt <- wide_dt[, column_order, with = FALSE]
     
   } else {
     stop("Unknown expr_tag: ", expr_flag)
@@ -181,7 +184,7 @@ colFilter <- function(flag){
 
   if (flag == "germline"){
     all_column_var <- names(fread(filenames$var_call.germline[1], nrows = 0))
-    all_column_names  <- setdiff(all_column_var, c("sample"))
+    all_column_names  <- setdiff(all_column_var, c("sample"))  # dont show/add sample column in table
     default_selection <- c("var_name","variant_freq","in_library","Gene_symbol","coverage_depth","gene_region",
                            "gnomAD_NFE","clinvar_sig","snpDB","CGC_Germline","trusight_genes","fOne","Consequence","HGVSc", "HGVSp","all_full_annot_name")
     
@@ -196,102 +199,38 @@ colFilter <- function(flag){
     } else {
       stop("Fusion file not found: ", filenames$fusions[1])
     }
+  } else if (flag == "expression"){
 
+    if (file.exists(filenames$expression.files[grep("multiRow", filenames$expression.files)][1])) {
+      # Načtení pouze názvů sloupců
+      # column_var <- names(fread(filenames$expression.files[grep("multiRow", filenames$expression.files)][1], nrows = 0))
+
+      tissue <- unique(gsub("^.*/|_all_genes_multiRow\\.tsv$", "", filenames$expression.files[grep("multiRow", filenames$expression.files)]))
+      keep_columns <- c("feature_name", "geneid", "all_kegg_paths_name", "num_of_paths")
+      hide_columns <- c("refseq_id", "type", "all_kegg_gene_names", "gene_definition")
+      
+      # Generování dynamických sloupců pro každou tkáň
+      log2FC_cols <- paste0("log2FC_", tissue)
+      p_value_cols <- paste0("p_value_", tissue)
+      p_adj_cols <- paste0("p_adj_", tissue)
+      
+      # Kombinace do finálního pořadí sloupců
+      all_column_names <- c(keep_columns,hide_columns, as.vector(rbind(log2FC_cols, p_value_cols, p_adj_cols)))
+      default_selection <- c(keep_columns, as.vector(rbind(log2FC_cols, p_value_cols, p_adj_cols)))
+      
+
+    } else {
+      stop("Expression file not found: ", filenames$expression.files[grep("multiRow", filenames$expression.files)][1])
+    }
+    
   } else {
-    print("NOT germline NOR fusion")
+    print("NOT germline, expression or fusion")
   }
 
   ordered_columns <- factor(all_column_names, levels = default_selection)
   all_column_names_sorted <- all_column_names[order(ordered_columns)]
   # message(paste("Returning column names for flag:", flag))
   return(list(all_columns = all_column_names_sorted, default_setting = default_selection))
-}
-
-#' @export
-columnName_map <- function(tag){
-  if (tag == "fusion"){
-    map_list <- list(
-      gene1 = "Gene 1",
-       gene2 = "Gene 2",
-       arriba.called = "Arriba called",
-       starfus.called = "StarFus called",
-       arriba.confidence = "Arriba confidence",
-       overall_support = "Overall support",
-       IGV = "IGV",
-       Visual_Check = "Visual check",
-       Notes = "Notes",
-       position1 = "Position 1",
-       position2 = "Position 2",
-       strand1 = "Strand 1",
-       strand2 = "Strand 2",
-       arriba.site1 = "Arriba site 1",
-       arriba.site2 = "Arriba site 2",
-       starfus.splice_type = "StarFus splice type",
-       DB_count = "DB count",
-       DB_list = "DB list",
-       arriba.split_reads = "Arriba split reads",
-       arriba.discordant_mates	= "Arriba discordant mates",
-       arriba.break_coverage	= "Arriba break coverage",
-       arriba.break2_coverage = "Arriba break coverage 2",
-       starfus.split_reads = "StarFus split reads",
-       starfus.discordant_mates = "StarFus discordant mates",
-       starfus.counter_fusion1 = "StarFus counter fusion 1",
-       starfus.counter_fusion2 = "StarFus counter fusion 2",
-       arriba.break_seq = "Arriba break sequence",
-       starfus.break_seq = "StarFus break sequence")
-  } else if (tag == "germline"){
-    map_list <- list(
-      var_name = "Variant name",
-       variant_freq = "Frequency",
-       in_library = "In library",
-       Gene_symbol = "Gene name",
-       coverage_depth = "Coverage",
-       gene_region = "Gene region",
-       gnomAD_NFE = "gnomAD NFE",
-       clinvar_sig = "Clinvar sig",
-       snpDB = "Clinvar ID",
-       Consequence = "Consequence",
-       HGVSc = "HGVSc",
-       HGVSp = "HGVSp",
-       all_full_annot_name = "Full annotation name",
-       occurance_in_cohort = "Occurence in cohort",
-       in_samples = "In samples",
-       alarm = "Alarm",
-       full_annot_name = "Full annotation name",
-       var_gen_coord = "Variant genomic coordinate",
-       variant_type = "Variant type",
-       genotype = "Genotype",
-       Called_by = "Called by",
-       `1000g_EUR_AF` = "1000g EUR AF",
-       COSMIC = "COSMIC",
-       HGMD = "HGMD",
-       NHLBI_ESP = "NHLBI ESP",
-       clinvar_DBN = "ClinVar DBN",
-       fOne = "fOne",
-       BRONCO = "BRONCO",
-       `md-anderson` = "MD Anderson",
-       trusight_genes = "Trusight genes",
-       CGC_Germline = "CGC Germline",
-       CGC_Tumour_Germline = "CGC tumour germline",
-       PolyPhen = "PolyPhen",
-       SIFT = "SIFT",
-       CADD_RAW = "CADD raw",
-       CADD_PHRED = "CADD phred",
-       IMPACT = "Impact",
-       SOMATIC = "Somatic",
-       PHENO = "Phenotype",
-       GENE_PHENO = "Gene phenotype",
-       PUBMED = "PubMed",
-       EXON = "Exon",
-       INTRON = "Intron",
-       Feature = "Feature",
-       Feature_type = "Feature type",
-       `Annotation source` = "Annotation source",
-       Gene = "Gene ID")
-  } else {
-    print("NOT germline NOR fusion")
-  }
-return(map_list)
 }
 
 #' @export

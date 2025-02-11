@@ -18,14 +18,13 @@ box::use(
   # reactable.extras[reactable_extras_ui,reactable_extras_server],
   htmltools[tags,HTML],
   app/logic/patients_list[set_patient_to_sample],
-  shinyWidgets[prettyCheckbox,searchInput],
-  app/logic/prepare_table[colFilter]
+  shinyWidgets[prettyCheckbox,searchInput]
   # reactablefmtr
 )
 
 box::use(
   app/logic/load_data[get_inputs,load_data],
-  app/logic/prepare_table[prepare_germline_table,columnName_map],
+  app/logic/prepare_table[prepare_germline_table],
   app/logic/waiters[use_spinner],
   app/logic/reactable_helpers[selectFilter,minRangeFilter,filterMinValue,generate_columnsDef]
 )

@@ -7,9 +7,6 @@ box::use(
   cyjShiny[dataFramesToJSON],
   stats[setNames]
 )
-box::use(
-  app/logic/load_data[get_inputs]
-)
 
 # Funkce pro získání interakcí mezi proteiny z STRING API
 #' @export
@@ -127,11 +124,4 @@ get_pathway_list <- function(){
   dt <- fread("input_files/kegg_tab.tsv")
   pathway_list <- sort(unique(dt$kegg_paths_name))
   return(pathway_list)
-}
-
-#' @export
-get_tissue_list <- function(){
-  input_files <- get_inputs("per_sample_file")
-  tissue_list <- sort(unique(gsub(".*/RNAseq21_NEW/[^/]+/([^_]+)_.*", "\\1", input_files$expression.file)))
-  return(tissue_list)
 }

@@ -1,7 +1,7 @@
 # app/view/expression_profile_table.R
 
 box::use(
-  shiny[moduleServer,NS,tagList,fluidRow,fluidPage,column,tabPanel,reactive],
+  shiny[moduleServer,NS,tagList,fluidRow,fluidPage,column,tabPanel,reactive,req],
   reactable,
   reactable[colDef,reactableOutput,renderReactable,reactable,colGroup],
   htmltools[tags],
@@ -14,15 +14,15 @@ box::use(
   app/logic/plots[prepare_barPlot_data,create_barPlot], 
   app/logic/waiters[use_spinner],
   app/logic/load_data[get_inputs,load_data],
-  app/logic/reactable_helpers[custom_colDef_setting],
-  app/logic/prepare_table[prepare_expression_table,set_pathway_colors]
+  app/logic/reactable_helpers[generate_columnsDef], # ,custom_colGroup_setting
+  app/logic/prepare_table[prepare_expression_table,set_pathway_colors,get_tissue_list]
 )
 
 # Load and process data table
 input_data <- function(sample,expr_flag){
   input_files <- get_inputs("per_sample_file")
   # message("Loading data for expression profile: ", filenames$expression.files)
-  data <- load_data(input_files$expression.files,"expression",sample,expr_flag)
+  data <- load_data(input_files$expression.files,"expression",sample,expr_flag) #expr_flag = "all_genes" #sample = "MR1507"
   dt <- prepare_expression_table(data,expr_flag)
   return(dt)
 }
@@ -35,14 +35,31 @@ ui_allGenes <- function(id, patient) {
   )
 }
 
-server_allGenes <- function(id, patient) {
+server_allGenes <- function(id, patient,selected_columns, column_mapping) {
   moduleServer(id, function(input, output, session) {
     data <- reactive({
       input_data(patient,expr_flag = "all_genes") 
     })
 
+    # Call generate_columnsDef to generate colDef setting for reactable
+    column_defs <- reactive({
+      message("Generating colDef for expression")
+      req(selected_columns())
+      generate_columnsDef(names(data()), selected_columns(), "expression", column_mapping, session)
+    })
+
+    custom_colGroup_setting <- lapply(get_tissue_list(), function(tissue) {
+        group_name <- gsub("_", " ", tissue)
+        colGroup(name = group_name, columns = c(
+          paste0("log2FC_", tissue),
+          paste0("p_value_", tissue),
+          paste0("p_adj_", tissue)
+        ))
+      })
+
     output[[paste0("table_", patient)]] <- renderReactable({
       reactable(as.data.frame(data()),
+                columns = column_defs(),
                 resizable = TRUE,
                 showPageSizeOptions = TRUE,
                 pageSizeOptions = c(10, 20, 50, 100),
@@ -53,7 +70,8 @@ server_allGenes <- function(id, patient) {
                 outlined = TRUE,
                 filterable = TRUE,
                 compact = TRUE,
-                defaultColDef = colDef(sortNALast = TRUE,align = "center")
+                defaultColDef = colDef(sortNALast = TRUE,align = "center"),
+                columnGroups = custom_colGroup_setting
       )
     })
   })
