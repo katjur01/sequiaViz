@@ -14,7 +14,7 @@ box::use(
   app/logic/plots[prepare_barPlot_data,create_barPlot], 
   app/logic/waiters[use_spinner],
   app/logic/load_data[get_inputs,load_data],
-  app/logic/reactable_helpers[generate_columnsDef], # ,custom_colGroup_setting
+  app/logic/reactable_helpers[generate_columnsDef,custom_colGroup_setting],
   app/logic/prepare_table[prepare_expression_table,set_pathway_colors,get_tissue_list]
 )
 
@@ -48,14 +48,6 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping) {
       generate_columnsDef(names(data()), selected_columns(), "expression", column_mapping, session)
     })
 
-    custom_colGroup_setting <- lapply(get_tissue_list(), function(tissue) {
-        group_name <- gsub("_", " ", tissue)
-        colGroup(name = group_name, columns = c(
-          paste0("log2FC_", tissue),
-          paste0("p_value_", tissue),
-          paste0("p_adj_", tissue)
-        ))
-      })
 
     output[[paste0("table_", patient)]] <- renderReactable({
       reactable(as.data.frame(data()),
@@ -71,7 +63,9 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping) {
                 filterable = TRUE,
                 compact = TRUE,
                 defaultColDef = colDef(sortNALast = TRUE,align = "center"),
-                columnGroups = custom_colGroup_setting
+                columnGroups = custom_colGroup_setting("expression"),
+                defaultSorted = list("geneid" = "asc"),
+                
       )
     })
   })

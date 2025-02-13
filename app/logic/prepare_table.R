@@ -206,8 +206,8 @@ colFilter <- function(flag){
       # column_var <- names(fread(filenames$expression.files[grep("multiRow", filenames$expression.files)][1], nrows = 0))
 
       tissue <- unique(gsub("^.*/|_all_genes_multiRow\\.tsv$", "", filenames$expression.files[grep("multiRow", filenames$expression.files)]))
-      keep_columns <- c("feature_name", "geneid", "all_kegg_paths_name", "num_of_paths")
-      hide_columns <- c("refseq_id", "type", "all_kegg_gene_names", "gene_definition")
+      keep_columns <- c("feature_name", "geneid", "all_kegg_paths_name")
+      hide_columns <- c("refseq_id", "type", "all_kegg_gene_names", "gene_definition", "num_of_paths")
       
       # Generování dynamických sloupců pro každou tkáň
       log2FC_cols <- paste0("log2FC_", tissue)

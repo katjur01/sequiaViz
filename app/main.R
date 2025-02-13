@@ -258,9 +258,10 @@ server <- function(id) {
 ##################
     ## filter table columns dropdown button for fusion
     all_colnames_val_expression <- getColFilterValues("expression")
+    
     output$colFilter_dropdown_ui_expression <- renderUI({
       req(all_colnames_val_expression())
-      colFilterDropdown_ui(ns("colFilter_dropdown_expression"), all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting,columnName_map("expression"))
+      colFilterDropdown_ui(ns("colFilter_dropdown_expression"), all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting,columnName_map("expression",all_colnames_val_expression()$all_columns)$dropdown_btn)
     })
     
     ## run expression profile module
@@ -271,7 +272,7 @@ server <- function(id) {
     selected_columns_expression <- colFilterDropdown_server("colFilter_dropdown_expression", all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting)
     lapply(names(samples_expr), function(patient) {
       expression_profile_table$server_genesOfInterest(paste0("genesOfinterest_tab_", patient), samples_expr[[patient]])
-      expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",all_colnames_val_expression()$all_columns))
+      expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",all_colnames_val_expression()$all_columns)$table)
     })
 
 

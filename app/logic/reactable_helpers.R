@@ -1,11 +1,15 @@
 box::use(  
   shiny[tags,tagList, icon, actionButton, textInput,HTML],
   reactable,
-  reactable[colDef,JS,colGroup,colFormat],
+  reactable[colDef,JS,colGroup],
   htmltools[div,tags,tagAppendAttributes],
   stats[na.omit],
   bs4Dash[actionButton],
   reactablefmtr[pill_buttons,data_bars]
+)
+
+box::use(
+  app/logic/prepare_table[get_tissue_list]
 )
 
 
@@ -176,8 +180,31 @@ columnName_map <- function(tag, all_columns = NULL){
       Feature_type = "Feature type",
       `Annotation source` = "Annotation source",
       Gene = "Gene ID")
+    
   } else if (tag == "expression"){
-    map_list <- list(
+    
+    dropdown_btn <- list()
+    table <- list()
+    tissue_list <- get_tissue_list()
+    
+    rename_column <- function(col, tissue_list) {
+      for (tissue in tissue_list) {
+        if (grepl(tissue, col)) {
+          prefix <- gsub(paste0("_", tissue), "", col)  # Odstraníme tkáň z názvu
+          tissue <- gsub("_", " ", tissue)  # Nahrazení podtržítka mezerou pro čitelnost
+
+          # Vrátíme přejmenovaný sloupec jen pokud je relevantní
+          if (prefix %in% c("log2FC", "p_value", "p_adj")) {
+            return(paste(tissue, ifelse(prefix == "log2FC", "log2FC",
+                                        ifelse(prefix == "p_value", "p-value", "p-adj"))))
+          }
+        }
+      }
+      return(NULL)  # Pokud se sloupec nemá přejmenovat, vrátíme NULL
+    }
+
+    static_columns <- list(
+      sample = "Sample",
       feature_name = "Gene name",
       geneid = "Gene ID",
       refseq_id = "RefSeq ID",
@@ -185,19 +212,29 @@ columnName_map <- function(tag, all_columns = NULL){
       gene_definition = "Gene definition",
       all_kegg_gene_names = "KEGG gene names",
       all_kegg_paths_name = "Pathway",
-      num_of_paths = "Number of pathways"
+      num_of_paths = "Pathway (n)"
     )
-    
-    for (col in all_columns) {   # Přidání dynamických sloupců do map_list
-      if (grepl("^log2FC_", col)) {
-        map_list[[col]] <- "log2FC"
-      } else if (grepl("^p_value_", col)) {
-        map_list[[col]] <- "p-value"
-      } else if (grepl("^p_adj_", col)) {
-        map_list[[col]] <- "p-adj"
+
+    for (col in all_columns) {
+      new_name <- rename_column(col, tissue_list)
+      if (!is.null(new_name)) {  # Přidáme jen pokud má smysl
+        dropdown_btn[[col]] <- new_name
       }
     }
-    
+
+    for (col in all_columns) {
+      if (grepl("^log2FC_", col)) {
+        table[[col]] <- "log2FC"
+      } else if (grepl("^p_value_", col)) {
+        table[[col]] <- "p-value"
+      } else if (grepl("^p_adj_", col)) {
+        table[[col]] <- "p-adj"
+      }
+    }
+
+    dropdown_btn <- append(static_columns,dropdown_btn)
+    table <- c(static_columns,table)
+    map_list <- list(dropdown_btn = dropdown_btn, table = table)
     
   } else {
     print("NOT germline, expression or fusion")
@@ -354,26 +391,55 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
     # names(custom_colDef) <- names(data)
     
     custom_colDef <- list(
-      feature_name = colDef(minWidth = 150,filterable = TRUE),
-      geneid = colDef(maxWidth = 140,filterable = TRUE),
-      all_kegg_paths_name = colDef(minWidth = 150,filterable = TRUE),
-      num_of_paths = colDef(maxWidth = 100)
+      feature_name = colDef(minWidth = 150, filterable = TRUE),
+      geneid = colDef(minWidth = 150, filterable = TRUE),
+      all_kegg_paths_name = colDef(minWidth = 170, filterable = TRUE),
+      num_of_paths = colDef(maxWidth = 100),
+      refseq_id = colDef(maxWidth = 140),
+      type = colDef(maxWidth = 100),
+      gene_definition = colDef(minWidth = 130),
+      all_kegg_gene_names = colDef(minWidth = 150)
     )
     
     dynamic_columns <- list()
+    num_columns <- length(column_names)  # Celkový počet dynamických sloupců
+    log2fc_indices <- which(grepl("^log2FC_", column_names))  # Indexy log2FC sloupců
     
-    for (col in column_names) {
+    for (i in seq_along(column_names)) {
+      col <- column_names[i]
+      
+      # Oddělovací čáru přidáme pouze tam, kde to má smysl
+      border_style <- NULL
+      
       if (grepl("^log2FC_", col)) {
-        dynamic_columns[[col]] <- colDef(maxWidth = 130, format = colFormat(digits = 6))
+        # První log2FC dostane čáru na oddělení od statických sloupců
+        if (i == log2fc_indices[1]) {
+          border_style <- list(borderLeft = "1px solid gray")
+        }
+      }
+      
+      if (grepl("^p_adj_", col)) {
+        # P_adj dostane oddělovací čáru jen pokud to není poslední trojice
+        if (i < num_columns) {
+          border_style <- list(borderRight = "1px dashed rgba(0, 0, 0, 0.3)")
+        }
+      }
+      
+      # Vytvoření sloupců s dynamickými vlastnostmi
+      # scientific formát, bohužel to trvá strašně dlouho. nejedná se totiž o přepočet ale pouze o zobrazení čísla 
+      # v daném zápisu, který reactable zatím nepodporuje: cell = function(value) formatC(value, format = "e", digits = 2)
+      if (grepl("^log2FC_", col)) {
+        dynamic_columns[[col]] <- colDef(maxWidth = 130, style = border_style) #,format = colFormat(digits = 6)
       } else if (grepl("^p_value_", col)) {
-        dynamic_columns[[col]] <- colDef(maxWidth = 130, format = colFormat(digits = 6), sortable = TRUE)
+        dynamic_columns[[col]] <- colDef(maxWidth = 130, sortable = TRUE) #,cell = function(value) formatC(value, format = "e", digits = 2)
       } else if (grepl("^p_adj_", col)) {
-        dynamic_columns[[col]] <- colDef(maxWidth = 130, format = colFormat(digits = 6), sortable = TRUE)
+        dynamic_columns[[col]] <- colDef(maxWidth = 130, sortable = TRUE, style = border_style)
       }
     }
     
     # Spojení dynamických a statických sloupců
     custom_colDef <- c(custom_colDef, dynamic_columns)
+    
     
   # } else if (tag == "expression") {
   # 
@@ -433,7 +499,20 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
   return(custom_colDef)
 }
 
-      
+#' @export
+custom_colGroup_setting <- function(tag){
+  if (tag == "expression"){
+    custom_colGroup <- lapply(get_tissue_list(), function(tissue) {
+        group_name <- gsub("_", " ", tissue)
+        colGroup(name = group_name, columns = c(
+            paste0("log2FC_", tissue),
+            paste0("p_value_", tissue),
+            paste0("p_adj_", tissue)
+        ))
+    })
+  }
+  return(custom_colGroup)
+}
 
 #' @export
 set_pathway_colors <- function(){
