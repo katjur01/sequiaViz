@@ -366,30 +366,6 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
       Gene = colDef(minWidth = 150,filterable = TRUE)
     )
   } else if (tag == "expression") {
-    
-    # tissue_columns <- grep("log2FC_", names(data), value = TRUE)
-    # scale_indices <- grep("^Scale_", names(data))
-    # fc_indices <- grep("^FC_", names(data))
-    
-    # custom_colDef <- lapply(names(data), function(col) {
-    #   if (grepl("^log2FC_", col)) {
-    #     colDef(
-    #       name = "FC",
-    #       maxWidth = 280,
-    #       cell = data_bars(
-    #         data,
-    #         fill_color = c("#42c2ca","#d9f2f4","#ffbaba","#ff7b7b"),
-    #         number_fmt = scales::number_format(accuracy = 0.01)
-    #       )
-    #       ,style = if (which(names(data) == col) == fc_indices[1]) list(borderRight = "1px dashed rgba(0, 0, 0, 0.3)") else NULL
-    #     )
-    #   } else {
-    #     colDef()
-    #   }
-    # })
-    # 
-    # names(custom_colDef) <- names(data)
-    
     custom_colDef <- list(
       feature_name = colDef(minWidth = 150, filterable = TRUE),
       geneid = colDef(minWidth = 150, filterable = TRUE),
@@ -400,21 +376,18 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
       gene_definition = colDef(minWidth = 130),
       all_kegg_gene_names = colDef(minWidth = 150)
     )
-    
     dynamic_columns <- list()
     num_columns <- length(column_names)  # Celkový počet dynamických sloupců
     log2fc_indices <- which(grepl("^log2FC_", column_names))  # Indexy log2FC sloupců
     
     for (i in seq_along(column_names)) {
       col <- column_names[i]
-      
-      # Oddělovací čáru přidáme pouze tam, kde to má smysl
       border_style <- NULL
       
       if (grepl("^log2FC_", col)) {
         # První log2FC dostane čáru na oddělení od statických sloupců
         if (i == log2fc_indices[1]) {
-          border_style <- list(borderLeft = "1px solid gray")
+          border_style <- list(borderLeft = "2px solid black")
         }
       }
       
@@ -429,70 +402,46 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
       # scientific formát, bohužel to trvá strašně dlouho. nejedná se totiž o přepočet ale pouze o zobrazení čísla 
       # v daném zápisu, který reactable zatím nepodporuje: cell = function(value) formatC(value, format = "e", digits = 2)
       if (grepl("^log2FC_", col)) {
-        dynamic_columns[[col]] <- colDef(maxWidth = 130, style = border_style) #,format = colFormat(digits = 6)
+        dynamic_columns[[col]] <- colDef(
+          maxWidth = 130,
+          style = JS("function(rowInfo, colInfo) {
+                        var value = rowInfo.values[colInfo.id];
+                        var borderStyle = colInfo.id.includes('p_adj') ? '1px dashed rgba(0, 0, 0, 0.3)' : '';
+                        var color = value > 1 ? '#FFE9E9' : (value < -1 ? '#E6F7FF' : '#FFFFFF');
+
+                        return {
+                          backgroundColor: color,
+                          borderRight: borderStyle
+                        };}"))
       } else if (grepl("^p_value_", col)) {
-        dynamic_columns[[col]] <- colDef(maxWidth = 130, sortable = TRUE) #,cell = function(value) formatC(value, format = "e", digits = 2)
+        dynamic_columns[[col]] <- colDef(
+          maxWidth = 130,
+          style = JS("function(rowInfo, colInfo) {
+                        var value = rowInfo.values[colInfo.id];
+                        var borderStyle = colInfo.id.includes('p_adj') ? '1px dashed rgba(0, 0, 0, 0.3)' : '';
+                        var color = (value <= 0.05) ? '#FFEFDE' : '#FFFFFF';
+
+                        return {
+                          backgroundColor: color,
+                          borderRight: borderStyle
+                        };}"))
       } else if (grepl("^p_adj_", col)) {
-        dynamic_columns[[col]] <- colDef(maxWidth = 130, sortable = TRUE, style = border_style)
+        dynamic_columns[[col]] <- colDef(
+          maxWidth = 130,
+          style = JS("function(rowInfo, colInfo) {
+                        var value = rowInfo.values[colInfo.id];
+                        var borderStyle = '1px dashed rgba(0, 0, 0, 0.3)';  // p-adj má border vždy
+                        var color = (value <= 0.05) ? '#E7FAEF' : '#FFFFFF';
+                  
+                        return {
+                          backgroundColor: color,
+                          borderRight: borderStyle
+                        };}"))
       }
     }
-    
-    # Spojení dynamických a statických sloupců
+
     custom_colDef <- c(custom_colDef, dynamic_columns)
     
-    
-  # } else if (tag == "expression") {
-  # 
-  #     tissue_columns <- grep("Tissue_", names(data), value = TRUE)
-  #     scale_indices <- grep("^Scale_", names(data))
-  #     fc_indices <- grep("^FC_", names(data))
-  # 
-  #     custom_colDef <- lapply(names(data), function(col) {
-  #       if (col %in% tissue_columns) {
-  #         colDef(show = FALSE)
-  #       } else if (grepl("^FC_", col)) {
-  #         colDef(
-  #           name = "FC",
-  #           maxWidth = 280,
-  #           cell = data_bars(
-  #             data,
-  #             fill_color = c("#42c2ca","#d9f2f4","#ffbaba","#ff7b7b"),
-  #             number_fmt = scales::number_format(accuracy = 0.01)
-  #           )
-  #           ,style = if (which(names(data) == col) == fc_indices[1]) list(borderRight = "1px dashed rgba(0, 0, 0, 0.3)") else NULL
-  #         )
-  #       } else if (grepl("^Scale_", col)) {
-  #         colDef(
-  #           name = "Scale",
-  #           maxWidth = 120
-  #           # align = "center"
-  #         )
-  #       } else if (col == "Gene") {
-  #         colDef(
-  #           maxWidth = 150
-  #         )
-  #       } else if (col == "Pathway") {
-  #         colDef(
-  #           minWidth = 200,
-  #           align = "left",
-  #           cell = pill_buttons(
-  #             data = data,
-  #             color_ref = "Color",
-  #             box_shadow = TRUE
-  #           ),
-  #           style = list(borderRight = "1px dashed rgba(0, 0, 0, 0.3)")
-  #         )
-  #       } else if (col == "Color") {
-  #         colDef(show = FALSE)
-  #       } else if (col == "Sample") {
-  #         colDef(show = FALSE)
-  #       } else {
-  #         colDef()
-  #       }
-  #     })
-  # 
-  #     names(custom_colDef) <- names(data)
-  # 
   } else {
     print("NOT fusion, expression or germline")
   }

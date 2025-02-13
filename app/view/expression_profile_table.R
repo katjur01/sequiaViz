@@ -51,6 +51,7 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping) {
 
     output[[paste0("table_", patient)]] <- renderReactable({
       reactable(as.data.frame(data()),
+                class = "expression-table",
                 columns = column_defs(),
                 resizable = TRUE,
                 showPageSizeOptions = TRUE,
@@ -64,7 +65,7 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping) {
                 compact = TRUE,
                 defaultColDef = colDef(sortNALast = TRUE,align = "center"),
                 columnGroups = custom_colGroup_setting("expression"),
-                defaultSorted = list("geneid" = "asc"),
+                defaultSorted = list("geneid" = "asc")
                 
       )
     })

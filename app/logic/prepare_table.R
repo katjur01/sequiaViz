@@ -3,7 +3,8 @@
 box::use(
   data.table[fread,tstrsplit,setcolorder,setnames,uniqueN,dcast],
   shiny[observe],
-  openxlsx[read.xlsx]
+  openxlsx[read.xlsx],
+  scales[scientific_format]
 )
 box::use(
   app/logic/load_data[get_inputs,load_data],
@@ -143,6 +144,14 @@ prepare_expression_table <- function(combined_dt,expr_flag){
     
     column_order <- c("sample","feature_name","geneid","refseq_id","type","gene_definition","all_kegg_gene_names","all_kegg_paths_name", "num_of_paths",as.vector(rbind(log2FC_cols, p_value_cols, p_adj_cols)))
     wide_dt <- wide_dt[, column_order, with = FALSE]
+    
+    # Převod pouze číselných sloupců na scientific zápis
+    # Použití scientific formátu a zajištění, že NA zůstane NA
+    wide_dt[, (log2FC_cols) := lapply(.SD, function(x) ifelse(is.na(x), NA, format(x, scientific = TRUE, digits = 4))), .SDcols = log2FC_cols]
+    wide_dt[, (p_value_cols) := lapply(.SD, function(x) ifelse(is.na(x), NA, format(x, scientific = TRUE, digits = 5))), .SDcols = p_value_cols]
+    wide_dt[, (p_adj_cols) := lapply(.SD, function(x) ifelse(is.na(x), NA, format(x, scientific = TRUE, digits = 6))), .SDcols = p_adj_cols]
+
+    
     
   } else {
     stop("Unknown expr_tag: ", expr_flag)
