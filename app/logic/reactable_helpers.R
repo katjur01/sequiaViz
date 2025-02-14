@@ -5,7 +5,8 @@ box::use(
   htmltools[div,tags,tagAppendAttributes],
   stats[na.omit],
   bs4Dash[actionButton],
-  reactablefmtr[pill_buttons,data_bars]
+  reactablefmtr[pill_buttons,data_bars],
+  htmltools[HTML,span, div, tagList]
 )
 
 box::use(
@@ -100,7 +101,7 @@ generate_columnsDef <- function(column_names, selected_columns, tag, column_mapp
 
 
 #' @export
-columnName_map <- function(tag, all_columns = NULL){
+columnName_map <- function(tag, expr_flag = NULL, all_columns = NULL){
   if (tag == "fusion"){
     map_list <- list(
       gene1 = "Gene 1",
@@ -203,17 +204,22 @@ columnName_map <- function(tag, all_columns = NULL){
       return(NULL)  # Pokud se sloupec nemá přejmenovat, vrátíme NULL
     }
 
-    static_columns <- list(
-      sample = "Sample",
-      feature_name = "Gene name",
-      geneid = "Gene ID",
-      refseq_id = "RefSeq ID",
-      type = "Type",
-      gene_definition = "Gene definition",
-      all_kegg_gene_names = "KEGG gene names",
-      all_kegg_paths_name = "Pathway",
-      num_of_paths = "Pathway (n)"
-    )
+    if (expr_flag == "all_genes"){
+        static_columns <- list(
+          feature_name = "Gene name",
+          geneid = "Gene ID",
+          refseq_id = "RefSeq ID",
+          type = "Type",
+          gene_definition = "Gene definition",
+          all_kegg_gene_names = "KEGG gene names",
+          all_kegg_paths_name = "Pathway",
+          num_of_paths = "Pathway (n)")
+    } else {
+        static_columns <- list(
+          feature_name = "Gene name",
+          geneid = "Gene ID",
+          pathway = "Pathway")
+    }
 
     for (col in all_columns) {
       new_name <- rename_column(col, tissue_list)
@@ -366,10 +372,53 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
       Gene = colDef(minWidth = 150,filterable = TRUE)
     )
   } else if (tag == "expression") {
+    
+
+    
     custom_colDef <- list(
       feature_name = colDef(minWidth = 150, filterable = TRUE),
       geneid = colDef(minWidth = 150, filterable = TRUE),
       all_kegg_paths_name = colDef(minWidth = 170, filterable = TRUE),
+      # pathway = colDef(minWidth = 180, filterable = TRUE),
+      pathway = colDef(
+        minWidth = 180,
+        filterable = TRUE,
+        html = TRUE,  # Povolení HTML v Reactable
+        cell = function(value) {
+          if (is.null(value) || value == "") return("N/A")
+          
+          pathway_colors <- list(
+            "RTK Signaling" = "#98FB98",
+            "Metabolic Signaling" = "#00CED1",
+            "Epigenetics" = "#DA70D6",
+            "PI3K/AKT/mTOR Signaling" = "#008000",
+            "Apoptosis" = "#FF7F00",
+            "MAPK Signaling" = "#800000",
+            "WNT signaling" = "#6495ED",
+            "Hormone Signaling" = "#DC143C",
+            "DNA damage/repair" = "#87CEEB",
+            "Cell cycle control" = "#FB9A99",
+            "Immune Checkpoints" = "#A9A9A9",
+            "TGF-B Signaling" = "#FFD700",
+            "JAK/STAT Signaling" = "#BDB76B",
+            "Hedgehog Signaling" = "#8B008B",
+            "Non-receptor kinases" = "#6A5ACD",
+            "Kinase Fusions" = "#D2691E",
+            "Immune Response" = "#4682B4")
+          
+          pathways <- strsplit(value, ",")[[1]] # Rozdělení pathway hodnot do seznamu (některé mohou obsahovat více pathway)
+          pathways <- trimws(pathways)  # Odstranění mezer kolem názvů
+          
+          # Vytvoření pill elementů
+          pills <- lapply(pathways, function(pathway) {
+            color <- pathway_colors[[pathway]]
+            if (is.null(color)) color <- "#D3D3D3"  # Výchozí šedá pro neznámé pathways
+            div(style = sprintf("display: inline-block; padding: 5px 10px; margin: 2px; border-radius: 15px; background-color: %s; color: white; font-size: 12px; font-weight: bold;", color),
+                pathway)
+          })
+          as.character(tagList(pills)) # Použití `as.character()` k převedení HTML do stringu
+        }
+      ),
       num_of_paths = colDef(maxWidth = 100),
       refseq_id = colDef(maxWidth = 140),
       type = colDef(maxWidth = 100),
@@ -460,30 +509,31 @@ custom_colGroup_setting <- function(tag){
         ))
     })
   }
+  message("custom_colGroup: ",custom_colGroup)
   return(custom_colGroup)
 }
 
-#' @export
 set_pathway_colors <- function(){
-  pathway_colors <- c(
-    "RTK Signaling" = "palegreen2",
-    "Metabolic Signaling" = "darkturquoise",
-    "Epigenetics" = "orchid1",
-    "PI3K/AKT/mTOR Signaling" = "green4",
-    "Apoptosis" = "#FF7F00",
-    "MAPK Signaling" = "maroon",
-    "WNT signaling" = "#6495ED",
-    "Hormone Signaling" = "#DC143C",
-    "DNA damage/repair" = "skyblue2",
-    "Cell cycle control" = "#FB9A99",
-    "Immune Checkpoints" = "#A9A9A9",
-    "TGF-B Signaling" = "gold1",
-    "JAK/STAT Signaling" = "#BDB76B",
-    "Hedgehog Signaling" = "#8B008B",
-    # "non-WNT/non-SHH medulloblastoma-related markers" = "khaki2",
-    "Non-receptor kinases" = "#6A5ACD", 
-    "Kinase Fusions" = "#D2691E"
-  )
+  pathway_colors <- list(
+      "RTK Signaling" = "#98FB98",
+      "Metabolic Signaling" = "#00CED1",
+      "Epigenetics" = "#DA70D6",
+      "PI3K/AKT/mTOR Signaling" = "#008000",
+      "Apoptosis" = "#FF7F00",
+      "MAPK Signaling" = "#800000",
+      "WNT signaling" = "#6495ED",
+      "Hormone Signaling" = "#DC143C",
+      "DNA damage/repair" = "#87CEEB",
+      "Cell cycle control" = "#FB9A99",
+      "Immune Checkpoints" = "#A9A9A9",
+      "TGF-B Signaling" = "#FFD700",
+      "JAK/STAT Signaling" = "#BDB76B",
+      "Hedgehog Signaling" = "#8B008B",
+      "Non-receptor kinases" = "#6A5ACD",
+      "Kinase Fusions" = "#D2691E",
+      # "non-WNT/non-SHH medulloblastoma-related markers" = "khaki2",
+      "Immune Response" = "#4682B4")
+
   return(pathway_colors)
 }
 

@@ -121,26 +121,30 @@ prepare_germline_table <- function(dt){
 
 #' @export
 prepare_expression_table <- function(combined_dt,expr_flag){
+  tissue_order <- unique(combined_dt$tissue)
+  
+  log2FC_cols <- paste0("log2FC_", tissue_order)
+  p_value_cols <- paste0("p_value_", tissue_order)
+  p_adj_cols <- paste0("p_adj_", tissue_order)
+  
   if(expr_flag == "genes_of_interest"){
     wide_dt <- dcast(combined_dt,
                      sample + feature_name + geneid + pathway ~ tissue,
                      value.var = c("log2FC", "p_value", "p_adj"))
+    
     # Column ordering
-    ordered_columns <- c("sample", "feature_name", "geneid", "pathway")
-    tissue_cols <- unlist(lapply(unique(combined_dt$tissue), function(tissue) {
-      paste0(c("log2FC", "p_value", "p_adj"), "_", tissue)
-    }))
-    wide_dt <- wide_dt[, c(ordered_columns, tissue_cols), with = FALSE]
+    column_order <- c("sample", "feature_name", "geneid", "pathway",as.vector(rbind(log2FC_cols, p_value_cols, p_adj_cols)))
+    wide_dt <- wide_dt[, column_order, with = FALSE]
+    
+    # tissue_cols <- unlist(lapply(unique(combined_dt$tissue), function(tissue) {
+    #   paste0(c("log2FC", "p_value", "p_adj"), "_", tissue)
+    # }))
+    # wide_dt <- wide_dt[, c(ordered_columns, tissue_cols), with = FALSE]
   } else if (expr_flag == "all_genes"){
-    tissue_order <- unique(combined_dt$tissue)
     wide_dt <- dcast(combined_dt,
                      sample + feature_name + geneid + refseq_id + type + all_kegg_gene_names
                      + gene_definition + all_kegg_paths_name + num_of_paths ~ tissue,
                      value.var = c("log2FC", "p_value", "p_adj"))
-    
-    log2FC_cols <- paste0("log2FC_", tissue_order)
-    p_value_cols <- paste0("p_value_", tissue_order)
-    p_adj_cols <- paste0("p_adj_", tissue_order)
     
     column_order <- c("sample","feature_name","geneid","refseq_id","type","gene_definition","all_kegg_gene_names","all_kegg_paths_name", "num_of_paths",as.vector(rbind(log2FC_cols, p_value_cols, p_adj_cols)))
     wide_dt <- wide_dt[, column_order, with = FALSE]
@@ -187,7 +191,7 @@ set_pathway_colors <- function(){
 }
 
 #' @export
-colFilter <- function(flag){
+colFilter <- function(flag,expr_flag = NULL){
   filenames <- get_inputs("per_sample_file")
   # message(paste("Getting columns for flag:", flag))
 
@@ -215,8 +219,13 @@ colFilter <- function(flag){
       # column_var <- names(fread(filenames$expression.files[grep("multiRow", filenames$expression.files)][1], nrows = 0))
 
       tissue <- unique(gsub("^.*/|_all_genes_multiRow\\.tsv$", "", filenames$expression.files[grep("multiRow", filenames$expression.files)]))
-      keep_columns <- c("feature_name", "geneid", "all_kegg_paths_name")
-      hide_columns <- c("refseq_id", "type", "all_kegg_gene_names", "gene_definition", "num_of_paths")
+      if (expr_flag == "all_genes"){
+        keep_columns <- c("feature_name", "geneid", "all_kegg_paths_name")
+        hide_columns <- c("refseq_id", "type", "all_kegg_gene_names", "gene_definition", "num_of_paths")
+      } else {
+        keep_columns <- c("feature_name", "geneid", "pathway")
+        hide_columns <- NULL
+      }
       
       # Generování dynamických sloupců pro každou tkáň
       log2FC_cols <- paste0("log2FC_", tissue)

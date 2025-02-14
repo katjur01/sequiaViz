@@ -29,7 +29,8 @@ box::use(
   # reactable[colDef],
   htmltools[tags,p],
   shinyWidgets[pickerInput],
-  shinyjs[useShinyjs, runjs]
+  shinyjs[useShinyjs, runjs],
+  utils[str]
   # data.table
   # openxlsx[read.xlsx]
 )
@@ -133,12 +134,13 @@ ui <- function(id){
                                lapply(names(set_patient_to_sample("expression")), function(patient) {
                                  tabPanel(title = patient,
                                       tabBox(id = ns(paste0("expression_profile_tabs_", patient)), width = 12, collapsible = FALSE,
-                                             tabPanel("All Genes",
-                                                      tabName = ns("allGenes_panel"), value = "allGenes",
-                                                      expression_profile_table$ui_allGenes(ns(paste0("allGenes_tab_", patient)), patient)),
                                              tabPanel("Genes of Interest",
                                                       tabName = ns("genesOfinterest_panel"), value = "genesOfinterest",
-                                                      expression_profile_table$ui_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), patient))
+                                                      expression_profile_table$ui_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), patient)),
+                                             tabPanel("All Genes",
+                                                      tabName = ns("allGenes_panel"), value = "allGenes",
+                                                      expression_profile_table$ui_allGenes(ns(paste0("allGenes_tab_", patient)), patient))
+
                                       )
                                  )
                                })))
@@ -205,9 +207,9 @@ server <- function(id) {
   # })
 #
 #
-    getColFilterValues <- function(flag) {
+    getColFilterValues <- function(flag,expr_flag) {
       reactive({
-        colnames_list <- colFilter(flag)
+        colnames_list <- colFilter(flag,expr_flag)
         list(all_columns = colnames_list$all_columns, default_setting = colnames_list$default_setting)
       })
     }
@@ -256,23 +258,42 @@ server <- function(id) {
     })
 
 ##################
-    ## filter table columns dropdown button for fusion
-    all_colnames_val_expression <- getColFilterValues("expression")
+    
+    samples_expr <- set_patient_to_sample("expression")
+    
+    # Reaktivní value for watching which panel is active
+    expr_flag <- reactive({
+      patients <- names(samples_expr)
+
+      for (patient in patients) {
+        panel_id <- paste0("expression_profile_tabs_", patient)
+        
+        if (!is.null(input[[panel_id]])) {
+          if (input[[panel_id]] == "allGenes") {
+            return("all_genes")
+          } else if (input[[panel_id]] == "genesOfinterest") {
+            return("genes_of_interest")}}
+      }
+      return(NULL)
+    })
+    
+    all_colnames_val_expression <- reactive({
+      req(expr_flag())
+      return(getColFilterValues("expression", expr_flag())())
+    })
     
     output$colFilter_dropdown_ui_expression <- renderUI({
       req(all_colnames_val_expression())
-      colFilterDropdown_ui(ns("colFilter_dropdown_expression"), all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting,columnName_map("expression",all_colnames_val_expression()$all_columns)$dropdown_btn)
-    })
-    
-    ## run expression profile module
-    samples_expr <- set_patient_to_sample("expression")
-    # lapply(names(samples_expr), function(patient) {
-    #   expression_profile_table$server(paste0("exprProfile_tab_", patient), samples_expr[[patient]])
-    # })
-    selected_columns_expression <- colFilterDropdown_server("colFilter_dropdown_expression", all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting)
-    lapply(names(samples_expr), function(patient) {
-      expression_profile_table$server_genesOfInterest(paste0("genesOfinterest_tab_", patient), samples_expr[[patient]])
-      expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",all_colnames_val_expression()$all_columns)$table)
+      colFilterDropdown_ui(ns("colFilter_dropdown_expression"), all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting,columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$dropdown_btn)
+      })
+
+    observe({
+      req(all_colnames_val_expression())
+      selected_columns_expression <- colFilterDropdown_server("colFilter_dropdown_expression", all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting)
+      lapply(names(samples_expr), function(patient) {
+        expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$table)
+        expression_profile_table$server_genesOfInterest(paste0("genesOfinterest_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$table)
+      })
     })
 
 

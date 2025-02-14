@@ -10,7 +10,6 @@ box::use(
 )
 
 box::use(
-  # app/logic/expression_profile_helpers[get_tissues,sorting_setting,groups_setting,set_pathway_colors], 
   app/logic/plots[prepare_barPlot_data,create_barPlot], 
   app/logic/waiters[use_spinner],
   app/logic/load_data[get_inputs,load_data],
@@ -38,7 +37,7 @@ ui_allGenes <- function(id, patient) {
 server_allGenes <- function(id, patient,selected_columns, column_mapping) {
   moduleServer(id, function(input, output, session) {
     data <- reactive({
-      input_data(patient,expr_flag = "all_genes") 
+      input_data(patient, "all_genes") 
     })
 
     # Call generate_columnsDef to generate colDef setting for reactable
@@ -66,13 +65,10 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping) {
                 defaultColDef = colDef(sortNALast = TRUE,align = "center"),
                 columnGroups = custom_colGroup_setting("expression"),
                 defaultSorted = list("geneid" = "asc")
-                
       )
     })
   })
 }
-
-
 
 
 ui_genesOfInterest <- function(id,patient){
@@ -89,23 +85,25 @@ ui_genesOfInterest <- function(id,patient){
 }
 
 
-server_genesOfInterest <- function(id, patient) {
+server_genesOfInterest <- function(id, patient, selected_columns, column_mapping) {
   moduleServer(id, function(input, output, session) {
 
     data <- reactive({
-      dt <- input_data(patient,expr_flag = "genes_of_interest")
-      pathway_colors <- set_pathway_colors()
-      dt$color <- pathway_colors[dt$pathway]
-      dt
+      dt <- input_data(patient,"genes_of_interest")
+      # pathway_colors <- set_pathway_colors()
+      # dt$color <- pathway_colors[dt$pathway]
+      # dt
     })
 
-    # column_defs <- reactive({custom_colDef_setting("expression",data = data())})
-    # default_sorted <- reactive({sorting_setting(data())})
-    # column_groups <- reactive({groups_setting(data())})
-
+    column_defs <- reactive({
+      message("Generating colDef for expression")
+      req(selected_columns())
+      generate_columnsDef(names(data()), selected_columns(), "expression", column_mapping, session)
+    })
 
     output[[paste0("table_", patient)]] <- renderReactable({
       reactable(as.data.frame(data()),
+                columns = column_defs(),
                 resizable = TRUE,
                 showPageSizeOptions = TRUE,
                 height = 600,
@@ -118,21 +116,7 @@ server_genesOfInterest <- function(id, patient) {
                 pagination = FALSE,
                 compact = TRUE,
                 defaultColDef = colDef(sortNALast = TRUE,align = "center"),
-                columns = list(
-                  pathway = colDef(
-                    minWidth = 200,
-                    align = "left",
-                    cell = pill_buttons(
-                      data = data(),  # Použití wide_dt jako zdroje dat
-                      color_ref = "color",  # Ujistěte se, že toto je správný název sloupce
-                      box_shadow = TRUE
-                    ),
-                    style = list(borderRight = "1px dashed rgba(0, 0, 0, 0.3)")
-                  )
-                )
-                # defaultSorted = default_sorted(),
-                # columnGroups = column_groups(),
-                # columns = column_defs()
+                columnGroups = custom_colGroup_setting("expression")
       )
     })
     #
