@@ -1,67 +1,26 @@
-library(data.table)
-library(openxlsx)
-library(reactable)
-library(shiny)
-library(htmltools)
-library(bs4Dash)
+dictionary <- fread("sample_name_list.tsv")
+formatted_n <- lapply(dictionary[,1],function(x) sprintf("%03d", as.integer(x)))
+dictionary[,protein_name := lapply(formatted_n,function(x) paste0("P_",x))]
 
-ui <- fluidPage(
-  reactableOutput("table")
-)
+ens_prot_table <- fread("ens_prot_table.tsv")
+ens_prot_table_unique <- unique(ens_prot_table[,.(PG.ProteinAccessions = uniprotswissprot,ensembl_gene_id)],by = "PG.ProteinAccessions")
+ens_prot_table_unique <- unique(ens_prot_table_unique,by = "ensembl_gene_id")
 
-server <- function(input, output, session) {
-  
-  library <- "MOII_e117"
-  germline_variant_calling_project <- "117_WES_germline"
-  data <- fread("./input_files/MOII_e117/117_WES_germline/per_sample_final_var_tabs/tsv_formated/VH0452krev.variants.tsv")
+#rna tpm   
 
-  data[, Visual_Check := ""]
-  
-  filtered_dt <- data[, names(data) %in% c("sample", "var_name", "Gene_symbol", "variant_freq", "coverage_depth", "in_library", "HGVSc", "HGVSp", "Visual_Check",
-                                           "gnomAD_NFE","snpDB","gene_region", "Consequence", "clinvar_sig", "all_full_annot_name"), with = FALSE]
-  
-  setcolorder(filtered_dt, c("sample", "var_name", "variant_freq", "in_library", "Gene_symbol", "coverage_depth", "gene_region",
-                             "gnomAD_NFE", "clinvar_sig","snpDB","Consequence", "HGVSc", "HGVSp", "all_full_annot_name", "Visual_Check"))
+RNA_tpm <- fread("final_tab_globalimputing_WO_P037_and_P079.csv")
 
-  
-  
-  dt <- filtered_dt[1:100]
-  output$table <- renderReactable({
-    message("RenderReactable called")
-    reactable(
-      dt,
-      resizable = TRUE,
-      showPageSizeOptions = TRUE,
-      pageSizeOptions = c(10, 20, 50, 100),
-      defaultPageSize = 20,
-      striped = TRUE,
-      wrap = FALSE,
-      highlight = TRUE,
-      outlined = TRUE,
-      filterable = TRUE,
-      compact = TRUE,
-      columns = list(
-        IGV = colDef(
-          maxWidth = 100, filterable = FALSE,
-          cell = function(value, index) {
-            if (index <= input$table_state$lastRow - input$table_state$firstRow + 1) {
-              message(paste("Rendering action button for row", index))
-              actionButton(
-                inputId = paste0("igvButton_", index),
-                label = NULL,
-                icon = icon("play")
-              )
-            }
-          }
-        )
-      )
-    )
-  })
+setnames(RNA_tpm,"patient_prot","sample")
+RNA_tpm[,patient_rna := NULL]
+RNA_tpm <- merge(ens_prot_table_unique[,.(protein_name = PG.ProteinAccessions,gene_id = ensembl_gene_id)],RNA_tpm,by = "protein_name")
+RNA_tpm <- unique(RNA_tpm,by = c("gene_id","sample"))
 
-  observe({
-    input$table_state
-    invalidateLater(20)
-  })
-}
+setnames(RNA_tpm,"count_rna","RNA_raw")
+setnames(RNA_tpm,"count_prot","prot_raw")
 
-shinyApp(ui, server)
+RNA_tpm[,RNA_log := log2(RNA_raw + 32)]
+RNA_tpm[,prot_log := log2(prot_raw)]
+RNA_tpm[,RNA_fc := RNA_log - mean(RNA_log), .(gene_id)]
+RNA_tpm[,prot_fc := prot_log - mean(prot_log), .(gene_id)]
+
+

@@ -28,9 +28,10 @@ box::use(
   # reactable,
   # reactable[colDef],
   htmltools[tags,p],
-  shinyWidgets[pickerInput],
-  shinyjs[useShinyjs, runjs],
-  utils[str]
+  shinyWidgets[pickerInput,prettySwitch],
+  shinyjs[useShinyjs, runjs,toggle],
+  utils[str],
+
   # data.table
   # openxlsx[read.xlsx]
 )
@@ -59,6 +60,15 @@ box::use(
 ui <- function(id){
   ns <- NS(id)
   useShinyjs()
+  tags$head(
+    tags$style(HTML("
+    #app-plots_tabBox_box {
+      box-shadow: none !important;
+      border: none !important;
+    }
+  "))
+  )
+  
   dashboardPage(
           header = dashboardHeader(),
           sidebar = dashboardSidebar( id = ns("sidebar"), collapsed = TRUE,
@@ -139,8 +149,16 @@ ui <- function(id){
                                                       expression_profile_table$ui_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), patient)),
                                              tabPanel("All Genes",
                                                       tabName = ns("allGenes_panel"), value = "allGenes",
-                                                      expression_profile_table$ui_allGenes(ns(paste0("allGenes_tab_", patient)), patient))
-
+                                                      expression_profile_table$ui_allGenes(ns(paste0("allGenes_tab_", patient)), patient)),
+                                             column(12, div(style = "margin-top: 20px;", prettySwitch(ns("showPlots_switch"), label = "Show plots", status = "success", fill = TRUE))),
+                                             # tabPanel("Volcano plot",
+                                             #          tabName = ns("volcanoPlot_panel"), value = "volcanoPlot"),
+                                             # tabPanel("Heatmap",
+                                             #          tabName = ns("heatmap_panel"), value = "heatmap")
+                                             tabBox(id = ns("plots_tabBox"), width = 12, collapsible = FALSE,headerBorder = FALSE,
+                                                    tabPanel("Volcano plot", tabName = "volcanoPlot_panel", value = "volcanoPlot"),
+                                                    tabPanel("Heatmap", tabName = "heatmap_panel", value = "heatmap")
+                                             )
                                       )
                                  )
                                })))
@@ -198,6 +216,10 @@ server <- function(id) {
     ns <- session$ns
     shared_data <- reactiveValues(germline_data = reactiveVal(NULL), fusion_data = reactiveVal(NULL))
   
+    
+    observeEvent(input$showPlots_switch, {
+      toggle("plots_tabBox", condition = input$showPlots_switch)
+    })
     
 ## run summary module
     summary_table$summaryServer("summaryUI", session)

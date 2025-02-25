@@ -133,8 +133,14 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
         #   colGroup(name = "Databases", columns = c("gnomAD_NFE", "clinvar_sig", "snpDB", "CGC_Germline", "trusight_genes", "fOne")),
         #   colGroup(name = "Annotation", columns = c("Consequence", "HGVSc", "HGVSp", "all_full_annot_name"))
         # ),
+        details = function(index) {div(style = "padding: 10px;", paste("Detailní informace pro řádek:", index))},
         selection = "multiple",
-        onClick = "select",
+        onClick = JS("function(rowInfo, column, event) {
+                        if (event.target.classList.contains('rt-expander') || event.target.classList.contains('rt-expander-button')) {
+                            rowInfo.toggleRowExpanded();  
+                        } else {
+                            rowInfo.toggleRowSelected();  
+                        }}"),
         class = "germline-table",
         elementId = "tbl-germline"
       )

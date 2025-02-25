@@ -126,10 +126,12 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
                           },
                           #onClick = "expand",
                           selection = "multiple",
-                          onClick = JS("function(rowInfo) {
-                                      rowInfo.toggleRowExpanded();
-                                      rowInfo.toggleRowSelected();
-                          }"),
+                          onClick = JS("function(rowInfo, column, event) {
+                                          if (event.target.classList.contains('rt-expander') || event.target.classList.contains('rt-expander-button')) {
+                                              rowInfo.toggleRowExpanded();  
+                                          } else {
+                                              rowInfo.toggleRowSelected();
+                                        }}"),
                           elementId = "tbl-fusion"
         )
   })
