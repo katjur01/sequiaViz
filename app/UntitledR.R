@@ -1,26 +1,102 @@
-dictionary <- fread("sample_name_list.tsv")
-formatted_n <- lapply(dictionary[,1],function(x) sprintf("%03d", as.integer(x)))
-dictionary[,protein_name := lapply(formatted_n,function(x) paste0("P_",x))]
+box::use(
+  shiny[moduleServer,NS,tagList,fluidRow,fluidPage,column,tabPanel,reactive,req,
+        updateSelectInput,selectInput,numericInput,actionButton,renderPlot,plotOutput],
+  reactable,
+  reactable[colDef,reactableOutput,renderReactable,reactable,colGroup],
+  htmltools[tags],
+  plotly[plotlyOutput,renderPlotly],
+  reactablefmtr[pill_buttons,data_bars],
+  utils[head]
+  
+)
 
-ens_prot_table <- fread("ens_prot_table.tsv")
-ens_prot_table_unique <- unique(ens_prot_table[,.(PG.ProteinAccessions = uniprotswissprot,ensembl_gene_id)],by = "PG.ProteinAccessions")
-ens_prot_table_unique <- unique(ens_prot_table_unique,by = "ensembl_gene_id")
+box::use(
+  app/logic/plots[prepare_barPlot_data,create_barPlot], 
+  app/logic/waiters[use_spinner],
+  app/logic/load_data[get_inputs,load_data],
+  app/logic/reactable_helpers[generate_columnsDef,custom_colGroup_setting],
+  app/logic/prepare_table[prepare_expression_table,set_pathway_colors,get_tissue_list],
+  app/logic/plots[prepare_volcano,plot_volcano],
+)
 
-#rna tpm   
-
-RNA_tpm <- fread("final_tab_globalimputing_WO_P037_and_P079.csv")
-
-setnames(RNA_tpm,"patient_prot","sample")
-RNA_tpm[,patient_rna := NULL]
-RNA_tpm <- merge(ens_prot_table_unique[,.(protein_name = PG.ProteinAccessions,gene_id = ensembl_gene_id)],RNA_tpm,by = "protein_name")
-RNA_tpm <- unique(RNA_tpm,by = c("gene_id","sample"))
-
-setnames(RNA_tpm,"count_rna","RNA_raw")
-setnames(RNA_tpm,"count_prot","prot_raw")
-
-RNA_tpm[,RNA_log := log2(RNA_raw + 32)]
-RNA_tpm[,prot_log := log2(prot_raw)]
-RNA_tpm[,RNA_fc := RNA_log - mean(RNA_log), .(gene_id)]
-RNA_tpm[,prot_fc := prot_log - mean(prot_log), .(gene_id)]
+# Load and process data table
+input_data <- function(sample,expr_flag){
+  input_files <- get_inputs("per_sample_file") 
+  # message("Loading data for expression profile: ", filenames$expression.files)
+  data <- load_data(input_files$expression.files,"expression",sample,expr_flag) #expr_flag = "all_genes"|"genes_of_interest" #sample = "MR1507"
+  print(data)
+  dt <- prepare_expression_table(data,expr_flag)
+  print(head(dt))
+  return(dt)
+}
 
 
+ui <- function(id){
+  ns <- NS(id)
+  tagList(
+    fluidRow(
+      selectInput(ns("selected_tissue"), "Vyber tkáň:", choices = "Blood"),  # Naplníme dynamicky
+      numericInput(ns("padj_cutoff"), "p-adj cutoff:", value = 0.05, min = 0, step = 0.01),
+      numericInput(ns("logfc_cutoff"), "log2FC cutoff:", value = 1, min = 0, step = 0.1),
+      numericInput(ns("top_n"), "Počet popisků genů:", value = 20, min = 0, step = 1),
+      actionButton(ns("update_plot"), "Aktualizovat graf")
+    ),
+    fluidRow(
+      plotOutput(ns("volcano_plot"))
+    )
+  )
+}
+
+
+
+server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    data <- reactive({
+      input_data("MR1507", "all_genes") 
+    })
+    
+    # tissue_names <- reactive({
+    #   unique(gsub("log2FC_", "", grep("log2FC_", colnames(data()), value = TRUE)))
+    # })
+
+    
+    # Reaktivní dataset na základě vybrané tkáně
+    selected_data <- reactive({
+      # message("YYYYYYYYYY: ",input$selected_tissue)
+      # req(input$selected_tissue)  # Počkej, než uživatel něco vybere
+
+      prepare_volcano(data(), "Blood")
+    })
+    
+    # Reaktivní volcano plot
+    output$volcano_plot <- renderPlot({
+      message("Selected data: ", prepare_volcano(data(), "Blood"))
+      # req(input$selected_tissue)
+      
+      # isolate({
+      #   input$update_plot  # Aby se graf aktualizoval jen po kliknutí na tlačítko
+      # })
+      
+      plot_volcano(selected_data(), "Blood"
+                   
+                   # input$selected_tissue,
+                   # top_n = input$top_n,
+                   # padj_cutoff = input$padj_cutoff,
+                   # logfc_cutoff = input$logfc_cutoff
+      )
+      
+    })
+    
+    
+  })
+}
+
+expUI <- fluidPage(
+  ui("exp1")
+)
+
+expSerever <- function(input, output, session) {
+  server("exp1")
+}
+
+shinyApp(expUI, expSerever)

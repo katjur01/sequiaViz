@@ -19,6 +19,7 @@ get_tissue_list <- function(){
   return(tissue_list)
 }
 
+
 replace_dot_with_na <- function(data) {
   for (col in names(data)) {
     data[get(col) == ".", (col) := NA]

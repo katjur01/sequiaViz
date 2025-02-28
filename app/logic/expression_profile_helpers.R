@@ -9,23 +9,7 @@ box::use(
   app/logic/load_data[get_inputs,load_data]
 )
 
-#########################
-##   get tissue name   ##
-#########################
 
-#' @export
-get_tissues <- function(patient){  # patient = "DZ1601"
-  
-  input_files <- get_inputs("per_sample_file")
-  patient_files <- input_files$expression.files[grep(patient, input_files$expression.files)]
-  
-  tissue_list <- lapply(patient_files, function(file) { # file <- patient_files[1]
-    tissue <- gsub(paste0(".*",  input_files$expression.project, ".*\\_(.*)\\_report.xlsx"), "\\1", file)
-    tissue <- gsub("[ -]", "", tissue)
-  })
-  
-  return(tissue_list)
-}
 
 
 
