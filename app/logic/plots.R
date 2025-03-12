@@ -1,12 +1,12 @@
 box::use(
   data.table[setnames],
-  plotly[plot_ly,plotlyOutput,renderPlotly,layout],
+  plotly[plot_ly,layout,add_segments,add_trace],
   magrittr[`%>%`],
-  ggplot2[ggplot,geom_point,scale_color_manual,geom_hline,geom_vline,ggtitle,theme_bw,ggsave,aes],
-  ggrepel[geom_text_repel],
+  ggplot2[ggplot,scale_color_manual,geom_hline,geom_vline,ggtitle,theme_bw,ggsave,aes,geom_point,facet_wrap,theme,element_text,scale_x_continuous,unit],
+  # ggiraph[geom_point_interactive,geom_text_repel_interactive,girafe,opts_hover,opts_tooltip,opts_sizing,opts_zoom],
   promises[`%...>%`,catch],
   future[future],
-  
+
 )
 
 
@@ -28,8 +28,8 @@ prepare_volcano <- function(dt, tissue) {
   # Vytvoření nové datové tabulky s univerzálními názvy sloupců
   dt_tissue <- dt[, .(feature_name, geneid,
                       log2FC = as.numeric(as.character(get(fc_col))),
-                      p_value = as.numeric(as.character(get(pval_col))),
-                      p_adj = as.numeric(as.character(get(padj_col))))]
+                      pval = as.numeric(as.character(get(pval_col))),
+                      padj = as.numeric(as.character(get(padj_col))))]
   
   # Odstranění neplatných hodnot
   dt_tissue <- dt_tissue[!is.na(log2FC) & !is.infinite(log2FC) & !is.nan(log2FC)]
@@ -39,58 +39,180 @@ prepare_volcano <- function(dt, tissue) {
 
   return(dt_tissue)
 }
-
+#' @export
 classify_volcano_genes <- function(dt, padj_cutoff = 0.05, logfc_cutoff = 1) {
   
 
   dt[, abs.logfc := abs(log2FC)]
   dt[, sig := "na"]  # Defaultní barva
-  
-  dt[is.na(p_adj), sig := "na"]
-  dt[p_adj >= padj_cutoff, sig := "nsig"]  # Nesignifikantní
-  dt[p_adj < padj_cutoff & log2FC > -logfc_cutoff & log2FC < logfc_cutoff, sig := "sig"]  # Signifikantní
-  dt[p_adj < padj_cutoff & log2FC <= -logfc_cutoff, sig := "down"]  # Downregulated
-  dt[p_adj < padj_cutoff & log2FC >= logfc_cutoff, sig := "up"]  # Upregulated
+
+  dt[is.na(padj), sig := "na"]
+  dt[padj >= padj_cutoff, sig := "nsig"]  # Nesignifikantní
+  dt[padj < padj_cutoff & log2FC > -logfc_cutoff & log2FC < logfc_cutoff, sig := "sig"]  # Signifikantní
+  dt[padj < padj_cutoff & log2FC <= -logfc_cutoff, sig := "down"]  # Downregulated
+  dt[padj < padj_cutoff & log2FC >= logfc_cutoff, sig := "up"]  # Upregulated
+
+  # dt[, abs_logfc := abs(log2FC)]
+  # setorder(dt, padj, pvalue, -abs_logfc, na.last = T)
+  # 
+  # dt[, `:=`(sig="na", significant="NA")] #set default as grey and not significant
+  # dt[padj>=padj_cutoff, `:=`(sig="nsig", significant="Non significant")]
+  # dt[padj<padj_cutoff & log2FC>-(logfc_cutoff) & log2FC<logfc_cutoff, `:=`(sig="sig", significant="Significant")]
+  # dt[padj<padj_cutoff & log2FC<=-(logfc_cutoff) , `:=`(sig="down", significant="Down regulated")] #down regulated DE genes
+  # dt[padj<padj_cutoff & log2FC>=logfc_cutoff , `:=`(sig="up", significant="Up regulated")] #up regulated DE genes
+  # dt[, significant := factor(significant,levels = c("Significant","Down regulated","Up regulated","Non significant","NA"))]
 
   return(dt)
 }
 
-#' @export
-volcanoPlot <- function(dt, tissue, top_n = 10) {
-  dt <- classify_volcano_genes(dt)  # Klasifikace genů
-  
-  # Výběr top genů pro popisky
-  top_genes <- dt[order(p_adj)][1:top_n]
-  
-  plot <- ggplot(dt, aes(x = log2FC, y = -log10(p_adj), color = sig)) +
-    geom_point(alpha = 0.7, size = 1) +
-    scale_color_manual(values = c("sig" = "gray", "down" = "blue", "up" = "red", "nsig" = "black", "na" = "gray")) +
-    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  # Threshold p-adj
-    geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "black") +  # Threshold logFC
-    geom_text_repel(data = top_genes, aes(label = feature_name), size = 3, max.overlaps = 10) +
-    ggtitle(paste("Volcano Plot -", tissue)) +
-    theme_bw()
-  
-  return(plot)
-}
+
 
 #' @export
-plot_volcano <- function(dt, tissue) {
-  future({
-    # message("🖌️ Paralelní generování plotu pro:", tissue)
-    
-    # Předpokládáme, že dt už je připravené (prepare_volcano proběhlo v serveru)
-    volcanoPlot(dt, tissue)
-  }) %...>% 
-    (function(plot) {
-      # message("✅ Plot hotov:", tissue)
-      plot  # Vrátí ggplot objekt
-    }) %>%
-    catch(function(err) {
-      message("❌ Chyba při generování grafu:", tissue, " - ", err$message)
-      NULL
-    })
+volcanoPlot <- function(dt, tissue, top_n = 10) {
+  dt <- dt[!is.na(log2FC) & !is.na(padj)]
+  dt <- classify_volcano_genes(dt)  # Klasifikace genů
+  dt[,neg_log10_padj := -log10(padj)]
+  
+  # Dynamické nahrazení Inf hodnot velkou konečnou hodnotou
+  max_y <- max(dt$neg_log10_padj[is.finite(dt$neg_log10_padj)], na.rm = TRUE)
+  
+  dt$neg_log10_padj[!is.finite(dt$neg_log10_padj)] <- 
+    sign(dt$neg_log10_padj[!is.finite(dt$neg_log10_padj)]) * (abs(max_y) + 10)
+  
+  
+  # Převod faktorové proměnné na barvy
+  color_map <- c("sig" = "gray", "down" = "blue", "up" = "red", "nsig" = "black", "na" = "gray")
+  
+  # Určení limitů os
+  x_min <- min(dt$log2FC, na.rm = TRUE) + 1.5
+  x_max <- max(dt$log2FC, na.rm = TRUE) + 1.5
+  y_min <- min(dt$neg_log10_padj, na.rm = TRUE) - 15
+  y_max <- max(dt$neg_log10_padj, na.rm = TRUE) + 1
+  # top_genes <- dt[order(padj)][1:top_n]
+  
+  
+  # Vytvoření grafu
+  plot <- plot_ly() %>%
+    add_trace(
+      data = dt,
+      x = ~log2FC,
+      y = ~neg_log10_padj,
+      type = 'scatter',
+      mode = 'markers',
+      color = ~sig,
+      colors = color_map,
+      marker = list(opacity = 0.7, size = 5),
+      text = ~paste(feature_name," \n",padj),
+      # text = ~feature_name,
+      hoverinfo = "text",
+      inherit = FALSE
+    ) %>%
+    add_segments(
+      x = -1, xend = -1,
+      y = y_min, yend = y_max,
+      line = list(dash = "dash", color = "black",width=1),
+      showlegend = FALSE,
+      inherit = FALSE
+    ) %>%
+    add_segments(
+      x = 1, xend = 1,
+      y = y_min, yend = y_max,
+      line = list(dash = "dash", color = "black",width=1),
+      showlegend = FALSE,
+      inherit = FALSE
+    ) %>%
+    # Přidání vodorovné prahové čáry (-log10(0.05))
+    add_segments(
+      x = x_min, xend = x_max,  # Čára bude vodorovná přes celou osu X
+      y = -log10(0.05), yend = -log10(0.05),  # Y souřadnice je stejná
+      line = list(dash = "dash", color = "black",width=1), 
+      showlegend = FALSE
+    ) %>%
+    # add_text(data = top_genes, x = ~log2FC, y = ~neg_log10_padj, text = ~feature_name,
+    #          textposition = "top center", showlegend = FALSE, textfont = list(size = 10)
+    #  ) %>%
+    layout(
+      title = "Volcano Plot",
+      xaxis = list(title = "log2FC", range = c(x_min, x_max),zeroline = FALSE,showline = TRUE),
+      yaxis = list(title = "-log10(p-adj)", range = c(y_min, y_max), zeroline = FALSE, showline = TRUE),
+      plot_bgcolor = "white"
+    )
+  ###################
+  ## ggplotly plot ##
+  ###################
+  # y_max <- max(-log10(data[padj != 0]$padj))+10
+  # plot <- ggplot(data, aes(x = log2FC, y = neg_log10_padj, color = sig, text = feature_name)) +
+  #   geom_point(alpha = 0.7, size = 1) +
+  #   scale_color_manual(values = c("sig" = "gray", "down" = "blue", "up" = "red", "nsig" = "black", "na" = "gray")) +
+  #   geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  # Threshold p-adj
+  #   geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "black") +  # Threshold logFC
+  #   #geom_text_repel(data = top_genes, aes(label = feature_name), size = 3, max.overlaps = 10) +
+  #   ggtitle(paste("Volcano Plot -", tissue)) +
+  #   ylim(c(min(data$neg_log10_padj, na.rm = TRUE) - 10, y_max)) + 
+  #   #theme_bw()
+  #   theme_minimal()
+  # 
+  # ggplotly(plot,tooltip = "text")
+  ################
+  ## giraf plot ##
+  ################
+  # plot <- ggplot(data, aes(x = log2FC, y = -log10(padj), color = sig)) +
+  #   geom_point_interactive(aes(tooltip = feature_name, data_id = feature_name), alpha = 0.7, size = 1) +
+  #   scale_color_manual(values = c("sig" = "gray", "down" = "blue", "up" = "red", "nsig" = "black", "na" = "gray")) +
+  #   geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +  # Threshold p-adj
+  #   geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "black") +  # Threshold logFC
+  #   #geom_text_repel_interactive(data = top_genes, aes(label = feature_name, tooltip = feature_name, data_id = feature_name), size = 3, max.overlaps = 10) +
+  #   ggtitle(paste("Volcano Plot -", tissue)) +
+  #   theme_bw()
+  # 
+  # iplot <- girafe(
+  #   ggobj = plot,  # Převod ggplot na interaktivní girafe
+  #   options = list(
+  #   # opts_sizing(width = .7),
+  #   opts_zoom(max = 5),
+  #   opts_hover(css = "fill:red;")  # Hover efekt na body
+  #   # opts_tooltip(css = "background-color:white; color:black; border:1px solid gray; padding:5px;")  # Styl tooltipu
+  #   )
+  # )
+  return(plot)
 }
+#' @export
+ggvolcanoPlot <- function(dt, top_n = 10) {
+  # dt <- dt[!is.na(log2FC) & !is.na(padj)]
+  # dt <- classify_volcano_genes(dt)  # Klasifikace genů
+  dt[,neg_log10_padj := -log10(padj)]
+  dt[, tissue := factor(tissue, levels = unique(dt$tissue))]
+  
+  x_min <- floor(min(dt$log2FC, na.rm = TRUE) / 5) * 5
+  x_max <- ceiling(max(dt$log2FC, na.rm = TRUE) / 5) * 5
+  tick_marks <- seq(x_min, x_max, by = 5)  # Vytvoříme pravidelné intervaly na ose
+  
+  plot <- ggplot(dt, aes(x = log2FC, y = neg_log10_padj, color = sig, text = feature_name)) +
+    geom_point(alpha = 0.7, size = 1) +
+    scale_color_manual(values = c("sig" = "gray", "down" = "blue", "up" = "red", "nsig" = "black", "na" = "gray")) +
+    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "black") +
+    geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "black") +
+    facet_wrap(~ tissue, scales = "free") +
+    scale_x_continuous(breaks = tick_marks) +
+    theme_bw() +
+    theme(strip.text = element_text(size = 12, face = "bold"),panel.spacing = unit(1, "cm"))
+
+  return(plot)
+}
+## paralelní vykreslování grafů
+# plot_volcano <- function(dt, tissue) {
+#   future(seed = TRUE,{
+#     set.seed(42)
+#     volcanoPlot(dt, tissue)
+#   }) %...>%
+#     (function(plot) {
+#        plot  # Vrátí ggplot objekt
+#     }) %>%
+#     catch(function(err) {
+#       message("❌ Chyba při generování grafu:", tissue, " - ", err$message)
+#       NULL
+#     })
+# }
 
 
 

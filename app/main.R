@@ -31,7 +31,10 @@ box::use(
   shinyWidgets[pickerInput,prettySwitch],
   shinyjs[useShinyjs, runjs,toggle],
   utils[str],
-
+  promises[future_promise,`%...!%`,`%...>%`,catch],
+  future[plan,multisession],
+  # microbenchmark[microbenchmark],
+  # parallel[detectCores],
   # data.table
   # openxlsx[read.xlsx]
 )
@@ -48,9 +51,13 @@ box::use(
 #   app/logic/load_data[load_data,get_inputs],
   app/logic/prepare_table[colFilter],
   app/logic/reactable_helpers[columnName_map],
-  app/view/networkGraph_cytoscape
-#   
+  app/view/networkGraph_cytoscape,
+
+
 )
+
+plan(multisession)#, workers = detectCores() - 1
+
 
 #####################################################
 
@@ -315,16 +322,25 @@ server <- function(id) {
     observe({
       req(all_colnames_val_expression())
       selected_columns_expression <- colFilterDropdown_server("colFilter_dropdown_expression", all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting)
+
       lapply(names(samples_expr), function(patient) {
-        expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$table)
-        expression_profile_table$server_genesOfInterest(paste0("genesOfinterest_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$table)
+        expression_profile_table$server_allGenes(ns(paste0("allGenes_tab_", patient)), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$table)
+        expression_profile_table$server_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$table)
       })
     })
-    
-    
+
+
     lapply(names(samples_expr), function(patient) {
-      expression_profile_table$server_volcano(paste0("allGenes_volcano_", patient), patient)
+      expression_profile_table$server_volcano(ns(paste0("allGenes_volcano_", patient), patient))
     })
+      
+
+    
+   
+      
+      
+      
+      
     
 
 
