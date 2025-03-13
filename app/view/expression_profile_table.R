@@ -12,8 +12,10 @@ box::use(
   utils[head],
   shinyWidgets[radioGroupButtons],
   data.table[rbindlist],
-    promises[future_promise,`%...!%`,`%...>%`,catch],
-  future[plan,multisession],
+  # grDevice[colorRampPalette],
+  pheatmap[pheatmap],
+  #   promises[future_promise,`%...!%`,`%...>%`,catch],
+  # future[plan,multisession],
   # shinyjs[useShinyjs,runjs],
   # future.apply[future_lapply],
   # microbenchmark[microbenchmark],
@@ -40,6 +42,74 @@ input_data <- function(sample,expr_flag){
   data <- load_data(input_files$expression.files,"expression",sample,expr_flag) #expr_flag = "all_genes"|"genes_of_interest" #sample = "MR1507"
   dt <- prepare_expression_table(data,expr_flag)
   return(dt)
+}
+
+ui_heatmap <- function(id, patient){
+  ns <- NS(id)
+  tagList(
+    fluidRow(
+      column(12, plotlyOutput(outputId = ns("heatmap")))
+    )
+  )
+}
+
+
+server_heatmap <- function(id, patient){
+  moduleServer(id, function(input, output, session) {
+    data <- reactive({
+      input_data(patient, "all_genes") 
+    })
+    tissue_names <- get_tissue_list()
+    
+    
+    dt_all <- rbindlist(lapply(tissue_names, function(tissue) {
+      prepare_volcano(dt, tissue)
+    }))
+    
+    
+    ### potřebuju zde data jak zdravých tkání, tak data pacientů před analýzou!
+    ## pak vezmu 100 nejvíc exprimovaných genů (log2FCa a padj po analýze) a vykreslím heatmapu původní pacientská data vs zdravé tkáně
+    heatmap <- reactive({
+      data[, abs.logfc := abs(log2FC)]
+      padj_cutoff <- 0.05
+      logfc_cutoff <- 1
+      nlabels <- 100
+      
+      # 🔹 Vybereme signifikantní geny
+      select <- data[tissue == "Blood" & abs.logfc >= logfc_cutoff & p_adj <= padj_cutoff & !is.na(p_adj),]$geneid
+      select <- select[1:min(nlabels, length(select))]  # 🔹 Omezíme na reálný počet dostupných genů
+      
+      selected <- data[geneid %in% select,]
+      
+      # 🔹 Převod na matici
+      mat <- as.matrix(selected %>% select(contains("counts_tpm_round")))
+      
+      # 🔹 Přidáme jména řádků (pokud existují)
+      if (!is.null(nrow(mat)) && nrow(mat) > 1) {
+        row.names(mat) <- selected$feature_name
+        dimnames(mat)[[2]] <- gsub("_tpm_round", "", dimnames(mat)[[2]])
+        
+        # 🔹 Vykreslení heatmapy pouze pokud máme dost dat
+        pheatmap(log2(mat + 1), 
+                 cluster_rows = TRUE, 
+                 show_rownames = TRUE, 
+                 cluster_cols = TRUE,
+                 color = colorRampPalette(c("blue", "white", "red"))(255),  # 🔹 Oprava barevné škály
+                 main = paste0("Top ", min(nlabels, nrow(mat)), " significantly DE genes (log2norm)"))
+      } else {
+        message("⚠️ Warning: Příliš málo genů pro vykreslení heatmapy (min. 2 požadované).")
+        return(NULL)  # Nevykreslíme heatmapu, pokud je málo genů
+      }
+    })
+    
+    
+    
+    # output$heatmap <- renderPlotly({
+    #   req(data())
+    #   heatmap <- plot_ly(dt_all, x = ~feature_name, y = ~tissue, z = ~log2FC, type = "heatmap", colorscale = "Viridis")
+    #   heatmap
+    # })
+  })
 }
 
 
@@ -85,19 +155,13 @@ server_volcano <- function(id, patient) {
     
     tissue_names <- get_tissue_list()
 
-    
     output$ggvolcanoPlot <- renderPlot({
       req(data())
 
       dt_all <- rbindlist(lapply(tissue_names, function(tissue) {
         dt <- prepare_volcano(data(), tissue)
-        classify_volcano_genes(dt)
-      }))
+        classify_volcano_genes(dt)}))
 
-      print("✅ Data připravena, vykresluji ggplot...")  # Debug
-
-      # Vykreslíme ggplot s facetováním
-      # ggvolcanoPlot(dt_all)
       ggvolcanoPlot(dt_all)
     })
 
@@ -105,7 +169,7 @@ server_volcano <- function(id, patient) {
       req(data())
       # toWebGL()
       volcanoPlot(prepare_volcano(data(), "Blood"), "Blood")
-    })})
+    })
   
     # output$volcano_plots_container <- renderUI({
     #   ns <- session$ns
@@ -127,9 +191,6 @@ server_volcano <- function(id, patient) {
     #   })
     #   girafeOutput(plot_list)
     # })
-    
-
-
     
     # # Paralelní vykreslování každého grafu
     # lapply(tissue_names, function(tissue) {

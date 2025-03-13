@@ -31,8 +31,8 @@ box::use(
   shinyWidgets[pickerInput,prettySwitch],
   shinyjs[useShinyjs, runjs,toggle],
   utils[str],
-  promises[future_promise,`%...!%`,`%...>%`,catch],
-  future[plan,multisession],
+  # promises[future_promise,`%...!%`,`%...>%`,catch],
+  # future[plan,multisession],
   # microbenchmark[microbenchmark],
   # parallel[detectCores],
   # data.table
@@ -56,7 +56,7 @@ box::use(
 
 )
 
-plan(multisession)#, workers = detectCores() - 1
+# plan(multisession)#, workers = detectCores() - 1
 
 
 #####################################################
@@ -164,10 +164,11 @@ ui <- function(id){
                                              
                                              
                                              ,tabBox(id = ns("plots_tabBox"), width = 12, collapsible = FALSE,headerBorder = FALSE,
-                                                    tabPanel("Volcano plot", tabName = "volcanoPlot_panel", value = "volcanoPlot",
+                                                     tabPanel("Heatmap", tabName = "heatmap_panel", value = "heatmap"),
+                                                     tabPanel("Volcano plot", tabName = "volcanoPlot_panel", value = "volcanoPlot",
                                                              expression_profile_table$ui_volcano(ns(paste0("allGenes_volcano_", patient)), patient)
-                                                             ),
-                                                    tabPanel("Heatmap", tabName = "heatmap_panel", value = "heatmap")
+                                                             )
+                                                    
                                              )
                                       )
                                  )
@@ -246,48 +247,48 @@ server <- function(id) {
       })
     }
 
-# #################
-#   ## filter table columns dropdown button for fusion
-#     all_colnames_val_fusion <- getColFilterValues("fusion")
-#     output$colFilter_dropdown_ui_fusion <- renderUI({
-#       req(all_colnames_val_fusion())
-#       colFilterDropdown_ui(ns("colFilter_dropdown_fusion"), all_colnames_val_fusion()$all_columns, all_colnames_val_fusion()$default_setting,columnName_map("fusion"))
-#     })
-#     
-#     ## run fusion genes module
-#     samples_fuze <- set_patient_to_sample("fusion")
-#     selected_columns_fusion <- colFilterDropdown_server("colFilter_dropdown_fusion", all_colnames_val_fusion()$all_columns, all_colnames_val_fusion()$default_setting)
-#     lapply(names(samples_fuze), function(patient) {
-#       fusion_genes_table$server(paste0("geneFusion_tab_", patient), samples_fuze[[patient]], selected_columns_fusion, columnName_map("fusion"), shared_data)
-#     })
-# ##################
-#     
-#     
-#     # filter table columns dropdown button for germline
-#     all_colnames_val_germline <- getColFilterValues("germline")
-#     output$colFilter_dropdown_ui_germline <- renderUI({
-#       req(all_colnames_val_germline())
-#       colFilterDropdown_ui(ns("colFilter_dropdown_germ"), all_colnames_val_germline()$all_columns, all_colnames_val_germline()$default_setting, columnName_map("germline"))
-#     })
-#     
-#     ## igv dropdown button for germline
-#     selection_enabled <- reactiveVal(FALSE)
-#     
-#     # IGV dropdown button for germline
-#     output$igv_dropdown_ui <- renderUI({
-#       igvDropdown_ui(ns("igv_dropdown"), names(set_patient_to_sample("germline")))
-#     })
-#     
-#     # IGV Dropdown server call, pass the reactive value
-#     igvDropdown_server("igv_dropdown", session, selection_enabled)
-#     
-#     # Run germline varcall module
-#     samples_germ <- set_patient_to_sample("germline")
-#     selected_columns_germ <- colFilterDropdown_server("colFilter_dropdown_germ", all_colnames_val_germline()$all_columns, all_colnames_val_germline()$default_setting)
-#     
-#     lapply(names(samples_germ), function(patient) {
-#       germline_var_call_table$server(paste0("germline_tab_", patient), samples_germ[[patient]], selected_columns_germ, columnName_map("germline"), selection_enabled, shared_data)
-#     })
+#################
+  ## filter table columns dropdown button for fusion
+    all_colnames_val_fusion <- getColFilterValues("fusion")
+    output$colFilter_dropdown_ui_fusion <- renderUI({
+      req(all_colnames_val_fusion())
+      colFilterDropdown_ui(ns("colFilter_dropdown_fusion"), all_colnames_val_fusion()$all_columns, all_colnames_val_fusion()$default_setting,columnName_map("fusion"))
+    })
+
+    ## run fusion genes module
+    samples_fuze <- set_patient_to_sample("fusion")
+    selected_columns_fusion <- colFilterDropdown_server("colFilter_dropdown_fusion", all_colnames_val_fusion()$all_columns, all_colnames_val_fusion()$default_setting)
+    lapply(names(samples_fuze), function(patient) {
+      fusion_genes_table$server(paste0("geneFusion_tab_", patient), samples_fuze[[patient]], selected_columns_fusion, columnName_map("fusion"), shared_data)
+    })
+##################
+
+
+    # filter table columns dropdown button for germline
+    all_colnames_val_germline <- getColFilterValues("germline")
+    output$colFilter_dropdown_ui_germline <- renderUI({
+      req(all_colnames_val_germline())
+      colFilterDropdown_ui(ns("colFilter_dropdown_germ"), all_colnames_val_germline()$all_columns, all_colnames_val_germline()$default_setting, columnName_map("germline"))
+    })
+
+    ## igv dropdown button for germline
+    selection_enabled <- reactiveVal(FALSE)
+
+    # IGV dropdown button for germline
+    output$igv_dropdown_ui <- renderUI({
+      igvDropdown_ui(ns("igv_dropdown"), names(set_patient_to_sample("germline")))
+    })
+
+    # IGV Dropdown server call, pass the reactive value
+    igvDropdown_server("igv_dropdown", session, selection_enabled)
+
+    # Run germline varcall module
+    samples_germ <- set_patient_to_sample("germline")
+    selected_columns_germ <- colFilterDropdown_server("colFilter_dropdown_germ", all_colnames_val_germline()$all_columns, all_colnames_val_germline()$default_setting)
+
+    lapply(names(samples_germ), function(patient) {
+      germline_var_call_table$server(paste0("germline_tab_", patient), samples_germ[[patient]], selected_columns_germ, columnName_map("germline"), selection_enabled, shared_data)
+    })
 
 ##################
     
@@ -324,14 +325,14 @@ server <- function(id) {
       selected_columns_expression <- colFilterDropdown_server("colFilter_dropdown_expression", all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting)
 
       lapply(names(samples_expr), function(patient) {
-        expression_profile_table$server_allGenes(ns(paste0("allGenes_tab_", patient)), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$table)
-        expression_profile_table$server_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$table)
+        expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$table)
+        expression_profile_table$server_genesOfInterest(paste0("genesOfinterest_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$table)
       })
     })
 
 
     lapply(names(samples_expr), function(patient) {
-      expression_profile_table$server_volcano(ns(paste0("allGenes_volcano_", patient), patient))
+      expression_profile_table$server_volcano(paste0("allGenes_volcano_", patient), patient)
     })
       
 
