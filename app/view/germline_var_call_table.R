@@ -41,12 +41,12 @@ input_data <- function(sample){
 ui <- function(id) {
   ns <- NS(id)
   tagList(
-    tags$style(HTML("
-      .rt-td-inner select {
-        border: 1px solid rgba(0,0,0,.1); /* Barva hrany bunky*/
-        border-radius: 3px;  /* Zaoblení hrany bunky */
-        }
-      ")),
+    # tags$style(HTML("
+    #   .rt-td-inner select {
+    #     border: 1px solid rgba(0,0,0,.1); /* Barva hrany bunky*/
+    #     border-radius: 3px;  /* Zaoblení hrany bunky */
+    #     }
+    #   ")),
     use_spinner(reactableOutput(ns("germline_var_call_tab"))),
 
     tags$br(),

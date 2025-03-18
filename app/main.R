@@ -9,7 +9,7 @@
 # rhino::build_js()
 # #
 # ## run this from console when the css style is changed ##
-# # rhino::build_sass()
+rhino::build_sass()
 #
 # ## run shiny app with command:
 # # shiny::runApp()
@@ -150,6 +150,7 @@ ui <- function(id){
                           do.call(tabsetPanel, c(id = ns("expression_profile_patients"),
                                lapply(names(set_patient_to_sample("expression")), function(patient) {
                                  tabPanel(title = patient,
+                                    div(style = "margin-left: -7px;",
                                       tabBox(id = ns(paste0("expression_profile_tabs_", patient)), width = 12, collapsible = FALSE,
                                              tabPanel("All Genes",
                                                       tabName = ns("allGenes_panel"), value = "allGenes",
@@ -171,6 +172,7 @@ ui <- function(id){
                                                     
                                              )
                                       )
+                                    )
                                  )
                                })))
                         ))

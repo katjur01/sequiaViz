@@ -373,57 +373,55 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
     )
   } else if (tag == "expression") {
     
-
-    
     custom_colDef <- list(
-      feature_name = colDef(minWidth = 150, filterable = TRUE),
-      geneid = colDef(minWidth = 150, filterable = TRUE),
-      all_kegg_paths_name = colDef(minWidth = 170, filterable = TRUE),
+      # feature_name = colDef(minWidth = 150, filterable = TRUE),
+      # geneid = colDef(minWidth = 150, filterable = TRUE),
+      # all_kegg_paths_name = colDef(minWidth = 170, filterable = TRUE),
       # pathway = colDef(minWidth = 180, filterable = TRUE),
-      pathway = colDef(
-        minWidth = 180,
-        filterable = TRUE,
-        html = TRUE,  # Povolení HTML v Reactable
-        cell = function(value) {
-          if (is.null(value) || value == "") return("N/A")
-          
-          pathway_colors <- list(
-            "RTK Signaling" = "#98FB98",
-            "Metabolic Signaling" = "#00CED1",
-            "Epigenetics" = "#DA70D6",
-            "PI3K/AKT/mTOR Signaling" = "#008000",
-            "Apoptosis" = "#FF7F00",
-            "MAPK Signaling" = "#800000",
-            "WNT signaling" = "#6495ED",
-            "Hormone Signaling" = "#DC143C",
-            "DNA damage/repair" = "#87CEEB",
-            "Cell cycle control" = "#FB9A99",
-            "Immune Checkpoints" = "#A9A9A9",
-            "TGF-B Signaling" = "#FFD700",
-            "JAK/STAT Signaling" = "#BDB76B",
-            "Hedgehog Signaling" = "#8B008B",
-            "Non-receptor kinases" = "#6A5ACD",
-            "Kinase Fusions" = "#D2691E",
-            "Immune Response" = "#4682B4")
-          
-          pathways <- strsplit(value, ",")[[1]] # Rozdělení pathway hodnot do seznamu (některé mohou obsahovat více pathway)
-          pathways <- trimws(pathways)  # Odstranění mezer kolem názvů
-          
-          # Vytvoření pill elementů
-          pills <- lapply(pathways, function(pathway) {
-            color <- pathway_colors[[pathway]]
-            if (is.null(color)) color <- "#D3D3D3"  # Výchozí šedá pro neznámé pathways
-            div(style = sprintf("display: inline-block; padding: 5px 10px; margin: 2px; border-radius: 15px; background-color: %s; color: white; font-size: 12px; font-weight: bold;", color),
-                pathway)
-          })
-          as.character(tagList(pills)) # Použití `as.character()` k převedení HTML do stringu
-        }
-      ),
-      num_of_paths = colDef(maxWidth = 100),
-      refseq_id = colDef(maxWidth = 140),
-      type = colDef(maxWidth = 100),
-      gene_definition = colDef(minWidth = 130),
-      all_kegg_gene_names = colDef(minWidth = 150)
+      # pathway = colDef(
+      #   minWidth = 180,
+      #   filterable = TRUE,
+      #   html = TRUE,  # Povolení HTML v Reactable
+      #   cell = function(value) {
+      #     if (is.null(value) || value == "") return("N/A")
+      #     
+      #     pathway_colors <- list(
+      #       "RTK Signaling" = "#98FB98",
+      #       "Metabolic Signaling" = "#00CED1",
+      #       "Epigenetics" = "#DA70D6",
+      #       "PI3K/AKT/mTOR Signaling" = "#008000",
+      #       "Apoptosis" = "#FF7F00",
+      #       "MAPK Signaling" = "#800000",
+      #       "WNT signaling" = "#6495ED",
+      #       "Hormone Signaling" = "#DC143C",
+      #       "DNA damage/repair" = "#87CEEB",
+      #       "Cell cycle control" = "#FB9A99",
+      #       "Immune Checkpoints" = "#A9A9A9",
+      #       "TGF-B Signaling" = "#FFD700",
+      #       "JAK/STAT Signaling" = "#BDB76B",
+      #       "Hedgehog Signaling" = "#8B008B",
+      #       "Non-receptor kinases" = "#6A5ACD",
+      #       "Kinase Fusions" = "#D2691E",
+      #       "Immune Response" = "#4682B4")
+      #     
+      #     pathways <- strsplit(value, ",")[[1]] # Rozdělení pathway hodnot do seznamu (některé mohou obsahovat více pathway)
+      #     pathways <- trimws(pathways)  # Odstranění mezer kolem názvů
+      #     
+      #     # Vytvoření pill elementů
+      #     pills <- lapply(pathways, function(pathway) {
+      #       color <- pathway_colors[[pathway]]
+      #       if (is.null(color)) color <- "#D3D3D3"  # Výchozí šedá pro neznámé pathways
+      #       div(style = sprintf("display: inline-block; padding: 5px 10px; margin: 2px; border-radius: 15px; background-color: %s; color: white; font-size: 12px; font-weight: bold;", color),
+      #           pathway)
+      #     })
+      #     as.character(tagList(pills)) # Použití `as.character()` k převedení HTML do stringu
+      #   }
+      # ),
+      # num_of_paths = colDef(maxWidth = 100),
+      # refseq_id = colDef(maxWidth = 140),
+      # type = colDef(maxWidth = 100),
+      # gene_definition = colDef(minWidth = 130),
+      # all_kegg_gene_names = colDef(minWidth = 150)
     )
     dynamic_columns <- list()
     num_columns <- length(column_names)  # Celkový počet dynamických sloupců
@@ -452,7 +450,7 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
       # v daném zápisu, který reactable zatím nepodporuje: cell = function(value) formatC(value, format = "e", digits = 2)
       if (grepl("^log2FC_", col)) {
         dynamic_columns[[col]] <- colDef(
-          maxWidth = 130,
+          # maxWidth = 130,
           style = JS("function(rowInfo, colInfo) {
                         var value = rowInfo.values[colInfo.id];
                         var borderStyle = colInfo.id.includes('p_adj') ? '1px dashed rgba(0, 0, 0, 0.3)' : '';
@@ -464,7 +462,7 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
                         };}"))
       } else if (grepl("^p_value_", col)) {
         dynamic_columns[[col]] <- colDef(
-          maxWidth = 130,
+          # maxWidth = 130,
           style = JS("function(rowInfo, colInfo) {
                         var value = rowInfo.values[colInfo.id];
                         var borderStyle = colInfo.id.includes('p_adj') ? '1px dashed rgba(0, 0, 0, 0.3)' : '';
@@ -476,7 +474,7 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
                         };}"))
       } else if (grepl("^p_adj_", col)) {
         dynamic_columns[[col]] <- colDef(
-          maxWidth = 130,
+          # maxWidth = 130,
           style = JS("function(rowInfo, colInfo) {
                         var value = rowInfo.values[colInfo.id];
                         var borderStyle = '1px dashed rgba(0, 0, 0, 0.3)';  // p-adj má border vždy
@@ -509,7 +507,7 @@ custom_colGroup_setting <- function(tag){
         ))
     })
   }
-  message("custom_colGroup: ",custom_colGroup)
+  # message("custom_colGroup: ",custom_colGroup)
   return(custom_colGroup)
 }
 
