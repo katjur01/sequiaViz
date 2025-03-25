@@ -2,14 +2,15 @@
 
 box::use(
   shiny[moduleServer,NS,h3,tagList,div,textInput,renderPrint,reactive,observe,observeEvent,icon,mainPanel,titlePanel,isolate,
-        uiOutput,renderUI,HTML,req,reactiveVal],
+        uiOutput,renderUI,HTML,req,reactiveVal,column,fluidRow],
   reactable,
   reactable[reactable,colDef,reactableOutput,renderReactable,JS,getReactableState],
   htmltools[tags,p],
   bs4Dash[actionButton,bs4Card],
-  shinyjs[useShinyjs,runjs],
+  shinyjs[useShinyjs,runjs,hide,show],
   reactablefmtr[pill_buttons,icon_assign],
-  data.table[fifelse,setcolorder]
+  data.table[fifelse,setcolorder],
+  shinyalert[shinyalert,useShinyalert],
 )
 box::use(
   app/logic/load_data[get_inputs,load_data],
@@ -42,9 +43,22 @@ ui <- function(id) {
       use_spinner(reactable$reactableOutput(ns("fusion_genes_tab"))),
     # )
     tags$br(),
-    actionButton(ns("selectFusion_button"), "Select fusion as causal"),
-    actionButton(ns("delete_button"), "Delete fusion"),
-    reactableOutput(ns("selectFusion_tab")),
+    actionButton(ns("selectFusion_button"), "Select fusion as causal", status = "info"),
+    tags$br(),
+    fluidRow(
+      column(3,reactableOutput(ns("selectFusion_tab")))
+    ),
+    tags$br(),
+    fluidRow(
+      column(1,actionButton(ns("delete_button"), "Delete fusion", status = "danger")),
+      column(1,),
+      column(1,actionButton(ns("confirm_btn"), "Confirm fusion", status = "success"))
+    )
+
+    # actionButton(ns("delete_button"), "Delete fusion", status = "danger"),
+    # actionButton(ns("confirm_btn"), "Confirm fusion", status = "success"),
+
+
     
   )
 
@@ -54,7 +68,6 @@ ui <- function(id) {
 server <- function(id, selected_samples, selected_columns, column_mapping, shared_data) {
   moduleServer(id, function(input, output, session) {
     # prepare_arriba_images(selected_samples)
-
     
   # Call loading function to load data
     dt <- reactive({
@@ -184,8 +197,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
           #     # actionButton(session$ns(paste0("remove_", index)), label = "", class = "btn btn-danger btn-sm", icon = icon("remove"))
           #   })
         ),
-        selection = "multiple", onClick = "select",
-        width = "30%"
+        selection = "multiple", onClick = "select"
       )
     })
     
@@ -199,7 +211,51 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       shared_data$fusion_data(updated_variants)
       
       session$sendCustomMessage("resetReactableSelection",selected_fusions())
+      
+      if (nrow(selected_fusions()) == 0) {
+        hide("confirm_btn")
+        hide("delete_button")
+      }
     })
+    
+
+    fusion_selected <- reactiveVal(FALSE)
+    
+    # Při stisku tlačítka pro výběr fúze
+    observeEvent(input$selectFusion_button, {
+      if (nrow(selected_fusions()) == 0) {
+        # Pokud nejsou vybrány žádné řádky, zůstaň u původního stavu
+        fusion_selected(FALSE)
+        hide("confirm_btn")
+        hide("delete_button")
+        
+        shinyalert(
+          title = "No fusion selected",
+          text = "Please select the potentially causal fusions from table above.",
+          type = "warning",
+          showCancelButton = FALSE,
+          confirmButtonText = "OK",
+          callbackR = function(value) {
+            # value bude TRUE pro OK, FALSE pro "Go to variant"
+            if (!value) {
+              # updateTabItems(session = session$userData$parent_session,  # použijeme parent session
+              #                inputId = "sidebar_menu",  # bez namespace
+              #                selected = "fusion_genes")
+            }})
+      } else {
+        # Pokud jsou nějaké řádky vybrány, nastav fusion_selected na TRUE
+        fusion_selected(TRUE)
+        
+        # Zobraz tlačítka pomocí shinyjs
+        show("confirm_btn")
+        show("delete_button")
+      }
+    })
+    
+    hide("confirm_btn")
+    hide("delete_button")
+
+    
     
     # observeEvent(input$igvButton_click, {
     #   runjs("

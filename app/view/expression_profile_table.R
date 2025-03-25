@@ -221,13 +221,17 @@ server_plots <- function(id, patient, expr_flag) {
       
       ggvolcanoPlot(dt_all)
     })
-    
-    output$volcanoPlot_blood <- renderPlotly({
-      req(data())
-      req(input$selectPlot_btn == "Volcano plot")
-      # toWebGL()
-      volcanoPlot(prepare_volcano(data(), "Blood"), "Blood")
+    observeEvent(input$selected_tissue, {
+      message("Selected tissue: ",input$selected_tissue)
+      
+      output$volcanoPlot_blood <- renderPlotly({
+        req(data())
+        req(input$selectPlot_btn == "Volcano plot")
+        # toWebGL()
+        volcanoPlot(prepare_volcano(data(), input$selected_tissue), input$selected_tissue)
+      })
     })
+
     
 
     

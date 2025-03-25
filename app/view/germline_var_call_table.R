@@ -18,7 +18,9 @@ box::use(
   # reactable.extras[reactable_extras_ui,reactable_extras_server],
   htmltools[tags,HTML],
   app/logic/patients_list[set_patient_to_sample],
-  shinyWidgets[prettyCheckbox,searchInput]
+  shinyWidgets[prettyCheckbox,searchInput],
+  shinyalert[shinyalert,useShinyalert],
+  shinyjs[useShinyjs,hide,show],
   # reactablefmtr
 )
 
@@ -40,6 +42,7 @@ input_data <- function(sample){
 
 ui <- function(id) {
   ns <- NS(id)
+  useShinyjs()
   tagList(
     # tags$style(HTML("
     #   .rt-td-inner select {
@@ -57,10 +60,17 @@ ui <- function(id) {
     #             placeholder = "variant name", btnSearch = icon("plus"),
     #             btnClass = "btn-default btn-outline-secondary"),
     # 
-    actionButton(ns("selectPathogenic_button"), "Select variants as posibly patogenic"),
-    actionButton(ns("delete_button"), "Delete variants"),
-    reactableOutput(ns("selectPathogenic_tab"))
-
+    actionButton(ns("selectPathogenic_button"), "Select variants as possibly pathogenic", status = "info"),
+    tags$br(),
+    fluidRow(
+      column(3,reactableOutput(ns("selectPathogenic_tab")))
+    ),
+    tags$br(),
+    fluidRow(
+      column(1,actionButton(ns("delete_button"), "Delete fusion", status = "danger")),
+      column(1,),
+      column(1,actionButton(ns("confirm_btn"), "Confirm fusion", status = "success"))
+    )
   )
 }
 
@@ -194,8 +204,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
           #     # actionButton(session$ns(paste0("remove_", index)), label = "", class = "btn btn-danger btn-sm", icon = icon("remove"))
           #   })
         ),
-        selection = "multiple", onClick = "select",
-        width = "30%"
+        selection = "multiple", onClick = "select"
       )
     })
     
@@ -207,7 +216,49 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
       selected_variants(updated_variants)
       shared_data$germline_data(updated_variants)
       session$sendCustomMessage("resetReactableSelection",selected_variants())
+      
+      if (nrow(selected_variants()) == 0) {
+        hide("confirm_btn")
+        hide("delete_button")
+      }
     })
+
+    # variant_selected <- reactiveVal(FALSE)
+    
+    # Při stisku tlačítka pro výběr fúze
+    observeEvent(input$selectPathogenic_button, {
+      if (nrow(selected_variants()) == 0) {
+        # Pokud nejsou vybrány žádné řádky, zůstaň u původního stavu
+        # variant_selected(FALSE)
+        hide("confirm_btn")
+        hide("delete_button")
+        
+        shinyalert(
+          title = "No variant selected",
+          text = "Please select the potentially pathogenic variants from table above.",
+          type = "warning",
+          showCancelButton = FALSE,
+          confirmButtonText = "OK",
+          callbackR = function(value) {
+            # value bude TRUE pro OK, FALSE pro "Go to variant"
+            if (!value) {
+              # updateTabItems(session = session$userData$parent_session,  # použijeme parent session
+              #                inputId = "sidebar_menu",  # bez namespace
+              #                selected = "fusion_genes")
+            }})
+      } else {
+        # Pokud jsou nějaké řádky vybrány, nastav fusion_selected na TRUE
+        # variant_selected(TRUE)
+        
+        # Zobraz tlačítka pomocí shinyjs
+        show("confirm_btn")
+        show("delete_button")
+      }
+    })
+    
+    hide("confirm_btn")
+    hide("delete_button")
+    
     
     addPopover(id = "checkbox_popover",
                options = list(
