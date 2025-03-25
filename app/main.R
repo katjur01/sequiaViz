@@ -9,7 +9,7 @@
 # rhino::build_js()
 # #
 # ## run this from console when the css style is changed ##
-rhino::build_sass()
+# rhino::build_sass()
 #
 # ## run shiny app with command:
 # # shiny::runApp()
@@ -23,7 +23,8 @@ box::use(
         fluidRow,fluidPage,mainPanel,tabPanel,titlePanel,tagList,HTML,textInput,sidebarLayout,sidebarPanel,includeScript,
         br,updateTabsetPanel, actionButton,imageOutput,renderImage,reactiveVal,req,fixedPanel,reactiveValues],
   bs4Dash[dashboardPage, dashboardHeader, dashboardSidebar, dashboardBody, sidebarMenu, menuItem, menuSubItem, dashboardControlbar,tabItems, tabItem, bs4Card,infoBox,tabBox,tabsetPanel,bs4ValueBox,
-          controlbarMenu,controlbarItem,column,box,boxLabel,descriptionBlock,boxProfile,boxProfileItem,attachmentBlock,boxComment,userBlock,updateTabItems,boxDropdown,boxDropdownItem,dropdownDivider],
+          controlbarMenu,controlbarItem,column,box,boxLabel,descriptionBlock,boxProfile,boxProfileItem,attachmentBlock,boxComment,userBlock,updateTabItems,boxDropdown,boxDropdownItem,dropdownDivider,
+          navbarMenu,navbarTab],
   # plotly[plot_ly,plotlyOutput,renderPlotly,layout],
   # reactable,
   # reactable[colDef],
@@ -31,6 +32,7 @@ box::use(
   shinyWidgets[pickerInput,prettySwitch],
   shinyjs[useShinyjs, runjs,toggle],
   utils[str],
+  # fresh[create_theme,bs4dash_vars,bs4dash_yiq,bs4dash_layout,bs4dash_sidebar_light,bs4dash_status,bs4dash_color]
   # promises[future_promise,`%...!%`,`%...>%`,catch],
   # future[plan,multisession],
   # microbenchmark[microbenchmark],
@@ -76,25 +78,32 @@ ui <- function(id){
   "))
   )
   
+
   dashboardPage(
-          header = dashboardHeader(),
-          sidebar = dashboardSidebar( id = ns("sidebar"), collapsed = TRUE,
-            h3( "MOII_e_117krve", style = "font-size: 20px; padding: 10px; color: #FFFFFF; "),
-            sidebarMenu(id = ns("sidebar_menu"),
-                        menuItem("Expression profile", tabName = ns("expression_profile"), icon = icon("chart-line")),
-                        menuItem("Network graph", tabName = ns("network_graph"), icon = icon("diagram-project")),
-                        menuItem("Fusion genes", tabName = ns("fusion_genes"), icon = icon("atom")),
-                        menuItem("Variant calling", tabName = ns("variant_calling"), icon = icon("dna")),
-
-
-                      
-
-
-                        menuItem("Hidden IGV Item", tabName = ns("hidden_igv"), icon = icon("eye-slash")),
-                        menuItem("Summary",tabName = ns("summary"),icon = icon("id-card-clip"))
-                  
-                  )),
-          body = dashboardBody(
+    header = dashboardHeader(
+      nav = navbarMenu(
+        navbarTab("Expression profile", tabName = ns("expression_profile")),
+        navbarTab("Network graph", tabName = ns("network_graph")),
+        navbarTab("Fusion genes", tabName = ns("fusion_genes")),
+        navbarTab("Variant calling", tabName = ns("variant_calling")),
+        navbarTab("Hidden IGV Item", tabName = ns("hidden_igv")),
+        navbarTab("Summary", tabName = ns("summary"))
+      )
+    ),
+    sidebar = dashboardSidebar(disable = TRUE),
+          # header = dashboardHeader(),
+          # sidebar = dashboardSidebar( id = ns("sidebar"), collapsed = TRUE,
+          #   h3( "MOII_e_117krve", style = "font-size: 20px; padding: 10px; color: #FFFFFF; "),
+          #   sidebarMenu(id = ns("sidebar_menu"),
+          #               menuItem("Expression profile", tabName = ns("expression_profile"), icon = icon("chart-line")),
+          #               menuItem("Network graph", tabName = ns("network_graph"), icon = icon("diagram-project")),
+          #               menuItem("Fusion genes", tabName = ns("fusion_genes"), icon = icon("atom")),
+          #               menuItem("Variant calling", tabName = ns("variant_calling"), icon = icon("dna")),
+          #               menuItem("Hidden IGV Item", tabName = ns("hidden_igv"), icon = icon("eye-slash")),
+          #               menuItem("Summary",tabName = ns("summary"),icon = icon("id-card-clip"))
+          #         
+          #         )),
+          body = dashboardBody(#style = "background-color: white;",
             tabItems(
               tabItem(h3("SUMMARY"),tabName = ns("summary"),
                       fluidRow(
@@ -152,51 +161,24 @@ ui <- function(id){
                                  tabPanel(title = patient,
                                     div(style = "margin-left: -7px;",
                                       tabBox(id = ns(paste0("expression_profile_tabs_", patient)), width = 12, collapsible = FALSE,
+                                             tabPanel("Genes of Interest",
+                                                      tabName = ns("genesOfinterest_panel"), value = "genesOfinterest",
+                                                      expression_profile_table$ui_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), patient),
+                                                      expression_profile_table$ui_plots(ns(paste0("genesOfinterest_plots_", patient)), patient)),
+                                             # ),
                                              tabPanel("All Genes",
                                                       tabName = ns("allGenes_panel"), value = "allGenes",
-                                                      expression_profile_table$ui_allGenes(ns(paste0("allGenes_tab_", patient)), patient)),
-                                                      
-                                             
-                                             tabPanel("Genes of Interest",
-                                                      tabName = ns("genesOfinterest_panel"), value = "genesOfinterest")
-                                                      # expression_profile_table$ui_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), patient)),
+                                                      expression_profile_table$ui_allGenes(ns(paste0("allGenes_tab_", patient)), patient),
+                                                      expression_profile_table$ui_plots(ns(paste0("allGenes_plots_", patient)), patient))
 
-                                             # column(12, div(style = "margin-top: 20px;", prettySwitch(ns("showPlots_switch"), label = "Show plots", status = "success", fill = TRUE)))
-                                             
-                                             
-                                             ,tabBox(id = ns("plots_tabBox"), width = 12, collapsible = FALSE,headerBorder = FALSE,
-                                                     tabPanel("Heatmap", tabName = "heatmap_panel", value = "heatmap"),
-                                                     tabPanel("Volcano plot", tabName = "volcanoPlot_panel", value = "volcanoPlot",
-                                                             expression_profile_table$ui_volcano(ns(paste0("allGenes_volcano_", patient)), patient)
-                                                             )
-                                                    
+# )
                                              )
                                       )
                                     )
-                                 )
+
                                })))
-                        ))
-
-                      # tabBox(id = "expression_profile_tabs", width = 12, collapsible = FALSE,
-                      #        tabPanel("Genes of interest",tabName = "genesOfinterest_panel",value = "genesOfinterest",
-                      #                 fluidPage(
-                      #                   do.call(tabsetPanel, c(id = "expression_profile_patients", lapply(names(set_patient_to_sample("expression")), function(sample) {
-                      #                     tabPanel(title = sample
-                      #                              # expression_profile_table$ui(paste0("exprProfile_tab_", sample), sample)
-                      #                              )
-                      #                     })))
-                      #                 )),
-                      #        tabPanel("All genes",tabName = "allGenes_panel",value = "allGenes",
-                      #                 fluidPage(
-                      #                   do.call(tabsetPanel, c(id = "expression_profile_patients", lapply(names(set_patient_to_sample("expression")), function(sample) {
-                      #                     tabPanel(title = sample
-                      #                              # expression_profile_table$ui(paste0("exprProfile_tab_", sample), sample)
-                      #                     )
-                      #                   })))
-                      #                 ))
-                      # )
-
-
+                        )
+                      )
               ),
               tabItem(h1("Gene Interactions Network"),tabName = ns("network_graph"),
                       bs4Card(width = 12,headerBorder = FALSE, collapsible = FALSE,
@@ -334,7 +316,8 @@ server <- function(id) {
 
 
     lapply(names(samples_expr), function(patient) {
-      expression_profile_table$server_volcano(paste0("allGenes_volcano_", patient), patient)
+      expression_profile_table$server_plots(paste0("allGenes_plots_", patient), patient,"all_genes")
+      expression_profile_table$server_plots(paste0("genesOfinterest_plots_", patient), patient,"genes_of_interest")
     })
       
 

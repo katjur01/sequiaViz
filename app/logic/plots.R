@@ -4,8 +4,8 @@ box::use(
   magrittr[`%>%`],
   ggplot2[ggplot,scale_color_manual,geom_hline,geom_vline,ggtitle,theme_bw,ggsave,aes,geom_point,facet_wrap,theme,element_text,scale_x_continuous,unit],
   # ggiraph[geom_point_interactive,geom_text_repel_interactive,girafe,opts_hover,opts_tooltip,opts_sizing,opts_zoom],
-  promises[`%...>%`,catch],
-  future[future],
+  # promises[`%...>%`,catch],
+  # future[future],
 
 )
 
@@ -26,7 +26,7 @@ prepare_volcano <- function(dt, tissue) {
     stop(paste("Chybí sloupce pro tkáň:", tissue))
   }
   # Vytvoření nové datové tabulky s univerzálními názvy sloupců
-  dt_tissue <- dt[, .(feature_name, geneid,
+  dt_tissue <- dt[, .(feature_name, geneid,#pathway,
                       log2FC = as.numeric(as.character(get(fc_col))),
                       pval = as.numeric(as.character(get(pval_col))),
                       padj = as.numeric(as.character(get(padj_col))))]
