@@ -1,7 +1,7 @@
 # app/view/expression_profile_table.R
 
 box::use(
-  shiny[moduleServer,NS,tagList,fluidRow,fluidPage,column,tabPanel,reactive,req,observe,div,observeEvent,reactiveVal,
+  shiny[moduleServer,NS,tagList,fluidRow,fluidPage,column,tabPanel,reactive,req,observe,div,observeEvent,reactiveVal,icon,splitLayout,h4,
         updateSelectInput,selectInput,numericInput,actionButton,renderPlot,plotOutput,uiOutput,renderUI,verbatimTextOutput,renderPrint,reactiveValues,isolate],
   reactable,
   reactable[colDef,reactableOutput,renderReactable,reactable,colGroup],
@@ -10,10 +10,11 @@ box::use(
   # ggiraph[renderGirafe,girafeOutput],
   reactablefmtr[pill_buttons,data_bars],
   utils[head],
-  shinyWidgets[radioGroupButtons,checkboxGroupButtons],
+  shinyWidgets[radioGroupButtons,checkboxGroupButtons,dropdown,actionBttn,awesomeCheckboxGroup,pickerInput],
   data.table[rbindlist,dcast.data.table,as.data.table,melt.data.table],
   grDevices[colorRampPalette],
   pheatmap[pheatmap],
+  stats[setNames],
   #   promises[future_promise,`%...!%`,`%...>%`,catch],
   # future[plan,multisession],
   # shinyjs[useShinyjs,runjs],
@@ -231,114 +232,9 @@ server_plots <- function(id, patient, expr_flag) {
         volcanoPlot(prepare_volcano(data(), input$selected_tissue), input$selected_tissue)
       })
     })
-
-    
-
-    
-
-
     
   })
 }
-
-
-# 
-# ui_volcano <- function(id, patient){
-#   ns <- NS(id)
-#   # tagList(
-#   #   fluidRow(
-#   #     # selectInput(ns("selected_tissue"), "Vyber tkáň:", choices = "Blood"),  # Naplníme dynamicky
-#   #     numericInput(ns("padj_cutoff"), "p-adj cutoff:", value = 0.05, min = 0, step = 0.01),
-#   #     numericInput(ns("logfc_cutoff"), "log2FC cutoff:", value = 1, min = 0, step = 0.1),
-#   #     numericInput(ns("top_n"), "Počet popisků genů:", value = 20, min = 0, step = 1),
-#   #     # actionButton(ns("update_plot"), "Aktualizovat graf")
-#   #   ),
-#   #   fluidRow(
-#   #     # uiOutput(ns("volcano_plots_container")),
-#   #     plotlyOutput(outputId = ns("volcanoPlot_blood"))
-#   #     # plotOutput(outputId = ns(paste0("volcanoPlot_", get_tissue_list())))
-#   #   )
-#   # )
-#   tagList(
-#     fluidRow(
-#       plotOutput(outputId = ns("ggvolcanoPlot"))
-#     ),
-#     fluidRow(
-#       column(6, radioGroupButtons(ns("selected_tissue"), "Choose a tissue :", choices = get_tissue_list(), justified = TRUE))
-#     ),
-#     fluidRow(
-#       column(6, plotlyOutput(outputId = ns("volcanoPlot_blood"))),
-#       column(1,),
-#       column(1, numericInput(ns("padj_cutoff"), "p-adj cutoff:", value = 0.05, min = 0, step = 0.01)),
-#       column(1, numericInput(ns("logfc_cutoff"), "log2FC cutoff:", value = 1, min = 0, step = 0.1)),
-#       column(1, numericInput(ns("top_n"), "Počet popisků genů:", value = 20, min = 0, step = 1))
-#     )
-#   )
-# }
-# 
-# 
-# server_volcano <- function(id, patient) {
-#   moduleServer(id, function(input, output, session) {
-#     data <- reactive({
-#       input_data(patient, "all_genes")
-#     })
-# 
-#     tissue_names <- get_tissue_list()
-# 
-#     output$ggvolcanoPlot <- renderPlot({
-#       req(data())
-# 
-#       dt_all <- rbindlist(lapply(tissue_names, function(tissue) {
-#         dt <- prepare_volcano(data(), tissue)
-#         classify_volcano_genes(dt)}))
-# 
-#       ggvolcanoPlot(dt_all)
-#     })
-# 
-#     output$volcanoPlot_blood <- renderPlotly({
-#       req(data())
-#       # toWebGL()
-#       volcanoPlot(prepare_volcano(data(), "Blood"), "Blood")
-#     })
-# 
-#     # output$volcano_plots_container <- renderUI({
-#     #   ns <- session$ns
-#     #   if (length(tissue_names) == 0) {
-#     #     return("Žádná dostupná data pro vykreslení.")
-#     #   }
-#     #
-#     #   plot_list <- lapply(tissue_names, function(tissue) {
-#     #     div(style = "flex: 1 1 30%; padding: 10px;",
-#     #         use_spinner(plotlyOutput(ns(paste0("volcanoPlot_", tissue)), height = "600px", width = "600px")))
-#     #   })
-#     #   div(style = "display: flex; flex-wrap: wrap; justify-content: center;", plot_list)
-#     # })
-# 
-#     # output$volcano_plots_container <- renderUI({
-#     #   plot_list <- lapply(tissue_names, function(tissue) {
-#     #     # plot_volcano(prepare_volcano(data(), tissue), tissue)
-#     #     volcanoPlot(prepare_volcano(data(), tissue), tissue)
-#     #   })
-#     #   girafeOutput(plot_list)
-#     # })
-# 
-#     # # Paralelní vykreslování každého grafu
-#     # lapply(tissue_names, function(tissue) {
-#     #   output[[paste0("volcanoPlot_", tissue)]] <- renderPlotly({
-#     #     req(data())
-#     #     # toWebGL()
-#     #     plot <- volcanoPlot(prepare_volcano(data(), tissue), tissue)
-#     #     # plot <- plot_volcano(prepare_volcano(data(), tissue), tissue)
-#     #
-#     #     plot
-#     #   })
-#     # })
-# 
-# 
-#   })
-# }
-
-
 
 ui_allGenes <- function(id, patient) {
   ns <- NS(id)
@@ -388,20 +284,28 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping) {
 ui_genesOfInterest <- function(id,patient){
   ns <- NS(id)
   tagList(
+  fluidPage(
+    div(style = "display: flex; justify-content: flex-end; padding: 10px 0;",
+        uiOutput(ns("filterTab"))
+      ) ),
+
     fluidRow( # style = "padding-top:30px",
-      column(12, use_spinner(reactableOutput(outputId = ns(paste0("table_", patient))))))
-    # fluidRow(style = "padding-top:30px",
-    #          column(12, plotlyOutput(outputId = ns(paste0("barplot_", patient, "_", get_tissues(patient)[1]))))),
-    # fluidRow(style = "padding-top:30px",
-    #          column(12, plotlyOutput(outputId = ns(paste0("barplot_", patient, "_", get_tissues(patient)[2])))))
-    # column(6, tags$img(src = "./DZ1601_specBckg_BloodVessel.png"))
-  )
+      column(12, use_spinner(reactableOutput(outputId = ns(paste0("table_", patient)))))
+    )
+)
 }
 
 
-server_genesOfInterest <- function(id, patient, selected_columns, column_mapping) {
+server_genesOfInterest <- function(id, patient, selected_columns, column_mapping, all_colnames) {
   moduleServer(id, function(input, output, session) {
+    ns <- NS(id)
 
+    output$filterTab <- renderUI({
+      req(all_colnames)
+      filterTab_ui(ns("filterTab_dropdown"), column_mapping$dropdown_btn, all_colnames$all_columns, all_colnames$default_setting)
+    })
+    
+    
     data <- reactive({
       dt <- input_data(patient,"genes_of_interest")
     })
@@ -409,7 +313,7 @@ server_genesOfInterest <- function(id, patient, selected_columns, column_mapping
     column_defs <- reactive({
       message("Generating colDef for expression")
       req(selected_columns())
-      generate_columnsDef(names(data()), selected_columns(), "expression", column_mapping, session)
+      generate_columnsDef(names(data()), selected_columns(), "expression", column_mapping$table, session)
     })
 
     output[[paste0("table_", patient)]] <- renderReactable({
@@ -532,7 +436,52 @@ server_heatmap <- function(id, patient){
 }
 
 
-
+filterTab_ui <- function(id,columnName_map,column_list,default_setting){
+  ns <- NS(id)
+  tagList(
+    dropdown(right = TRUE,size = "xs",icon = icon("filter"),style = "material-flat",width = "auto",
+       fluidRow(style = "width: 40rem;",
+         column(6,
+                div(style = "display: flex; flex-direction: column;flex-wrap: wrap; width: 100%; border-right: 1px solid #e0e0e0;",
+                    checkboxGroupButtons(ns("Id051_col1"),"Select tissues:",choices = get_tissue_list(),selected = get_tissue_list(),individual = TRUE),
+                    tags$span("Table filter:", style = "font-size: 1rem; font-weight: bold; isplay: inline-block; margin-bottom: .5rem;"),
+                    fluidRow(
+                      div(style = "display: flex; align-items: center; gap: 10px; margin-bottom: -10px;",
+                          checkboxGroupButtons(ns("log2fc>1_btn"),choices = "log2FC > 1",selected = "",individual = TRUE),
+                          pickerInput(ns("log2fc>1_tissue"),choices = get_tissue_list(), multiple = TRUE, options = list(`live-search` = TRUE,`actions-box` = TRUE,`multiple-separator` = ", ",`none-selected-text` = "Select tissue",`width` = "100%",`virtual-scroll` = 10,`tick-icon` = "fa fa-check")))),
+                    fluidRow(
+                      div(style = "display: flex; align-items: center; gap: 10px; margin-bottom: -10px;",
+                          checkboxGroupButtons(ns("log2fc<-1_btn"),choices = "log2FC < -1",selected = "",individual = TRUE),
+                          pickerInput(ns("log2fc<-1_tissue"), choices = get_tissue_list(), multiple = TRUE, options = list(`live-search` = TRUE,`actions-box` = TRUE,`multiple-separator` = ", ",`none-selected-text` = "Select tissue",`width` = "100%",`virtual-scroll` = 10,`tick-icon` = "fa fa-check")))),
+                    fluidRow(
+                      div(style = "display: flex; align-items: center; gap: 10px; margin-bottom: -10px;",
+                          checkboxGroupButtons(ns("p-value_btn"),choices = "p-value < 0.05",selected = "",individual = TRUE),
+                          pickerInput(ns("p-value_tissue"), choices = get_tissue_list(), multiple = TRUE, options = list(`live-search` = TRUE,`actions-box` = TRUE,`multiple-separator` = ", ",`none-selected-text` = "Select tissue",`width` = "100%",`virtual-scroll` = 10,`tick-icon` = "fa fa-check")))),
+                    fluidRow(
+                      div(style = "display: flex; align-items: center; gap: 10px; margin-bottom: -10px;",
+                          checkboxGroupButtons(ns("p-adj_btn"),choices = "p-adj < 0.05",selected = "",individual = TRUE),
+                          pickerInput(ns("p-adj_tissue"), choices = get_tissue_list(), multiple = TRUE, options = list(`live-search` = TRUE,`actions-box` = TRUE,`multiple-separator` = ", ",`none-selected-text` = "Select tissue",`width` = "100%",`virtual-scroll` = 10,`tick-icon` = "fa fa-check"))))
+         
+                    )
+         ),
+         column(6,
+            div(style = "flex: 1; min-width: 300px;",
+                awesomeCheckboxGroup(ns("Id044"),"Columns selection:", 
+                                     # choices = setNames(column_list, sapply(column_list, function(x) columnName_map[[x]])),
+                                     # selected = default_setting
+                                     choices = c("Gene name","Gene id","log2FC","p-value","p-adj"),
+                                     selected = c("Gene name","Gene id","log2FC","p-value","p-adj")
+                                     )
+            )
+         )
+       ),
+       # Pravý sloupec s Awesome Checkbox Group
+       div(style = "display: flex; justify-content: center; margin-top: 10px;",
+           actionBttn(ns("confirn_btn"),"Confirm changes",style = "stretch",color = "success",size = "sm",individual = TRUE))
+    )
+    )
+}
+    
 
 # expUI <- fluidPage(
 #   ui("exp1", "DZ1601")
