@@ -46,7 +46,28 @@
   }
 }
 
-.expressionProfile-tissue-wrapper .btn-group-container-sw {
-  flex-wrap: wrap;
-  display: flex; // radši přidat, kdyby tam někdy nebyl
+.expressionProfile-filter_pathway {
+  .dropdown-menu {
+    right: 0 !important;
+    left: auto !important;
+    transform: none !important;
+  }
 }
+
+.filter-button-wrapper {
+  position: relative;
+
+  .sw-dropdown { // nebo použij konkrétní ID pokud máš, nebo klidně .sw-dropdown apod.
+    position: absolute;
+    top: -30px;
+    right: 0;
+    z-index: 10;
+  }
+}
+
+.filterTab-select-tissue {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  width: 100%;
+}
+

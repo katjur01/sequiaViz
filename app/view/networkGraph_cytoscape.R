@@ -113,7 +113,7 @@ ui <- function(id) {
     ),
    fluidRow(
      column(6,div(class = "networkGraph-tissue-wrapper",
-        radioGroupButtons(ns("selected_tissue"),"Choose a tissue :",choices = get_tissue_list(),justified = FALSE)))
+        radioGroupButtons(ns("selected_tissue"),"Choose a tissue :",choices = get_tissue_list(),justified = TRUE)))
    ),
    networkGraph_tables$tab_UI(ns("tab"))
   )

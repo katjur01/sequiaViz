@@ -32,6 +32,7 @@ box::use(
   app/logic/reactable_helpers[generate_columnsDef,custom_colGroup_setting],
   app/logic/prepare_table[prepare_expression_table,set_pathway_colors,get_tissue_list],
   app/logic/plots[prepare_volcano,volcanoPlot,ggvolcanoPlot,classify_volcano_genes], #plot_volcano
+  app/logic/networkGraph_helper[get_pathway_list],
 )
 
 
@@ -58,7 +59,7 @@ server_plots <- function(id, patient, expr_flag) {
   moduleServer(id, function(input, output, session) {
     
     data <- reactive({
-      input_data(patient, expr_flag) #expr_flag = "genes_of_interest" #sample = "MR1507"
+      input_data(patient, expr_flag) # expr_flag = "genes_of_interest" # sample = "DZ1601"
     })
     
     tissue_names <- get_tissue_list()
@@ -118,8 +119,8 @@ server_plots <- function(id, patient, expr_flag) {
             plotOutput(outputId = ns("ggvolcanoPlot"))
           ),
           fluidRow(
-            column(6, div(class = "expressionProfile-tissue-wrapper",
-              radioGroupButtons(ns("selected_tissue"), "Choose a tissue :", choices = get_tissue_list(), justified = FALSE)))
+            column(6, div(class = "filterTab-select-tissue",
+              radioGroupButtons(ns("selected_tissue"), "Choose a tissue :", choices = get_tissue_list(), justified = TRUE)))
           ),
           fluidRow(
             column(6, use_spinner(plotlyOutput(outputId = ns("volcanoPlot_blood")))),
@@ -285,14 +286,19 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping) {
 ui_genesOfInterest <- function(id,patient){
   ns <- NS(id)
   tagList(
-  fluidPage(
-    div(style = "display: flex; justify-content: flex-end; padding: 10px 0;",
-        uiOutput(ns("filterTab"))
-      ) ),
-
-    fluidRow( # style = "padding-top:30px",
-      column(12, use_spinner(reactableOutput(outputId = ns(paste0("table_", patient)))))
+    # div(style = "display: flex; justify-content: flex-end; padding: 10px 0;",
+    #     uiOutput(ns("filterTab"))
+    #   ),
+    # 
+    # fluidRow( # style = "padding-top:30px",
+    #   column(12, use_spinner(reactableOutput(outputId = ns(paste0("table_", patient)))))
+    # )
+    div(
+      class = "filter-button-wrapper",
+      uiOutput(ns("filterTab")),
+      use_spinner(reactableOutput(outputId = ns(paste0("table_", patient))))
     )
+    
 )
 }
 
@@ -444,7 +450,8 @@ filterTab_ui <- function(id,columnName_map,column_list,default_setting){
        fluidRow(style = "width: 40rem;",
          column(6,
                 div(style = "display: flex; flex-direction: column;flex-wrap: wrap; width: 100%; border-right: 1px solid #e0e0e0;",
-                    checkboxGroupButtons(ns("Id051_col1"),"Select tissues:",choices = get_tissue_list(),selected = get_tissue_list(),individual = TRUE),
+                    div(class = "filterTab-select-tissue",
+                      checkboxGroupButtons(ns("select_tissue"),"Select tissues:",choices = get_tissue_list(),selected = get_tissue_list(),individual = TRUE)),
                     tags$span("Table filter:", style = "font-size: 1rem; font-weight: bold; isplay: inline-block; margin-bottom: .5rem;"),
                     fluidRow(
                       div(style = "display: flex; align-items: center; gap: 10px; margin-bottom: -10px;",
@@ -467,12 +474,17 @@ filterTab_ui <- function(id,columnName_map,column_list,default_setting){
          ),
          column(6,
             div(style = "flex: 1; min-width: 300px;",
-                awesomeCheckboxGroup(ns("Id044"),"Columns selection:", 
+                div(class = "expressionProfile-filter_pathway",
+                    pickerInput(ns("filter_pathway"), "Filter pathways", 
+                                choices = get_pathway_list(), multiple = TRUE, 
+                                options = list(`live-search` = TRUE,`actions-box` = TRUE,`multiple-separator` = ", ",`none-selected-text` = "Select pathways",`width` = "100%",`virtual-scroll` = 10,`tick-icon` = "fa fa-check",`dropupAuto` = FALSE))),
+                awesomeCheckboxGroup(ns("filter_column"),"Columns selection:", 
                                      # choices = setNames(column_list, sapply(column_list, function(x) columnName_map[[x]])),
                                      # selected = default_setting
-                                     choices = c("Gene name","Gene id","log2FC","p-value","p-adj"),
-                                     selected = c("Gene name","Gene id","log2FC","p-value","p-adj")
+                                     choices  = c("Gene name","Gene ID","Pathway","log2FC","p-value","p-adj"),
+                                     selected = c("Gene name","Gene ID","Pathway","log2FC","p-value","p-adj")
                                      )
+
             )
          )
        ),
