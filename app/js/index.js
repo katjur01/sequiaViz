@@ -1,5 +1,8 @@
-export function sayHello(name) {
-  console.log(`Hello ${name}!`);
-}
+import cytoscape from 'cytoscape';
+import cola from 'cytoscape-cola';
+import fcose from 'cytoscape-fcose';
 
-Shiny.addCustomMessageHandler('sayHello', sayHello);
+cytoscape.use(cola);
+cytoscape.use(fcose);
+
+window.cytoscape = cytoscape;

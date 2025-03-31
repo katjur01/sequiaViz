@@ -43,14 +43,7 @@ ui <- function(id) {
   useShinyjs()
   tagList(
     tags$head(
-      tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.1/cytoscape.min.js"),
-      tags$script(src = "https://cdn.jsdelivr.net/npm/webcola@3.4.0/WebCola/cola.min.js"),
-      tags$script(src = "https://cdn.jsdelivr.net/npm/cytoscape-cola@2.5.1/cytoscape-cola.min.js"),
-      tags$script(src="https://unpkg.com/layout-base/layout-base.js"),
-      tags$script(src="https://unpkg.com/cose-base/cose-base.js"),
-      tags$script(src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"),
-      # tags$script(src="https://www.unpkg.com/jquery@3.0.0/dist/jquery.min.js"),
-      # tags$script(src="https://unpkg.com/cytoscape-panzoom@2.5.3/cytoscape-panzoom.js"),
+      tags$script(src = "static/js/app.min.js"),
       tags$script(src = "static/js/cytoscape_init.js"),
       tags$script(HTML(sprintf("var cyContainerId = '%s'; var cySubsetContainerId = '%s'; var cySelectedNodesInputId = '%s';", 
                                ns("cyContainer"), ns("cySubsetContainer"), ns("cySelectedNodes"))))
@@ -70,15 +63,12 @@ ui <- function(id) {
           column(3.3,
             div(style = "display: flex; align-items: center; gap: 10px;",
                 prettySwitch(ns("selectedSomVariants"), label = "Add possibly pathogenic somatic variants", status = "primary", slim = TRUE),
-                # dropdown(label = NULL,style = "material-flat", size = "xs", color = "black",icon = icon("table-cells"))
                 ),
             div(style = "display: flex; align-items: center; gap: 10px;",
                 prettySwitch(ns("selectedGermVariants"), label = "Add possibly pathogenic germline variants", status = "primary", slim = TRUE),
-                # dropdown(label = NULL,style = "material-flat", size = "xs",color = "black",icon = icon("table-cells"))
                 ),
             div(style = "display: flex; align-items: center; gap: 10px;",
                 prettySwitch(ns("selectedFusions"), label = "Add selected fusions", status = "primary", slim = TRUE),
-                # dropdown(label = NULL,style = "material-flat", size = "xs",color = "black",icon = icon("table-cells"))
                 )), # right = TRUE, #width = "240px"
          column(6, networkGraph_tables$selectedTab_UI(ns("tab")))
        )
@@ -107,9 +97,6 @@ ui <- function(id) {
      )
    ),
 
-    
-   
-
     uiOutput(ns("js_namespace")),
     fluidRow(
       column(6,
@@ -125,8 +112,8 @@ ui <- function(id) {
       column(5,div(id = ns("cySubsetContainer"), style = "width: 100%; height: 600px;"))
     ),
    fluidRow(
-     column(6,
-        radioGroupButtons(ns("selected_tissue"),"Choose a tissue :",choices = get_tissue_list(),justified = TRUE))
+     column(6,div(class = "networkGraph-tissue-wrapper",
+        radioGroupButtons(ns("selected_tissue"),"Choose a tissue :",choices = get_tissue_list(),justified = FALSE)))
    ),
    networkGraph_tables$tab_UI(ns("tab"))
   )
@@ -145,7 +132,8 @@ server <- function(id, shared_data) {
     result_dt <- reactiveVal(NULL)
     selected_dt <- reactiveVal(NULL)
     
-    dt <- input_data("MR1507","all_genes")
+    # dt <- input_data("MR1507","all_genes")
+    dt <- input_data("DZ1601","all_genes")
     # # subTissue_dt <- fread("input_files/MOII_e117/RNAseq21_NEW/MR1507/Blood_all_genes_oneRow.tsv")
     # dt <- fread("input_files/MOII_e117/RNAseq21_NEW/MR1507/Blood_all_genes_oneRow.tsv")
     # pathway_dt <- unique(dt[grepl("Metabolic pathways", all_kegg_paths_name, fixed = TRUE),-c("all_kegg_gene_names","counts_tpm_round","size","mu","lower_than_p","higher_than_p","type","gene_definition")])

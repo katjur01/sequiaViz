@@ -118,14 +118,15 @@ server_plots <- function(id, patient, expr_flag) {
             plotOutput(outputId = ns("ggvolcanoPlot"))
           ),
           fluidRow(
-            column(6, radioGroupButtons(ns("selected_tissue"), "Choose a tissue :", choices = get_tissue_list(), justified = TRUE))
+            column(6, div(class = "expressionProfile-tissue-wrapper",
+              radioGroupButtons(ns("selected_tissue"), "Choose a tissue :", choices = get_tissue_list(), justified = FALSE)))
           ),
           fluidRow(
             column(6, use_spinner(plotlyOutput(outputId = ns("volcanoPlot_blood")))),
             column(1,),
             column(1, numericInput(ns("padj_cutoff"), "p-adj cutoff:", value = 0.05, min = 0, step = 0.01)),
             column(1, numericInput(ns("logfc_cutoff"), "log2FC cutoff:", value = 1, min = 0, step = 0.1)),
-            column(1, numericInput(ns("top_n"), "Počet popisků genů:", value = 20, min = 0, step = 1))
+            column(1, numericInput(ns("top_n"), "Gene labels:", value = 20, min = 0, step = 1))
           )
         )
       }

@@ -19,6 +19,7 @@
 # setwd(paste0(script_dir))
 
 box::use(
+  rhino,
   shiny[h1,h2,h3,bootstrapPage,div,moduleServer,NS,renderUI,tags,uiOutput,icon,observeEvent,observe,reactive,isTruthy,
         fluidRow,fluidPage,mainPanel,tabPanel,titlePanel,tagList,HTML,textInput,sidebarLayout,sidebarPanel,includeScript,
         br,updateTabsetPanel, actionButton,imageOutput,renderImage,reactiveVal,req,fixedPanel,reactiveValues],
@@ -333,7 +334,7 @@ server <- function(id) {
 ##################    
     ## run network graph module    
     
-    # networkGraph_cytoscape$server("network_graph", shared_data)
+    networkGraph_cytoscape$server("network_graph", shared_data)
     
     
 

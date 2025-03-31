@@ -1,7 +1,7 @@
-// Registrace layoutů `cola` a `fcose`
-cytoscape.use(cytoscapeCola);
-cytoscape.use(cytoscapeFcose);  // Použití `cytoscapeFcose` pro fcose layout
+// Registrace layoutů `cola` a `fcose` probíhá v js/index.js
 //cytoscape.use(cytoscapePanzoom); 
+console.log("✅ cytoscape_init.js loaded");
+
 
 let cy;
 let cySubset;
