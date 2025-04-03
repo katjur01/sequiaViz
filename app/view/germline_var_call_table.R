@@ -134,7 +134,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
           var_in_row <- filtered_data$var_name[index]
           if (var_in_row %in% pathogenic_variants$var_name &           # Pokud je aktuální řádek v seznamu patogenních variant, zvýrazníme ho
               gene_in_row %in% pathogenic_variants$Gene_symbol) {
-            list(backgroundColor = "#ffcccc",fontWeight = "bold")
+            list(backgroundColor = "#B5E3B6",fontWeight = "bold")
           } else {
             NULL
           }
@@ -143,14 +143,11 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
         #   colGroup(name = "Databases", columns = c("gnomAD_NFE", "clinvar_sig", "snpDB", "CGC_Germline", "trusight_genes", "fOne")),
         #   colGroup(name = "Annotation", columns = c("Consequence", "HGVSc", "HGVSp", "all_full_annot_name"))
         # ),
-        details = function(index) {div(style = "padding: 10px;", paste("Detailní informace pro řádek:", index))},
         selection = "multiple",
         onClick = JS("function(rowInfo, column, event) {
                         if (event.target.classList.contains('rt-expander') || event.target.classList.contains('rt-expander-button')) {
-                            rowInfo.toggleRowExpanded();  
                         } else {
-                            rowInfo.toggleRowSelected();  
-                        }}"),
+                            rowInfo.toggleRowSelected();}}"),
         class = "germline-table",
         elementId = "tbl-germline"
       )

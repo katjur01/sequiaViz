@@ -132,7 +132,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
                                  gene2_in_row %in% pathogenic_fusions$gene2) |
                                 (gene1_in_row %in% pathogenic_fusions$gene2 & 
                                  gene2_in_row %in% pathogenic_fusions$gene1)) {
-                              list(backgroundColor = "#ffcccc", fontWeight = "bold")
+                              list(backgroundColor = "#B5E3B6", fontWeight = "bold")
                             } else {
                               NULL
                             }
