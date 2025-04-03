@@ -81,7 +81,7 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping) {
                 filterable = TRUE,
                 compact = TRUE,
                 defaultColDef = colDef(sortNALast = TRUE,align = "center"),
-                # columnGroups = custom_colGroup_setting("expression",,selected_tissues_final()),
+                columnGroups = custom_colGroup_setting("expression"),
                 defaultSorted = list("geneid" = "asc")
       )
     })
@@ -247,7 +247,7 @@ server_genesOfInterest <- function(id, patient, selected_columns, column_mapping
                 pagination = FALSE,
                 compact = TRUE,
                 defaultColDef = colDef(sortNALast = TRUE,align = "center"),
-                columnGroups = custom_colGroup_setting("expression",selected_tissues_final())
+                columnGroups = custom_colGroup_setting("expression")
       )
     })
 
@@ -259,7 +259,9 @@ server_genesOfInterest <- function(id, patient, selected_columns, column_mapping
 filterTab_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     
+    
     observe({
+      message(" get_pathway_list(genes_of_interest): " ,get_pathway_list("genes_of_interest"))
       updateCheckboxGroupButtons(session, "log2fc_bigger1_btn",
                                  selected = if (length(input$log2fc_bigger1_tissue) > 0) "log2FC > 1" else character(0))
       updateCheckboxGroupButtons(session, "log2fc_smaller1_btn",
@@ -301,24 +303,20 @@ filterTab_ui <- function(id,columnName_map,column_list,default_setting){
                     div(class = "filterTab-select-tissue",
                       checkboxGroupButtons(ns("select_tissue"),"Select tissues:",choices = get_tissue_list(),selected = get_tissue_list(),individual = TRUE)),
                     tags$span("Table filter:", style = "font-size: 1rem; font-weight: bold; isplay: inline-block; margin-bottom: .5rem;"),
-                    # fluidRow(
-                      div(style = "display: flex; gap: 10px; margin-bottom: -10px;",
+                    div(style = "display: flex; gap: 10px; margin-bottom: -10px;",
                           div(style = "width = 100%",
                             checkboxGroupButtons(ns("log2fc_bigger1_btn"),choices = "log2FC > 1",selected = "",individual = TRUE)),
                           div(class = "filter_pathway",
                             pickerInput(ns("log2fc_bigger1_tissue"),choices = get_tissue_list(), multiple = TRUE, options = list(`live-search` = TRUE,`actions-box` = TRUE,`multiple-separator` = ", ",`none-selected-text` = "Select tissue",`width` = "100%",`virtual-scroll` = 10,`tick-icon` = "fa fa-check",`dropupAuto` = FALSE)))),
-                    # fluidRow(
-                      div(style = "display: flex; gap: 10px; margin-bottom: -10px;",
+                    div(style = "display: flex; gap: 10px; margin-bottom: -10px;",
                           checkboxGroupButtons(ns("log2fc_smaller1_btn"),choices = "log2FC < -1",selected = "",individual = TRUE),
                           div(class = "filter_pathway",
                             pickerInput(ns("log2fc_smaller1_tissue"), choices = get_tissue_list(), multiple = TRUE, options = list(`live-search` = TRUE,`actions-box` = TRUE,`multiple-separator` = ", ",`none-selected-text` = "Select tissue",`width` = "100%",`virtual-scroll` = 10,`tick-icon` = "fa fa-check",`dropupAuto` = FALSE)))),
-                    # fluidRow(
-                      div(style = "display: flex; gap: 10px; margin-bottom: -10px;",
+                    div(style = "display: flex; gap: 10px; margin-bottom: -10px;",
                           checkboxGroupButtons(ns("pval_btn"),choices = "p-value < 0.05",selected = "",individual = TRUE),
                           div(class = "filter_pathway",
                             pickerInput(ns("pval_tissue"), choices = get_tissue_list(), multiple = TRUE, options = list(`live-search` = TRUE,`actions-box` = TRUE,`multiple-separator` = ", ",`none-selected-text` = "Select tissue",`width` = "100%",`virtual-scroll` = 10,`tick-icon` = "fa fa-check",`dropupAuto` = FALSE)))),
-                    # fluidRow(
-                      div(style = "display: flex; gap: 10px; margin-bottom: -10px;",
+                    div(style = "display: flex; gap: 10px; margin-bottom: -10px;",
                           checkboxGroupButtons(ns("padj_btn"),choices = "p-adj < 0.05",selected = "",individual = TRUE),
                           div(class = "filter_pathway",
                            pickerInput(ns("padj_tissue"), choices = get_tissue_list(), multiple = TRUE, options = list(`live-search` = TRUE,`actions-box` = TRUE,`multiple-separator` = ", ",`none-selected-text` = "Select tissue",`width` = "100%",`virtual-scroll` = 10,`tick-icon` = "fa fa-check",`dropupAuto` = FALSE))))
@@ -331,53 +329,14 @@ filterTab_ui <- function(id,columnName_map,column_list,default_setting){
                                 choices = get_pathway_list("genes_of_interest"), multiple = TRUE, 
                                 options = list(`live-search` = TRUE,`actions-box` = TRUE,`multiple-separator` = ", ",`none-selected-text` = "Select pathways",`width` = "100%",`virtual-scroll` = 10,`tick-icon` = "fa fa-check",`dropupAuto` = FALSE))),
                 awesomeCheckboxGroup(ns("filter_column"),"Columns selection:", 
-                                     # choices = setNames(column_list, sapply(column_list, function(x) columnName_map[[x]])),
-                                     # selected = default_setting
                                      choices  = c("Gene name","Gene ID","Pathway","log2FC","p-value","p-adj"),
                                      selected = c("Gene name","Gene ID","Pathway","log2FC","p-value","p-adj")
                                      )
-
             )
          )
        ),
-       # Pravý sloupec s Awesome Checkbox Group
        div(style = "display: flex; justify-content: center; margin-top: 10px;",
            actionBttn(ns("confirm_btn"),"Confirm changes",style = "stretch",color = "success",size = "sm",individual = TRUE,value = 0))
-           # actionButton(ns("confirm_btn"),"Confirm changes"))
     )
-    )
+  )
 }
-    
-
-# expUI <- fluidPage(
-#   ui("exp1", "DZ1601")
-# )
-#
-# expSerever <- function(input, output, session) {
-#   server("exp1", "DZ1601")
-# }
-#
-# shinyApp(expUI, expSerever)
-
-
-
-## testování rychlosti
-# library(microbenchmark)
-# 
-# times <- microbenchmark(
-#   sync = {
-#     lapply(tissue_names, function(tissue) {
-#       volcanoPlot(prepare_volcano(dt, tissue), tissue)
-#     })
-#   },
-#   async = {
-#     lapply(tissue_names, function(tissue) {
-#       plot_volcano(prepare_volcano(dt, tissue), tissue)
-#     })
-#   },
-#   times = 3  # Počet opakování testu
-# )
-# print(times)
-
-
-

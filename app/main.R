@@ -48,6 +48,7 @@ box::use(
   app/view/germline_var_call_table,
 #   # app/view/variant_calling_table,
   app/view/expression_profile_table,
+  app/view/expression_profile_plot,
   app/view/dropdown_button[igvDropdown_ui,igvDropdown_server,colFilterDropdown_ui,colFilterDropdown_server],
   app/logic/patients_list[patients_list,set_patient_to_sample],
   app/view/IGV,
@@ -165,12 +166,12 @@ ui <- function(id){
                                              tabPanel("Genes of Interest",
                                                       tabName = ns("genesOfinterest_panel"), value = "genesOfinterest",
                                                       expression_profile_table$ui_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), patient),
-                                                      expression_profile_table$ui_plots(ns(paste0("genesOfinterest_plots_", patient)), patient)),
+                                                      expression_profile_plot$ui(ns(paste0("genesOfinterest_plots_", patient)), patient)),
                                              # ),
                                              tabPanel("All Genes",
                                                       tabName = ns("allGenes_panel"), value = "allGenes",
                                                       expression_profile_table$ui_allGenes(ns(paste0("allGenes_tab_", patient)), patient),
-                                                      expression_profile_table$ui_plots(ns(paste0("allGenes_plots_", patient)), patient))
+                                                      expression_profile_plot$ui(ns(paste0("allGenes_plots_", patient)), patient))
 
 # )
                                              )
@@ -317,8 +318,8 @@ server <- function(id) {
 
 
     lapply(names(samples_expr), function(patient) {
-      expression_profile_table$server_plots(paste0("allGenes_plots_", patient), patient,"all_genes")
-      expression_profile_table$server_plots(paste0("genesOfinterest_plots_", patient), patient,"genes_of_interest")
+      expression_profile_plot$server(paste0("allGenes_plots_", patient), patient,"all_genes")
+      expression_profile_plot$server(paste0("genesOfinterest_plots_", patient), patient,"genes_of_interest")
     })
       
 

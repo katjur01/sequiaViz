@@ -1,4 +1,3 @@
-
 box::use(
   jsonlite[fromJSON, toJSON],
   data.table[fread,setnames],
@@ -126,7 +125,7 @@ get_pathway_list <- function(expr_tag){
     return(sort(unique(dt$kegg_paths_name)))
   } else if (expr_tag == "genes_of_interest"){
     dt <- fread("input_files/genes_of_interest.tsv")
-    return(sort(unique(dt$kegg_paths_name)))
+    return(sort(unique(dt$pathway)))
   } else {
     message("Invalid expr_tag. Please use 'all_genes' or 'genes_of_interest'.")
   }

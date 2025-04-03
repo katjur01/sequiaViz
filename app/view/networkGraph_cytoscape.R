@@ -55,7 +55,7 @@ ui <- function(id) {
                  div(style = "width: 75%;",
                    div(style = "display: flex; flex-direction: column; width: 100%; align-items: flex-start;", 
                      tags$label("Pathway:", style = "margin-bottom: 5px; align-self: flex-start;"),
-                     pickerInput(ns("selected_pathway"), NULL, selected = "EGFR tyrosine kinase inhibitor resistance",choices = get_pathway_list(), options = list(`live-search` = TRUE), width = "100%")),
+                     pickerInput(ns("selected_pathway"), NULL, selected = "EGFR tyrosine kinase inhibitor resistance",choices = get_pathway_list("all_genes"), options = list(`live-search` = TRUE), width = "100%")),
                    div(style = "display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 10px;", 
                      tags$label("Choose layout:", style = "align-self: flex-start;"),
                      tags$div(id = ns("helpPopover_layout"),tags$i(class = "fa fa-question fa-xs", style = "color: #2596be;"))),
