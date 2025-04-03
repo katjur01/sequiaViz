@@ -120,8 +120,15 @@ prepare_cytoscape_network <- function(interactions, tab, proteins = NULL) {
 }
 
 #' @export
-get_pathway_list <- function(){
-  dt <- fread("input_files/kegg_tab.tsv")
-  pathway_list <- sort(unique(dt$kegg_paths_name))
-  return(pathway_list)
+get_pathway_list <- function(expr_tag){
+  if(expr_tag == "all_genes") {
+    dt <- fread("input_files/kegg_tab.tsv")
+    return(sort(unique(dt$kegg_paths_name)))
+  } else if (expr_tag == "genes_of_interest"){
+    dt <- fread("input_files/genes_of_interest.tsv")
+    return(sort(unique(dt$kegg_paths_name)))
+  } else {
+    message("Invalid expr_tag. Please use 'all_genes' or 'genes_of_interest'.")
+  }
+  
 }
