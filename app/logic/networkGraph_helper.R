@@ -1,3 +1,4 @@
+
 box::use(
   jsonlite[fromJSON, toJSON],
   data.table[fread,setnames],
@@ -129,5 +130,5 @@ get_pathway_list <- function(expr_tag){
   } else {
     message("Invalid expr_tag. Please use 'all_genes' or 'genes_of_interest'.")
   }
-  
+  return(pathway_list)
 }
