@@ -6,7 +6,8 @@ box::use(
   stats[na.omit],
   bs4Dash[actionButton],
   reactablefmtr[pill_buttons,data_bars],
-  htmltools[HTML,span, div, tagList]
+  htmltools[HTML,span, div, tagList],
+  stats[setNames],
 )
 
 box::use(
@@ -188,21 +189,21 @@ columnName_map <- function(tag, expr_flag = NULL, all_columns = NULL){
     table <- list()
     tissue_list <- get_tissue_list()
     
-    rename_column <- function(col, tissue_list) {
-      for (tissue in tissue_list) {
-        if (grepl(tissue, col)) {
-          prefix <- gsub(paste0("_", tissue), "", col)  # Odstraníme tkáň z názvu
-          tissue <- gsub("_", " ", tissue)  # Nahrazení podtržítka mezerou pro čitelnost
-
-          # Vrátíme přejmenovaný sloupec jen pokud je relevantní
-          if (prefix %in% c("log2FC", "p_value", "p_adj")) {
-            return(paste(tissue, ifelse(prefix == "log2FC", "log2FC",
-                                        ifelse(prefix == "p_value", "p-value", "p-adj"))))
-          }
-        }
-      }
-      return(NULL)  # Pokud se sloupec nemá přejmenovat, vrátíme NULL
-    }
+    # rename_column <- function(col, tissue_list) {
+    #   for (tissue in tissue_list) {
+    #     if (grepl(tissue, col)) {
+    #       prefix <- gsub(paste0("_", tissue), "", col)  # Odstraníme tkáň z názvu
+    #       tissue <- gsub("_", " ", tissue)  # Nahrazení podtržítka mezerou pro čitelnost
+    # 
+    #       # Vrátíme přejmenovaný sloupec jen pokud je relevantní
+    #       if (prefix %in% c("log2FC", "p_value", "p_adj")) {
+    #         return(paste(tissue, ifelse(prefix == "log2FC", "log2FC",
+    #                                     ifelse(prefix == "p_value", "p-value", "p-adj"))))
+    #       }
+    #     }
+    #   }
+    #   return(NULL)  # Pokud se sloupec nemá přejmenovat, vrátíme NULL
+    # }
 
     if (expr_flag == "all_genes"){
         static_columns <- list(
@@ -218,28 +219,38 @@ columnName_map <- function(tag, expr_flag = NULL, all_columns = NULL){
         static_columns <- list(
           feature_name = "Gene name",
           geneid = "Gene ID",
-          pathway = "Pathway")
+          pathway = "Pathway",
+          mean_log2FC = "Mean log2FC")
     }
 
-    for (col in all_columns) {
-      new_name <- rename_column(col, tissue_list)
-      if (!is.null(new_name)) {  # Přidáme jen pokud má smysl
-        dropdown_btn[[col]] <- new_name
-      }
-    }
+    # for (col in all_columns) {
+    #   new_name <- rename_column(col, tissue_list)
+    #   if (!is.null(new_name)) {  # Přidáme jen pokud má smysl
+    #     dropdown_btn[[col]] <- new_name
+    #   }
+    # }
+    # all_columns <- c("feature_name", "geneid", "pathway", "mean_log2FC", "log2FC_Blood", "p_value_Blood", "p_adj_Blood", "log2FC_Blood_Vessel", "p_value_Blood_Vessel", "p_adj_Blood_Vessel", "log2FC_Breast", "p_value_Breast", "p_adj_Breast", "log2FC_Kidney", "p_value_Kidney", "p_adj_Kidney", "log2FC_Retina", "p_value_Retina", "p_adj_Retina", "log2FC_Testis", "p_value_Testis", "p_adj_Testis")
+    # for (col in all_columns) {
+    #   if (grepl("^log2FC_", col)) {
+    #     table[[col]] <- "log2FC"
+    #   } else if (grepl("^p_value_", col)) {
+    #     table[[col]] <- "p-value"
+    #   } else if (grepl("^p_adj_", col)) {
+    #     table[[col]] <- "p-adj"
+    #   } else {
+    #     table[[col]] <- NULL  # nebo můžeš vynechat
+    #   }
+    # }
 
-    for (col in all_columns) {
-      if (grepl("^log2FC_", col)) {
-        table[[col]] <- "log2FC"
-      } else if (grepl("^p_value_", col)) {
-        table[[col]] <- "p-value"
-      } else if (grepl("^p_adj_", col)) {
-        table[[col]] <- "p-adj"
-      }
-    }
-
-    dropdown_btn <- append(static_columns,dropdown_btn)
-    table <- c(static_columns,table)
+    # dropdown_btn <- append(static_columns,dropdown_btn)
+    # table <- c(static_columns,table)
+    # map_list <- list(dropdown_btn = dropdown_btn, table = table)
+    
+    grouped_types <- unique(unlist(table))
+    grouped_dropdown <- setNames(grouped_types, grouped_types)
+    
+    # --- Finální spojení ---
+    dropdown_btn <- append(static_columns, grouped_dropdown)
     map_list <- list(dropdown_btn = dropdown_btn, table = table)
     
   } else {
