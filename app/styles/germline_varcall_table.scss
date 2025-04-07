@@ -1,0 +1,36 @@
+.clinvar-tag {
+  display: inline-block;
+  padding: 0.125rem 0.75rem;
+  border-radius: 15px;
+//  font-weight: 600;
+  font-size: 16px;
+}
+
+.clinvar-pathogenic {
+  background: #F8D6D7;
+  color: #692B33;
+  font-weight: 600;
+}
+.clinvar-likely_pathogenic {
+  background: #FFC78F;
+  color: #DC5801;
+}
+.clinvar-benign {
+  background: #DABA97;
+  color: #845F39;
+  font-weight: 600;
+}
+.clinvar-not_provided {
+  background: #D8D8D8;
+  color: #444444;
+}
+.db-yes {
+  background: #E6F5E2;
+  color: #3E5236;
+  display: inline-block;
+  width: 60px;
+  padding: 0.125rem 0.75rem;
+  border-radius: 15px;
+  font-weight: 600;
+  font-size: 16px;
+}

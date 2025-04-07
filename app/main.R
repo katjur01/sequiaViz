@@ -90,10 +90,10 @@ ui <- function(id){
   dashboardPage(
     header = dashboardHeader(
       nav = navbarMenu(
+        navbarTab("Variant calling", tabName = ns("variant_calling")),
         navbarTab("Expression profile", tabName = ns("expression_profile")),
         navbarTab("Network graph", tabName = ns("network_graph")),
         navbarTab("Fusion genes", tabName = ns("fusion_genes")),
-        navbarTab("Variant calling", tabName = ns("variant_calling")),
         navbarTab("Hidden IGV Item", tabName = ns("hidden_igv")),
         navbarTab("Summary", tabName = ns("summary"))
       )
