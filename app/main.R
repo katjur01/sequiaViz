@@ -173,7 +173,6 @@ ui <- function(id){
                                                       tabName = ns("genesOfinterest_panel"), value = "genesOfinterest",
                                                       expression_profile_table$ui_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), patient),
                                                       expression_profile_plot$ui(ns(paste0("genesOfinterest_plots_", patient)), patient)),
-                                             # ),
                                              tabPanel("All Genes",
                                                       tabName = ns("allGenes_panel"), value = "allGenes",
                                                       expression_profile_table$ui_allGenes(ns(paste0("allGenes_tab_", patient)), patient),
@@ -341,7 +340,7 @@ server <- function(id) {
 ##################    
     ## run network graph module    
     
-    # networkGraph_cytoscape$server("network_graph", shared_data)
+    networkGraph_cytoscape$server("network_graph", shared_data)
     
     
 

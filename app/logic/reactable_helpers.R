@@ -242,7 +242,6 @@ columnName_map <- function(tag, expr_flag = NULL, all_columns = NULL){
     dropdown_btn <- append(static_columns,dropdown_btn)
     table <- c(static_columns,table)
     map_list <- list(dropdown_btn = dropdown_btn, table = table)
-    
   } else {
     print("NOT germline, expression or fusion")
   }
@@ -374,17 +373,7 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
     )
   } else if (tag == "expression") {
     
-    # if ("mean_log2FC" %in% column_names) {
-    #   mean_log2FC = colDef(
-    #       cell = data_bars(.,
-    #                        fill_color = c("lightblue","orange"),
-    #                        number_fmt = scales::percent))
-    #   return
-    #   
-    # }
     custom_colDef <- list(
-      
-
       # feature_name = colDef(minWidth = 150, filterable = TRUE),
       # geneid = colDef(minWidth = 150, filterable = TRUE),
       # all_kegg_paths_name = colDef(minWidth = 170, filterable = TRUE),
@@ -507,20 +496,25 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
 }
 
 #' @export
-custom_colGroup_setting <- function(tag){
-  if (tag == "expression"){
-    custom_colGroup <- lapply(get_tissue_list(), function(tissue) {
-        group_name <- gsub("_", " ", tissue)
-        colGroup(name = group_name, columns = c(
-            paste0("log2FC_", tissue),
-            paste0("p_value_", tissue),
-            paste0("p_adj_", tissue)
-        ))
-    })
+custom_colGroup_setting <- function(tag, tissues = NULL) {
+  if (tag == "expression") {
+    if (is.null(tissues)) {
+      tissues <- get_tissue_list()
+    }
+    
+    custom_colGroup <- lapply(tissues, function(tissue) {
+      group_name <- gsub("_", " ", tissue)
+      colGroup(name = group_name, columns = c(
+        paste0("log2FC_", tissue),
+        paste0("p_value_", tissue),
+        paste0("p_adj_", tissue)))})
+    
+    return(custom_colGroup)
   }
-  # message("custom_colGroup: ",custom_colGroup)
-  return(custom_colGroup)
+  
+  return(NULL)
 }
+
 
 set_pathway_colors <- function(){
   pathway_colors <- list(

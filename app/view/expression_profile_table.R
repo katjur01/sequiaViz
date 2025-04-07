@@ -50,7 +50,7 @@ ui_allGenes <- function(id, patient) {
   ns <- NS(id)
     tagList(
       div(class = "filter-button-wrapper", # style = "padding-top:30px",
-        filterTab_ui(ns("filterTab_dropdown"), "all_genes", column_mapping$dropdown_btn, all_colnames$all_columns, all_colnames$default_setting),
+        uiOutput(ns("filterTab")),
         column(12, use_spinner(reactableOutput(outputId = ns(paste0("table_", patient))))))
   )
 }
@@ -58,7 +58,16 @@ ui_allGenes <- function(id, patient) {
 server_allGenes <- function(id, patient,selected_columns, column_mapping, all_colnames) {
 
   moduleServer(id, function(input, output, session) {
-    ns <- NS(id)
+    ns <- session$ns
+    
+    output$filterTab <- renderUI({
+      req(all_colnames)
+      filterTab_ui(ns("filterTab_dropdown"), "all_genes",column_mapping$dropdown_btn, all_colnames$all_columns, all_colnames$default_setting)
+    })
+    
+    
+    filter_state <- filterTab_server("filterTab_dropdown")
+    
     selected_tissues_final <- reactiveVal(get_tissue_list())
     selected_pathway_final <- reactiveVal(get_pathway_list("all_genes"))
     log2fc_bigger1_final <- reactiveVal(NULL)
@@ -69,32 +78,30 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping, all_co
     log2fc_smaller1_btn_final <- reactiveVal(FALSE)
     pval_btn_final <- reactiveVal(FALSE)
     padj_btn_final <- reactiveVal(FALSE)
-    
+
+
     data <- reactive({
-      input_data(patient, "all_genes") 
+      input_data(patient, "all_genes")
     })
-    
-    
+
+
     filtered_data <- reactive({
       req(data())
       df <- copy(data())  # defensivní kopie
       base_cols <- c("sample", "feature_name", "geneid", "all_kegg_paths_name")
-      
-      output$filterTab <- renderUI({
-        req(all_colnames)
-        filterTab_ui(ns("filterTab_dropdown"), column_mapping$dropdown_btn, all_colnames$all_columns, all_colnames$default_setting)
-      })
+
+
       #########################
       ## filter table button ##
       #########################
-      
-      ## --- Filtr pathways --- 
+
+      ## --- Filtr pathways ---
       pathways_selected <- selected_pathway_final()
       if (!is.null(pathways_selected) && length(pathways_selected) > 0 && length(pathways_selected) < length(get_pathway_list("all_genes"))) {
         pattern <- paste(pathways_selected, collapse = "|")
         df <- df[grepl(pattern, all_kegg_paths_name)]
       }
-      
+
       # --- Filtrace podle aktivních filtrů pro tkáně ---
       # log2FC > 1
       if (log2fc_bigger1_btn_final()) {
@@ -104,7 +111,7 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping, all_co
             col <- paste0("log2FC_", tissue)
             if (col %in% names(df)) {
               df <- df[get(col) > 1] }}}}
-      
+
       # log2FC < -1
       if (log2fc_smaller1_btn_final()) {
         tissues <- log2fc_smaller1_final()
@@ -113,7 +120,7 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping, all_co
             col <- paste0("log2FC_", tissue)
             if (col %in% names(df)) {
               df <- df[get(col) < -1] }}}}
-      
+
       # p-value < 0.05
       if (pval_btn_final()) {
         tissues <- pval_final()
@@ -130,7 +137,7 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping, all_co
             col <- paste0("p_adj_", tissue)
             if (col %in% names(df)) {
               df <- df[get(col) < 0.05] }}}}
-      
+
       # --- Výběr sloupců podle vybraných tkání ---
       tissues <- selected_tissues_final()
       if (is.null(tissues) || length(tissues) == 0) return(df[, ..base_cols])
@@ -139,12 +146,12 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping, all_co
       }))
       valid_cols <- intersect(selected_cols, names(df))
       df_filtered <- df[, c(base_cols, valid_cols), with = FALSE]
-      
+
       return(df_filtered)
     })
-    
-    
-    
+
+
+
     # Call generate_columnsDef to generate colDef setting for reactable
     column_defs <- reactive({
       message("Generating colDef for expression")
@@ -167,23 +174,21 @@ server_allGenes <- function(id, patient,selected_columns, column_mapping, all_co
                 filterable = TRUE,
                 compact = TRUE,
                 defaultColDef = colDef(sortNALast = TRUE,align = "center"),
-                columnGroups = custom_colGroup_setting("expression"),
+                columnGroups = custom_colGroup_setting("expression",selected_tissues_final()),
                 defaultSorted = list("geneid" = "asc")
       )
     })
-    
-    
-    filter_state <- filterTab_server("filterTab_dropdown")
-    
+
+
     observeEvent(filter_state$confirm(), {
       selected_tissues_final(filter_state$selected_tissue())
       selected_pathway_final(filter_state$selected_pathway())
-      
+
       log2fc_bigger1_final(filter_state$log2fc_bigger1_tissue())
       log2fc_smaller1_final(filter_state$log2fc_smaller1_tissue())
       pval_final(filter_state$pval_tissue())
       padj_final(filter_state$padj_tissue())
-      
+
       log2fc_bigger1_btn_final("log2FC > 1" %in% filter_state$log2fc_bigger1_btn())
       log2fc_smaller1_btn_final("log2FC < -1" %in% filter_state$log2fc_smaller1_btn())
       pval_btn_final("p-value < 0.05" %in% filter_state$pval_btn())
@@ -197,7 +202,7 @@ ui_genesOfInterest <- function(id,patient){
   ns <- NS(id)
   tagList(
     div(class = "filter-button-wrapper",
-      filterTab_ui(ns("filterTab_dropdown"), "genes_of_interest", column_mapping$dropdown_btn, all_colnames$all_columns, all_colnames$default_setting),
+      uiOutput(ns("filterTab")),
       use_spinner(reactableOutput(outputId = ns(paste0("table_", patient)))))
   )
 }
@@ -205,7 +210,17 @@ ui_genesOfInterest <- function(id,patient){
 
 server_genesOfInterest <- function(id, patient, selected_columns, column_mapping, all_colnames) {
   moduleServer(id, function(input, output, session) {
-    ns <- NS(id)
+    ns <- session$ns
+    
+    output$filterTab <- renderUI({
+      req(all_colnames)
+      
+      filterTab_ui(ns("filterTab_dropdown"), "genes_of_interest", column_mapping$dropdown_btn, all_colnames$all_columns, all_colnames$default_setting)
+    })
+    
+    filter_state <- filterTab_server("filterTab_dropdown")
+
+    
     selected_tissues_final <- reactiveVal(get_tissue_list())
     selected_pathway_final <- reactiveVal(get_pathway_list("genes_of_interest"))
     log2fc_bigger1_final <- reactiveVal(NULL)
@@ -216,20 +231,21 @@ server_genesOfInterest <- function(id, patient, selected_columns, column_mapping
     log2fc_smaller1_btn_final <- reactiveVal(FALSE)
     pval_btn_final <- reactiveVal(FALSE)
     padj_btn_final <- reactiveVal(FALSE)
+
+
     
     data <- reactive({
       dt <- input_data(patient,"genes_of_interest")
     })
+
     
+
     filtered_data <- reactive({
       req(data())
       df <- copy(data())  # defensivní kopie
       base_cols <- c("sample", "feature_name", "geneid", "pathway", "mean_log2FC")
       
-    output$filterTab <- renderUI({
-      req(all_colnames)
-      filterTab_ui(ns("filterTab_dropdown"), column_mapping$dropdown_btn, all_colnames$all_columns, all_colnames$default_setting)
-    })
+
     #########################
     ## filter table button ##
     #########################
@@ -250,7 +266,7 @@ server_genesOfInterest <- function(id, patient, selected_columns, column_mapping
           col <- paste0("log2FC_", tissue)
           if (col %in% names(df)) {
             df <- df[get(col) > 1] }}}}
-    
+
     # log2FC < -1
     if (log2fc_smaller1_btn_final()) {
       tissues <- log2fc_smaller1_final()
@@ -259,7 +275,7 @@ server_genesOfInterest <- function(id, patient, selected_columns, column_mapping
           col <- paste0("log2FC_", tissue)
           if (col %in% names(df)) {
             df <- df[get(col) < -1] }}}}
-    
+
     # p-value < 0.05
     if (pval_btn_final()) {
       tissues <- pval_final()
@@ -276,7 +292,7 @@ server_genesOfInterest <- function(id, patient, selected_columns, column_mapping
           col <- paste0("p_adj_", tissue)
           if (col %in% names(df)) {
             df <- df[get(col) < 0.05] }}}}
-    
+
     # --- Výběr sloupců podle vybraných tkání ---
     tissues <- selected_tissues_final()
     if (is.null(tissues) || length(tissues) == 0) return(df[, ..base_cols])
@@ -285,7 +301,6 @@ server_genesOfInterest <- function(id, patient, selected_columns, column_mapping
     }))
     valid_cols <- intersect(selected_cols, names(df))
     df_filtered <- df[, c(base_cols, valid_cols), with = FALSE]
-    message("df_filtered colnames: ", colnames(df_filtered))
     return(df_filtered)
   })
 
@@ -296,7 +311,7 @@ server_genesOfInterest <- function(id, patient, selected_columns, column_mapping
     })
 
     output[[paste0("table_", patient)]] <- renderReactable({
-
+      
       reactable(as.data.frame(filtered_data()),
                 class = "expression-table",
                 columns = column_defs(),
@@ -312,22 +327,23 @@ server_genesOfInterest <- function(id, patient, selected_columns, column_mapping
                 pagination = FALSE,
                 compact = TRUE,
                 defaultColDef = colDef(sortNALast = TRUE,align = "center"),
-                columnGroups = custom_colGroup_setting("expression"),
+                columnGroups = custom_colGroup_setting("expression",selected_tissues_final()),
                 defaultSorted = list("geneid" = "asc")
       )
     })
 
-    filter_state <- filterTab_server("filterTab_dropdown")
+
     
     observeEvent(filter_state$confirm(), {
+      message("🟢 Confirm button was clicked")
       selected_tissues_final(filter_state$selected_tissue())
       selected_pathway_final(filter_state$selected_pathway())
-      
+
       log2fc_bigger1_final(filter_state$log2fc_bigger1_tissue())
       log2fc_smaller1_final(filter_state$log2fc_smaller1_tissue())
       pval_final(filter_state$pval_tissue())
       padj_final(filter_state$padj_tissue())
-      
+
       log2fc_bigger1_btn_final("log2FC > 1" %in% filter_state$log2fc_bigger1_btn())
       log2fc_smaller1_btn_final("log2FC < -1" %in% filter_state$log2fc_smaller1_btn())
       pval_btn_final("p-value < 0.05" %in% filter_state$pval_btn())
@@ -343,29 +359,29 @@ filterTab_server <- function(id) {
     observe({
       updateCheckboxGroupButtons(session, "log2fc_bigger1_btn", selected = if (length(input$log2fc_bigger1_tissue) > 0) "log2FC > 1" else character(0))
     }) %>% bindEvent(input$log2fc_bigger1_tissue)
-    
+
     observe({
       updateCheckboxGroupButtons(session, "log2fc_smaller1_btn", selected = if (length(input$log2fc_smaller1_tissue) > 0) "log2FC < -1" else character(0))
     }) %>% bindEvent(input$log2fc_smaller1_tissue)
-    
+
     observe({
       updateCheckboxGroupButtons(session, "pval_btn",  selected = if (length(input$pval_tissue) > 0) "p-value < 0.05" else character(0))
     }) %>% bindEvent(input$pval_tissue)
-    
+
     observe({
       updateCheckboxGroupButtons(session, "padj_btn", selected = if (length(input$padj_tissue) > 0) "p-adj < 0.05" else character(0))
     }) %>% bindEvent(input$padj_tissue)
-    
+
     return(list(
       confirm = reactive(input$confirm_btn),
       selected_tissue = reactive(input$select_tissue),
       selected_pathway = reactive(input$filter_pathway),
-      
+
       log2fc_bigger1_tissue = reactive(input$log2fc_bigger1_tissue),
       log2fc_smaller1_tissue = reactive(input$log2fc_smaller1_tissue),
       pval_tissue = reactive(input$pval_tissue),
       padj_tissue = reactive(input$padj_tissue),
-      
+
       log2fc_bigger1_btn = reactive(input$log2fc_bigger1_btn),
       log2fc_smaller1_btn = reactive(input$log2fc_smaller1_btn),
       pval_btn = reactive(input$pval_btn),
@@ -419,6 +435,7 @@ filterTab_ui <- function(id,expr_tag,columnName_map,column_list,default_setting)
          )
        ),
        div(style = "display: flex; justify-content: center; margin-top: 10px;",
+           # actionButton(ns("confirm_btn"),"Confirm changes"))
            actionBttn(ns("confirm_btn"),"Confirm changes",style = "stretch",color = "success",size = "sm",individual = TRUE,value = 0))
     )
   )

@@ -252,14 +252,6 @@ colFilter <- function(flag,expr_flag = NULL){
 }
 
 #' @export
-getColFilterValues <- function(flag,expr_flag) {
-  reactive({
-    colnames_list <- colFilter(flag,expr_flag)
-    list(all_columns = colnames_list$all_columns, default_setting = colnames_list$default_setting)
-  })
-}
-
-#' @export
 prepare_variant_calling_table <- function(dt,selected_samples){
 
   if ("CGC_Somatic" %in% names(dt)){
