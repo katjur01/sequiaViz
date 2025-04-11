@@ -1,0 +1,277 @@
+box::use(
+  shiny[h1,h2,h3,bootstrapPage,div,moduleServer,NS,renderUI,tags,uiOutput,icon,observeEvent,observe,reactive,isTruthy,span,textOutput,renderText,req,
+        fluidRow,fluidPage,mainPanel,tabPanel,titlePanel,tagList,HTML,textInput,sidebarLayout,sidebarPanel,includeScript,br,updateTabsetPanel, actionButton],
+  bs4Dash[dashboardPage, dashboardHeader, dashboardSidebar, dashboardBody, sidebarMenu, menuItem, dashboardControlbar,tabItems, tabItem, bs4Card,infoBox,tabBox,tabsetPanel,bs4ValueBox,
+          controlbarMenu,controlbarItem,column,box,boxLabel,descriptionBlock,boxProfile,boxProfileItem,attachmentBlock,boxComment,userBlock,updateTabItems],
+  reactable,
+  reactable[colDef],
+  data.table[fread,as.data.table,rbindlist,tstrsplit,setcolorder,setnames,fwrite, uniqueN],
+  openxlsx[read.xlsx,getSheetNames],
+  htmltools[hr,strong,h5]
+  # shiny.gosling
+  # plotly[renderPlotly, plot_ly,plotlyOutput]
+  # plotly[plot_ly,plotlyOutput,renderPlotly],
+  # magrittr,
+  # data.table,htmltools,
+  # billboarder[bb_donutchart,billboarderOutput,renderBillboarder]
+)
+
+box::use(
+  # app/logic/load_data[get_inputs,load_data],
+  app/logic/patients_list[set_patient_to_sample],
+  app/logic/prepare_table[get_tissue_list],
+)
+
+
+ui <- function(id){
+  ns <- NS(id)
+  tagList(
+
+      # descriptionBlock(
+      #   number = "17%", 
+      #   numberColor = "pink", 
+      #   numberIcon = icon("caret-up"),
+      #   header = "$35,210.43", 
+      #   text = "TOTAL REVENUE", 
+      #   rightBorder = TRUE,
+      #   marginBottom = FALSE
+      # )
+    
+    # column(4,
+       # div(class = "text-content",
+          # HTML('<span class="icon icon-green"><i class="fas fa-square-check"></i></span>'),
+          # span("Somatic var call", class = "category"),
+          # tags$div(textOutput(ns("mutationNormal"))),
+          # tags$div(textOutput(ns("mutationFoundation"))),
+          # tags$div(textOutput(ns("for_review_som"))),
+          # tags$div(textOutput(ns("clinvar_N_som"))),
+       
+       box(
+         title = span("Somatic var call", class = "category"),
+         # value = tagList(
+         tags$div(textOutput(ns("mutationNormal"))),
+         tags$div(textOutput(ns("mutationFoundation"))),
+         tags$div(textOutput(ns("for_review_som"))),
+         tags$div(textOutput(ns("clinvar_N_som"))),
+         # ),
+         icon = HTML('<span class="icon icon-green"><i class="fas fa-square-check"></i></span>'),
+         elevation = 2,
+         collapsible = FALSE
+       ),
+       box(
+         title = span("Germline var call", class = "category"),
+         # value = tagList(
+         tags$div(textOutput(ns("high_confidence"))), # high confidence ?
+         tags$div(textOutput(ns("potencially_fused"))), # medium + low + NA confidence
+         # ),
+         icon = HTML('<span class="icon icon-green"><i class="fas fa-square-check"></i></span>'),
+         color = "lightblue",
+         elevation = 2,
+         collapsible = FALSE
+       ),
+       box(
+          title = span("Expression profile", class = "category"),
+          tags$div(textOutput(ns("tissues"))),
+          tags$div(class = "item", "Over-expressed genes: 41"), # asi tabulka - rozdělení podle FC a k tomu alreded pathways
+          tags$div(class = "item", "Under-expressed genes: 21"),
+          tags$div(class = "item", "Altered pathways: 5"),
+          icon = HTML('<span class="icon icon-green"><i class="fas fa-square-check"></i></span>'),
+          color = "teal",
+          elevation = 2,
+          collapsible = FALSE
+      ),
+    div(
+      column(
+        width = 6,
+        h5("Germline varianty"),
+        uiOutput(ns("germline_boxes")),
+        hr(),
+        h5("Fúze"),
+        uiOutput(ns("fusion_boxes"))
+      )
+    )
+  )
+}
+
+server <- function(id, patient, shared_data){
+  moduleServer(id, function(input, output, session){
+    
+
+    
+    #####################
+    ### Card overview ###
+    #####################
+    
+    output$tissues <- renderText({
+      paste0("Tissue comparison: ",uniqueN(get_tissue_list()))
+    })
+    
+    # Pomocná funkce, která vrátí odpovídající klíč pro overview podle jména pacienta
+    getMatchingPatientKey <- function(patient, tag) {
+      samples <- set_patient_to_sample(tag)  # Např. c("DZ1601krev", "MR1507krev", "VH0452krev")
+      matching_sample <- samples[grepl(patient, samples)]
+      if (length(matching_sample) == 0) return(NULL)
+      matching_sample[1]
+    }
+    
+    
+    output$for_review_germ <- renderText({
+      key <- getMatchingPatientKey(patient,"germline")
+      if (is.null(key)) return("Variants for review: Not available")
+      overview_data <- shared_data$germline_overview[[ key ]]
+      if (is.null(overview_data)) {
+        return("Variants for review: NA")
+      } else {
+        paste("Variants for review: ", overview_data$for_review)
+      }
+    })
+    
+    output$clinvar_N_germ <- renderText({
+      key <- getMatchingPatientKey(patient,"germline")
+      if (is.null(key)) return("Pathogenic and likely-pathogenic variants: Not available")
+      overview_data <- shared_data$germline_overview[[ key ]]
+      if (is.null(overview_data)) {
+        return("Pathogenic and likely-pathogenic variants: NA")
+      } else {
+        paste("Pathogenic and likely-pathogenic variants: ", overview_data$clinvar_N)
+      }
+    })
+    
+    
+    output$high_confidence <- renderText({
+      key <- getMatchingPatientKey(patient,"fusion")
+      if (is.null(key)) return("Fused genes with high confidence: Not available")
+      overview_data <- shared_data$fusion_overview[[ key ]]
+      if (is.null(overview_data)) {
+        return("Fused genes with high confidence: NA")
+      } else {
+        paste("Fused genes with high confidence: ", overview_data$high_confidence)
+      }
+    })
+
+    output$potencially_fused <- renderText({
+      key <- getMatchingPatientKey(patient,"fusion")
+      if (is.null(key)) return("Potencially fused genes: Not available")
+      overview_data <- shared_data$fusion_overview[[ key ]]
+      if (is.null(overview_data)) {
+        return("Potencially fused genes: NA")
+      } else {
+        paste("Potencially fused genes: ", overview_data$potencially_fused)
+      }
+    })
+    
+    mutation_load <- reactive({
+      dt <- as.data.table(read.xlsx("~/Desktop/sequiaViz/input_files/MOII_e117/117_WES_somatic/mutation_loads.xlsx"))
+      dt[,normal:= as.numeric(gsub(",", ".", normal))]
+      dt[,foundation_one:= as.numeric(gsub(",", ".", foundation_one))]
+      dt
+    })
+    
+    
+    # 2) Zobrazení počtu variant pro kontrolu
+    output$for_review_som <- renderText({
+      paste("Variants for review: ")#, variantsCount())
+    })
+    output$clinvar_N_som <- renderText({
+      paste0("Pathogenic and likely-pathogenic variants: ")
+    })
+    # 3) Zobrazení mutation load pro 'normal'
+    output$mutationNormal <- renderText({
+      row <- mutation_load()[sample == patient, ]
+      
+      if (nrow(row) == 1) {
+        paste("Mutation load normal:", row$normal)
+      } else {
+        "Mutation load normal: N/A"
+      }
+    })
+    
+    # 4) Zobrazení mutation load pro 'foundationOne'
+    output$mutationFoundation <- renderText({
+      row <- mutation_load()[sample == patient, ]
+      
+      if (nrow(row) == 1) {
+        paste("Mutation load foundationOne:", row$foundation_one)
+      } else {
+        "Mutation load foundationOne: N/A"
+      }
+    })
+    
+    
+    
+    #################################################
+    ### Selected variant or fusion data + buttons ###
+    #################################################
+    
+    # Dynamicky generované karty pro germline varianty
+    output$germline_boxes <- renderUI({
+      germ_vars <- as.data.table(shared_data$germline_data())
+      
+      if (is.null(germ_vars) || nrow(germ_vars) == 0) return(NULL)
+      
+      germ_vars <- germ_vars[grepl(patient, sample)]
+      message("## germ_vars after filtering: ", germ_vars)
+      
+      if (nrow(germ_vars) == 0) return(NULL)
+      
+      # Pro každou variantu vytvoříme box (kartu)
+      boxes <- lapply(1:nrow(germ_vars), function(i) {
+        variant <- germ_vars[i, ]
+        box(
+          title = paste0(variant$Gene_symbol),
+          status = "teal", solidHeader = TRUE, collapsed = TRUE, width = 12,
+          footer = fluidRow(
+            column(
+              width = 6,
+              descriptionBlock(
+                number = "17%", 
+                numberColor = "pink", 
+                numberIcon = icon("caret-up"),
+                header = "$35,210.43", 
+                text = "TOTAL REVENUE", 
+                rightBorder = TRUE,
+                marginBottom = FALSE
+              )
+            )
+          ),
+          tags$p(strong("Detail:"), variant$var_name),
+          tags$p(strong("Detail:"), variant$additional_info)
+        )
+      })
+      
+      tagList(boxes) # Vrátíme seznam boxů jako tagList
+    })
+    
+    output$fusion_boxes <- renderUI({
+      fusion_vars <- as.data.table(shared_data$fusion_data())
+      
+      if (is.null(fusion_vars) || nrow(fusion_vars) == 0) return(NULL)
+      
+      fusion_vars <- fusion_vars[grepl(patient, sample)]
+      message("## fusion_vars after filtering: ", fusion_vars)
+      
+      if (nrow(fusion_vars) == 0) return(NULL)
+      
+      # Pro každou variantu vytvoříme box (kartu)
+      boxes <- lapply(1:nrow(fusion_vars), function(i) {
+        fusion <- fusion_vars[i, ]
+        box(
+          title = paste0(fusion$gene1," - ", fusion$gene2),
+          status = "primary", solidHeader = TRUE, collapsed = TRUE, width = 12, boxToolSize = "xs",
+          tags$p(strong("Detail:"), fusion$additional_info)
+        )
+      })
+      
+      tagList(boxes) # Vrátíme seznam boxů jako tagList
+    })
+    
+  })
+}
+
+# ui <- fluidPage(
+#   UI("xx")
+# )
+# server <- function(input, output, session){
+#   SERVER("xx","DZ1601")
+# }
+# shinyApp(ui,server,options = list(launch.browser = TRUE))

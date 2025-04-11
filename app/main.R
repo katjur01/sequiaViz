@@ -49,6 +49,7 @@ box::use(
 )
 
 box::use(
+  app/view/summary_2testing,
   app/view/summary_table,
   app/view/fusion_genes_table,
   app/view/germline_var_call_table,
@@ -90,12 +91,15 @@ ui <- function(id){
   dashboardPage(
     header = dashboardHeader(
       nav = navbarMenu(
+        navbarTab("Summary", tabName = ns("summary")),
+        navbarTab("Summary 2.0 dev", tabName = ns("summary2")),
+        navbarTab("Network graph", tabName = ns("network_graph")),
         navbarTab("Variant calling", tabName = ns("variant_calling")),
         navbarTab("Expression profile", tabName = ns("expression_profile")),
-        navbarTab("Network graph", tabName = ns("network_graph")),
+
         navbarTab("Fusion genes", tabName = ns("fusion_genes")),
-        navbarTab("Hidden IGV Item", tabName = ns("hidden_igv")),
-        navbarTab("Summary", tabName = ns("summary"))
+        navbarTab("Hidden IGV Item", tabName = ns("hidden_igv"))
+
       )
     ),
     sidebar = dashboardSidebar(disable = TRUE),
@@ -113,6 +117,20 @@ ui <- function(id){
           #         )),
           body = dashboardBody(#style = "background-color: white;",
             tabItems(
+              tabItem(tabName = ns("summary2"),
+                fluidPage(
+                  div(style = "display: flex; flex-wrap: wrap; width: 100%;",
+                    do.call(tagList, lapply(patients_list(), function(sample) {
+                      bs4Card(title = sample, icon=icon("person"), collapsible = FALSE,
+                        # případně přidejte další prvky UI, například:
+                        summary_2testing$ui(ns(paste0("summary_table2_", sample)))
+                      )
+                    }))
+                  )
+                )
+                
+              )
+              ,
               tabItem(h3("SUMMARY"),tabName = ns("summary"),
                       fluidRow(
                           summary_table$summaryUI(ns("summaryUI"))
@@ -216,7 +234,8 @@ ui <- function(id){
 server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    shared_data <- reactiveValues(germline_data = reactiveVal(NULL), fusion_data = reactiveVal(NULL))
+    shared_data <- reactiveValues(germline_data = reactiveVal(NULL), fusion_data = reactiveVal(NULL), 
+                                  germline_overview = list(), fusion_overview = list())
   
     
     # observeEvent(input$showPlots_switch, {
@@ -225,12 +244,12 @@ server <- function(id) {
     # 
 ## run summary module
     summary_table$summaryServer("summaryUI", session)
+    
+    lapply(patients_list(), function(patient) {
+      summary_2testing$server(paste0("summary_table2_", patient),patient, shared_data)
+    })
 
-  # lapply(patients_list(), function(patient) {
-  #   summary_table$summaryServer(paste0("summaryUI_", patient), session)
-  # })
-#
-#
+
     getColFilterValues <- function(flag,expr_flag) {
       reactive({
         colnames_list <- colFilter(flag,expr_flag)

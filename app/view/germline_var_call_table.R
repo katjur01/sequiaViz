@@ -21,6 +21,7 @@ box::use(
   shinyWidgets[prettyCheckbox,searchInput],
   shinyalert[shinyalert,useShinyalert],
   shinyjs[useShinyjs,hide,show],
+  data.table[data.table,uniqueN],
   # reactablefmtr
 )
 
@@ -67,9 +68,9 @@ ui <- function(id) {
     ),
     tags$br(),
     fluidRow(
-      column(1,actionButton(ns("delete_button"), "Delete fusion", status = "danger")),
+      column(1,actionButton(ns("delete_button"), "Delete variants", status = "danger")),
       column(1,),
-      column(1,actionButton(ns("confirm_btn"), "Confirm fusion", status = "success"))
+      column(1,actionButton(ns("confirm_btn"), "Confirm variants", status = "success"))
     )
   )
 }
@@ -77,11 +78,24 @@ ui <- function(id) {
 server <- function(id, selected_samples, selected_columns, column_mapping, selection_enabled, shared_data) {
   moduleServer(id, function(input, output, session) {
     
+
+    
     # Call loading function to load data
     data <- reactive({
       message("Loading input data for germline")
       input_data(selected_samples)
     })
+    
+    observe({
+        req(data())
+        overview_dt <- data.table(
+            clinvar_N = uniqueN(data()[clinvar_sig %in% c("Pathogenic", "Likely_pathogenic", "Pathogenic/Likely_pathogenic",
+                                                          "Pathogenic_(VUS)", "Likely_pathogenic (VUS)", "Pathogenic_(VUS)")]),
+            for_review = uniqueN(data()[gnomAD_NFE <= 0.01 & coverage_depth > 10 & Consequence != "synonymous_variant" &
+                                          (gene_region == "exon" | gene_region == "splice")]))
+        shared_data$germline_overview[[ selected_samples ]] <- overview_dt
+    })
+
     
     # Call generate_columnsDef to generate colDef setting for reactable
     column_defs <- reactive({
@@ -106,7 +120,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
     })
     
     # # Reactive value to store selected rows
-    selected_variants <- reactiveVal(data.frame(var_name = character(), Gene_symbol = character()))
+    selected_variants <- reactiveVal(data.frame(patient = character(),var_name = character(), Gene_symbol = character()))
     
     # Render reactable with conditional selection
     output$germline_var_call_tab <- renderReactable({
@@ -171,17 +185,36 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
       req(selected_rows)
       
       new_variants <- filtered_data()[selected_rows, c("var_name", "Gene_symbol")]  # Získání vybraných variant
+      new_variants$sample <- selected_samples
+
       current_variants <- selected_variants()  # Stávající přidané varianty
       new_unique_variants <- new_variants[!(new_variants$var_name %in% current_variants$var_name &       # Porovnání - přidáme pouze ty varianty, které ještě nejsou v tabulce
                                               new_variants$Gene_symbol %in% current_variants$Gene_symbol), ]
 
-      if (nrow(new_unique_variants) > 0) {      # Přidáme pouze unikátní varianty
-        selected_variants(rbind(current_variants, new_unique_variants))
-        shared_data$germline_data(selected_variants())
-        message("Updated germline_data in shared_data:", shared_data$germline_data())
+      if (nrow(new_unique_variants) > 0) selected_variants(rbind(current_variants, new_unique_variants))
+      
+      # Aktualizace globální proměnné shared_data$germline_data:
+      global_data <- shared_data$germline_data()
+      
+      if (is.null(global_data) || nrow(global_data) == 0 || !("sample" %in% names(global_data))) {
+        global_data <- data.table(
+          sample = character(),
+          var_name = character(),
+          Gene_symbol = character()
+        )
       }
+      message("## selected_variants(): ", selected_variants())
+      message("## global_data: ", global_data)
+      # Odstraníme data, která patří právě tomuto pacientovi
+      global_data <- global_data[sample != selected_samples]
+      
+      # Přidáme nově aktualizované lokální data daného pacienta
+      updated_global_data <- rbind(global_data, selected_variants())
+      shared_data$germline_data(updated_global_data)
+      message("## shared_data$germline_data(): ", shared_data$germline_data())
     })
     
+
 
     output$selectPathogenic_tab <- renderReactable({
       variants <- selected_variants()
@@ -263,6 +296,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
                  content = "gnomAD NFE <= 0.01, Coverage > 10, Consequence w/o synonymous_variant, Gene region is exon or splice",
                  placement = "bottom",
                  trigger = "hover"))
+    
   })
 }
 

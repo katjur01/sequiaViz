@@ -328,7 +328,14 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL,log2F
                                     if (is.na(value)) {
                                       return(NULL)  # Do not render anything for NA values
                                     }
-                                    div(class = paste0("clinvar-tag clinvar-", tolower(value)),value)}
+                                    # div(class = paste0("clinvar-tag clinvar-", tolower(value)),value)}
+                             tags$div(
+                               lapply(strsplit(value, "/")[[1]], function(v) {
+                                 v_trimmed <- trimws(v)
+                                 class_name <- paste0("clinvar-tag clinvar-", tolower(gsub(" ", "_", v_trimmed)))
+                                 tags$span(class = class_name, v_trimmed)
+                               })
+                             )}
                            ),
       snpDB = colDef(maxWidth = 120,filterable = TRUE
                      # header = function(value) {

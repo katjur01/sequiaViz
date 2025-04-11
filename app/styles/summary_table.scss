@@ -3,15 +3,17 @@
   flex-wrap: wrap;
   justify-content: space-around; /* Karty budou mít rovnoměrný prostor */
   gap: 15px; /* Mezera mezi kartami */
+  
+  .bs4-card {
+    flex: 1 1 40%; /* Karty zabírají 40% šířky rodiče */
+    //max-width: 400px; /* Maximální šířka karet */
+    width: 100%;
+    margin: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Mírný stín pro lepší vzhled */
+  }
 }
 
-.bs4-card {
-  flex: 1 1 40%; /* Karty zabírají 40% šířky rodiče */
-  //max-width: 400px; /* Maximální šířka karet */
-  width: 100%;
-  margin: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Mírný stín pro lepší vzhled */
-}
+
 
 .summary-content {
   //padding: 10px;
