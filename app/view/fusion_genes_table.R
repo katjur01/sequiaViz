@@ -77,13 +77,13 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
     })
 
     
-    # observe({
-    #   req(dt())
-    #   overview_dt <- data.table(
-    #     high_confidence = uniqueN(dt()[arriba.confidence %in% "high"]),
-    #     potencially_fused = uniqueN(dt()[arriba.confidence %in% c("medium", "low", NA)]))
-    #   shared_data$fusion_overview[[ selected_samples ]] <- overview_dt
-    # })
+    observe({
+      req(dt())
+      overview_dt <- data.table(
+        high_confidence = uniqueN(dt()[arriba.confidence %in% "high"]),
+        potencially_fused = uniqueN(dt()[arriba.confidence %in% c("medium", "low", NA)]))
+      shared_data$fusion_overview[[ selected_samples ]] <- overview_dt
+    })
 
     
     
@@ -101,8 +101,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       pathogenic_fusions <- selected_fusions() # seznam fúzí, které byly označeny jako patogenní
       
       message("Rendering Reactable for fusion")
-      # reactable(as.data.frame(dt()),
-        reactable(dt(),
+      reactable(as.data.frame(dt()),
                           columns = column_defs(),
                           class = "fusion-table",
                           resizable = TRUE,

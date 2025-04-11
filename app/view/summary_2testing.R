@@ -45,51 +45,89 @@ ui <- function(id){
           # tags$div(textOutput(ns("mutationFoundation"))),
           # tags$div(textOutput(ns("for_review_som"))),
           # tags$div(textOutput(ns("clinvar_N_som"))),
-       
-       box(
-         title = span("Somatic var call", class = "category"),
-         # value = tagList(
-         tags$div(textOutput(ns("mutationNormal"))),
-         tags$div(textOutput(ns("mutationFoundation"))),
-         tags$div(textOutput(ns("for_review_som"))),
-         tags$div(textOutput(ns("clinvar_N_som"))),
-         # ),
-         icon = HTML('<span class="icon icon-green"><i class="fas fa-square-check"></i></span>'),
-         elevation = 2,
-         collapsible = FALSE
-       ),
-       box(
-         title = span("Germline var call", class = "category"),
-         # value = tagList(
-         tags$div(textOutput(ns("high_confidence"))), # high confidence ?
-         tags$div(textOutput(ns("potencially_fused"))), # medium + low + NA confidence
-         # ),
-         icon = HTML('<span class="icon icon-green"><i class="fas fa-square-check"></i></span>'),
-         color = "lightblue",
-         elevation = 2,
-         collapsible = FALSE
-       ),
-       box(
-          title = span("Expression profile", class = "category"),
-          tags$div(textOutput(ns("tissues"))),
-          tags$div(class = "item", "Over-expressed genes: 41"), # asi tabulka - rozdělení podle FC a k tomu alreded pathways
-          tags$div(class = "item", "Under-expressed genes: 21"),
-          tags$div(class = "item", "Altered pathways: 5"),
-          icon = HTML('<span class="icon icon-green"><i class="fas fa-square-check"></i></span>'),
-          color = "teal",
-          elevation = 2,
-          collapsible = FALSE
+    fluidRow(
+      # Levý sloupec – boxy (všechny boxy se zobrazí jeden vedle druhého, případně můžete je obalit do vlastního fluidRow, pokud je chcete mít vertikálně)
+      column(8,
+        fluidRow(
+          div(style = "width: 350px;",
+              box(
+                title = span("Somatic var call", class = "category"),
+                tags$div(textOutput(ns("mutationNormal"))),
+                tags$div(textOutput(ns("mutationFoundation"))),
+                tags$div(textOutput(ns("for_review_som"))),
+                tags$div(textOutput(ns("clinvar_N_som"))),
+                icon = HTML('<span class="icon icon-green" title="Analysis available"><i class="fa-solid fa-circle-check"></i></span>'),
+                elevation = 2,
+                collapsible = FALSE,
+                headerBorder = FALSE,
+                style = "height:136px; overflow:auto;",
+                width = 12  # box zabere celou šířku levého sloupce
+              )
+          ),
+          div(class = "summary-box", style = "width: 350px;",
+            box(
+              title = span("Germline var call", class = "category"),
+              tags$div(textOutput(ns("for_review_germ"))),
+              tags$div(textOutput(ns("clinvar_N_germ"))),
+              icon = HTML('<span class="icon icon-gray" title="Analysis not available"><i class="fa-solid fa-circle-xmark"></i></span>'),
+              elevation = 2,
+              collapsible = FALSE,
+              headerBorder = FALSE,
+              style = "height:136px; overflow:auto;",
+              width = 12  # box zabere celou šířku levého sloupce
+            )
+          ),
+          div(style = "width: 350px;",
+            box(
+              title = span("Fusion genes", class = "category"),
+              tags$div(textOutput(ns("high_confidence"))),
+              tags$div(textOutput(ns("potencially_fused"))),
+              icon = HTML('<span class="icon icon-green" title="Analysis available"><i class="fa-solid fa-circle-check"></i></span>'),
+              color = "lightblue",
+              elevation = 2,
+              collapsible = FALSE,
+              headerBorder = FALSE,
+              style = "height:136px; overflow:auto;",
+              width = 12
+            )
+          ),
+          div(style = "width: 350px;",
+            box(
+              title = span("Expression profile", class = "category"),
+              tags$div(textOutput(ns("tissues"))),
+              tags$div(class = "item", "Over-expressed genes: 41"),
+              tags$div(class = "item", "Under-expressed genes: 21"),
+              tags$div(class = "item", "Altered pathways: 5"),
+              icon = HTML('<span class="icon icon-green" title="Analysis available"><i class="fa-solid fa-circle-check"></i></span>'),
+              color = "teal",
+              elevation = 2,
+              collapsible = FALSE,
+              headerBorder = FALSE,
+              style = "height:136px; overflow:auto;",
+              width = 12
+            )
+          )
+        )
       ),
-    div(
-      column(
-        width = 6,
-        h5("Germline varianty"),
+      # Pravý sloupec – obrázek
+      column(4
+        # div(
+        #   # class = "image-content",
+        #   tags$img(src = "potential_circos1.png",
+        #            style = "width:70%; height:auto; display:inline-block; vertical-align:middle;")
+        # )
+      )
+    ),
+    
+    fluidRow(
+      column(7,
+        hr(),
         uiOutput(ns("germline_boxes")),
         hr(),
-        h5("Fúze"),
         uiOutput(ns("fusion_boxes"))
       )
     )
+    
   )
 }
 
@@ -207,17 +245,24 @@ server <- function(id, patient, shared_data){
     output$germline_boxes <- renderUI({
       germ_vars <- as.data.table(shared_data$germline_data())
       
-      if (is.null(germ_vars) || nrow(germ_vars) == 0) return(NULL)
+      if (is.null(germ_vars) || nrow(germ_vars) == 0) {
+        # return(NULL)
+        tags$div("No germline variants selected")
+      } else {
+        
+     
       
       germ_vars <- germ_vars[grepl(patient, sample)]
       message("## germ_vars after filtering: ", germ_vars)
       
       if (nrow(germ_vars) == 0) return(NULL)
       
+      
       # Pro každou variantu vytvoříme box (kartu)
       boxes <- lapply(1:nrow(germ_vars), function(i) {
         variant <- germ_vars[i, ]
         box(
+          h5("Germline varianty"),
           title = paste0(variant$Gene_symbol),
           status = "teal", solidHeader = TRUE, collapsed = TRUE, width = 12,
           footer = fluidRow(
@@ -240,12 +285,19 @@ server <- function(id, patient, shared_data){
       })
       
       tagList(boxes) # Vrátíme seznam boxů jako tagList
+      
+      }
     })
     
     output$fusion_boxes <- renderUI({
+              
       fusion_vars <- as.data.table(shared_data$fusion_data())
       
-      if (is.null(fusion_vars) || nrow(fusion_vars) == 0) return(NULL)
+      if (is.null(fusion_vars) || nrow(fusion_vars) == 0) {
+        # return(NULL)
+        tags$div("No germline variants selected")
+      } else {
+        
       
       fusion_vars <- fusion_vars[grepl(patient, sample)]
       message("## fusion_vars after filtering: ", fusion_vars)
@@ -256,6 +308,7 @@ server <- function(id, patient, shared_data){
       boxes <- lapply(1:nrow(fusion_vars), function(i) {
         fusion <- fusion_vars[i, ]
         box(
+          h5("Fúze"),
           title = paste0(fusion$gene1," - ", fusion$gene2),
           status = "primary", solidHeader = TRUE, collapsed = TRUE, width = 12, boxToolSize = "xs",
           tags$p(strong("Detail:"), fusion$additional_info)
@@ -263,7 +316,13 @@ server <- function(id, patient, shared_data){
       })
       
       tagList(boxes) # Vrátíme seznam boxů jako tagList
+      
+      }
+      
     })
+    
+
+    
     
   })
 }

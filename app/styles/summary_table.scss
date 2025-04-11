@@ -1,3 +1,15 @@
+.summary-box {
+    .card-header {
+    padding: 5px 10px;  /* Sníží padding */
+  }
+  .card-header .card-title {
+    font-size: 16px;    /* Menší velikost písma */
+    margin: 0;          /* Odstraní nepřebytečné mezery */
+  }
+}
+
+
+
 .summary-card-container {
   display: flex;
   flex-wrap: wrap;

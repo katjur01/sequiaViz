@@ -91,8 +91,8 @@ ui <- function(id){
   dashboardPage(
     header = dashboardHeader(
       nav = navbarMenu(
-        navbarTab("Summary", tabName = ns("summary")),
         navbarTab("Summary 2.0 dev", tabName = ns("summary2")),
+        navbarTab("Summary", tabName = ns("summary")),
         navbarTab("Network graph", tabName = ns("network_graph")),
         navbarTab("Variant calling", tabName = ns("variant_calling")),
         navbarTab("Expression profile", tabName = ns("expression_profile")),
@@ -118,10 +118,10 @@ ui <- function(id){
           body = dashboardBody(#style = "background-color: white;",
             tabItems(
               tabItem(tabName = ns("summary2"),
-                fluidPage(
+                fluidRow(
                   div(style = "display: flex; flex-wrap: wrap; width: 100%;",
                     do.call(tagList, lapply(patients_list(), function(sample) {
-                      bs4Card(title = sample, icon=icon("person"), collapsible = FALSE,
+                      bs4Card(title = sample, icon=icon("person"), collapsible = FALSE,width = 12,
                         # případně přidejte další prvky UI, například:
                         summary_2testing$ui(ns(paste0("summary_table2_", sample)))
                       )
@@ -359,7 +359,7 @@ server <- function(id) {
 ##################    
     ## run network graph module    
     
-    networkGraph_cytoscape$server("network_graph", shared_data)
+    # networkGraph_cytoscape$server("network_graph", shared_data)
     
     
 
