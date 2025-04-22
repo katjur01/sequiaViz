@@ -1,5 +1,7 @@
 .summary-box {
-    .card-header {
+  width: 350px;
+  
+  .card-header {
     padding: 5px 10px;  /* Sníží padding */
   }
   .card-header .card-title {
@@ -8,7 +10,64 @@
   }
 }
 
+.no_data {
+  background-color: #f0f0f0 !important;
+  border: 2px dashed #aaa !important;
+  color: #888;
+}
 
+.somatic-infobox {
+  .elevation-2{
+    border: 2px solid #7ac143; 
+    background-color: #f8fcf6ff; 
+    border-radius: 10px;
+  }
+}
+.germline-infobox {
+  .elevation-2{
+    border: 2px solid #45818e; 
+    background-color: #f1f8f9ff; 
+    border-radius: 10px;
+  }
+}
+.fusion-infobox {
+  .elevation-2{
+    border: 2px solid #f1c232; 
+    background-color: #fffdf7ff; 
+    border-radius: 10px;
+  }
+}
+.expression-infobox {
+  .elevation-2{
+    border: 2px solid #3c78d8ff; 
+    background-color: #f2f6fcff; 
+    border-radius: 10px; 
+  }
+}
+.somatic-box {
+  .card {
+    border: 2px solid #7ac143; 
+  }
+  .card-header {
+    background-color: #f8fcf6ff; 
+  }
+}
+.germline-box {
+  .card {
+    border: 2px solid #45818e;
+  }
+  .card-header {
+    background-color: #f1f8f9ff; 
+  }
+}
+.fusion-box {
+  .card {
+    border: 2px solid #f1c232; 
+  }
+  .card-header {
+    background-color: #fffdf7ff; 
+  }
+}
 
 .summary-card-container {
   display: flex;
