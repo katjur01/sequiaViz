@@ -199,7 +199,7 @@ server <- function(id, patient, shared_data){
     })
     
     mutation_load <- reactive({
-      dt <- as.data.table(read.xlsx("~/Desktop/sequiaViz/input_files/MOII_e117/117_WES_somatic/mutation_loads.xlsx"))
+      dt <- as.data.table(read.xlsx("input_files/MOII_e117/117_WES_somatic/mutation_loads.xlsx"))
       dt[,normal:= as.numeric(gsub(",", ".", normal))]
       dt[,foundation_one:= as.numeric(gsub(",", ".", foundation_one))]
       dt
@@ -295,7 +295,8 @@ server <- function(id, patient, shared_data){
                 '<span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>',
                 '<span style="font-size:14px; font-weight:normal; ">missence variant</span>',
                 '<span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>',
-                '<span class="clinvar-tag clinvar-pathogenic">Pathogenic</span>'
+                # '<span class="clinvar-tag clinvar-pathogenic">Pathogenic</span>'
+                '<span style="font-size:14px; font-weight:normal; >Pathogenic</span>'
               )
             ),
             solidHeader = TRUE, collapsed = TRUE, width = 12,

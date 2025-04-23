@@ -179,7 +179,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       selected_rows <- getReactableState("fusion_genes_tab", "selected")
       req(selected_rows)
       
-      new_variants <- dt()[selected_rows, c("gene1","gene2")]  # Získání vybraných fúzí
+      new_variants <- dt()[selected_rows, c("gene1","gene2","overall_support")]  # Získání vybraných fúzí
       new_variants$sample <- selected_samples
       current_variants <- selected_fusions()  # Stávající přidané varianty
       new_unique_variants <- new_variants[!(new_variants$gene1 %in% current_variants$gene1 &       # Porovnání - přidáme pouze ty varianty, které ještě nejsou v tabulce
@@ -198,7 +198,8 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
         global_data <- data.table(
           sample = character(),
           gene1 = character(),
-          gene2 = character()
+          gene2 = character(),
+          overall_support = integer()
         )
       }
       message("## selected_fusions(): ", selected_fusions())

@@ -45,33 +45,18 @@ ui <- function(id) {
   ns <- NS(id)
   useShinyjs()
   tagList(
-    # tags$style(HTML("
-    #   .rt-td-inner select {
-    #     border: 1px solid rgba(0,0,0,.1); /* Barva hrany bunky*/
-    #     border-radius: 3px;  /* Zaoblení hrany bunky */
-    #     }
-    #   ")),
     use_spinner(reactableOutput(ns("germline_var_call_tab"))),
-
     tags$br(),
     tags$div(id = ns("checkbox_popover"), style = "width:245px; position: absolute; right: 10;", #margin-top: 13.5px;
              checkboxInput(ns("fullTable_checkbox"),label = "Keep pre-filtered variant table",value = TRUE)),
     tags$br(),
-    # searchInput(ns("selectPathogenic_button2"),label = "Select possibly pathogenic gene: ", width = "30%",
-    #             placeholder = "variant name", btnSearch = icon("plus"),
-    #             btnClass = "btn-default btn-outline-secondary"),
-    # 
     actionButton(ns("selectPathogenic_button"), "Select variants as possibly pathogenic", status = "info"),
     tags$br(),
     fluidRow(
-      column(3,reactableOutput(ns("selectPathogenic_tab")))
-    ),
+      column(3,reactableOutput(ns("selectPathogenic_tab")))),
     tags$br(),
     fluidRow(
-      column(1,actionButton(ns("delete_button"), "Delete variants", status = "danger")),
-      column(1,),
-      column(1,actionButton(ns("confirm_btn"), "Confirm variants", status = "success"))
-    )
+      column(1,actionButton(ns("delete_button"), "Delete variants", status = "danger")))
   )
 }
 
@@ -184,7 +169,8 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
       selected_rows <- getReactableState("germline_var_call_tab", "selected")
       req(selected_rows)
       
-      new_variants <- filtered_data()[selected_rows, c("var_name", "Gene_symbol")]  # Získání vybraných variant
+      new_variants <- filtered_data()[selected_rows, c("var_name", "Gene_symbol","variant_freq","coverage_depth", "Consequence",
+                                                       "HGVSc","HGVSp","variant_type","Feature", "clinvar_sig")]  # Získání vybraných variant
       new_variants$sample <- selected_samples
 
       current_variants <- selected_variants()  # Stávající přidané varianty
@@ -200,7 +186,15 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
         global_data <- data.table(
           sample = character(),
           var_name = character(),
-          Gene_symbol = character()
+          Gene_symbol = character(),
+          variant_freq= character(),
+          coverage_depth = character(),
+          Consequence = character(),
+          HGVSc = character(),
+          HGVSp = character(),
+          variant_type = character(),
+          Feature = character(),
+          clinvar_sig = character()#(round(variant_freq * coverage_depth))/coverage_depth
         )
       }
       message("## selected_variants(): ", selected_variants())
