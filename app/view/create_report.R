@@ -227,14 +227,14 @@ server <- function(input, output) {
   }
   
   
-  summary_dt <- reactive({
+  details_dt <- reactive({
     dt <- data.table(
       attribute = c("Specimen type", "Date of collection", "Number of biopsy",
                     "Cancer cell content", "Method used", "Library preparation",
                     "Sequencing device", "Date of sequencing"),
       germline = c("Peripheral blood", "7.9.2023", NA, NA, "Whole-exome sequencing", "KAPA HyperExome", "NextSeq 500", "11.9.2023"),
       somatic = c("FFPE tissue", "5.9.2023", "1391/23/1", "NA", "Whole-exome sequencing", "KAPA HyperExome", "NextSeq 500", "9.10.2023"),
-      fusion = c(NA, NA, NA, NA, NA, NA, NA, NA),
+      fusion = c("Peripheral blood", "7.9.2023", NA, NA, "Whole-exome sequencing", "KAPA HyperExome", "NextSeq 500", "11.9.2023"),
       expression = c("Frozen tissue", "5.9.2023", "1391/23", "NA", "Whole-transcriptome sequencing", "NEBNext Ultra II Directional RNA Library Prep Kit", "NextSeq 500", "31.10.2023")
     )
     
@@ -245,34 +245,37 @@ server <- function(input, output) {
     if (!is.null(fusion_dt()) && nrow(fusion_dt()) > 0) active_cols <- c(active_cols, "fusion")
     if (!is.null(expression_dt()) && nrow(expression_dt()) > 0) active_cols <- c(active_cols, "expression")
 
-    summary_dt <- dt[, c("attribute", active_cols), with = FALSE]
-    summary_dt
+    details_dt <- dt[, c("attribute", active_cols), with = FALSE]
+    details_dt
   })
   
-  preprare_summary_dt <- function(summary_dt) {
-    # ft <- flextable(summary_dt, col_keys = c("attribute","col1","germline","col2","somatic","col3","fusion","col4","expression"))
-    # ft <- myReport_theme(ft)
-    # ft <- set_table_properties(ft, width = 1, layout = "autofit")
-    # ft <- bold(ft, j = ~ attribute, bold = TRUE)
-    # 
+  preprare_details_dt <- function(details_dt) {
+    # Definujeme, které sloupce budou aktivní
     active_cols <- c("attribute", "space1",
-                        if ("germline" %in% names(summary_dt)) c("germline", "space2") else NULL,
-                        if ("somatic" %in% names(summary_dt)) c("somatic", "space3") else NULL,
-                        if ("fusion" %in% names(summary_dt)) c("fusion", "space4") else NULL,
-                        if ("expression" %in% names(summary_dt)) "expression" else NULL)
+                     if ("germline" %in% names(details_dt)) c("germline", "space2") else NULL,
+                     if ("somatic" %in% names(details_dt)) c("somatic", "space3") else NULL,
+                     if ("fusion" %in% names(details_dt)) c("fusion", "space4") else NULL,
+                     if ("expression" %in% names(details_dt)) "expression" else NULL)
     space_cols <- grep("space[0-9]+", active_cols, value = TRUE)
     
+    # Definujeme okraje
     top_bottom_border <- fp_border(color = "#22a9c0", width = 1)
-    last_row <- nrow_part(ft, part = "body")  # ✅ správný index řádku
     
-    ft <- flextable(summary_dt, col_keys = active_cols) |>
+    # Nejprve vytvoříme flextable objekt
+    ft <- flextable(details_dt, col_keys = active_cols)
+    
+    # Nyní můžeme bezpečně získat poslední řádek
+    last_row <- nrow_part(ft, part = "body")
+    
+    # Aplikujeme formátování
+    ft <- ft |>
       theme_vanilla() |>
       fontsize(size = 8, part = "all") |>
       align(align = "center", part = "header") |>
       empty_blanks() |>
       bg(part = "header", bg = "white") |>
-      bg(i = seq_len(nrow_part(ft, part = "body")), bg = "white", part = "body") |>
-      bg(i = seq(1, nrow_part(ft, part = "body"), by = 2), bg = "#bce5ec", part = "body") |>
+      bg(i = seq_len(last_row), bg = "white", part = "body") |>
+      bg(i = seq(1, last_row, by = 2), bg = "#bce5ec", part = "body") |>
       border(part = "header",
              border.top = top_bottom_border,
              border.bottom = top_bottom_border) |>
@@ -281,29 +284,19 @@ server <- function(input, output) {
              j = active_cols,
              border.bottom = top_bottom_border) |>
       bold(part = "header", bold = TRUE) |>
-      width(j = space_cols, width = 0.4) |>
-      width(j = ~ attribute, width = 1.5) |>
+      width(j = "attribute", width = 1.5) |>
+      width(j = "germline", width = 1.5) |>
+      width(j = "fusion", width = 1.5) |>
+      width(j = "expression", width = 1.5) |>
       set_table_properties(width = 1, layout = "autofit") |>
       set_header_labels(attribute = "") |>
-      bold(j = ~ attribute, bold = TRUE) |>
-      italic(j = ~ attribute, italic = TRUE) |>
+      bold(j = "attribute", bold = TRUE) |>
+      italic(j = "attribute", italic = TRUE) |>
       bg(j = space_cols, bg = "white", part = "body")
+    
     ft
   }
-  
 
-
-
-  # })
-  # preprare_summary_dt <- function(summary_dt) {
-  #   ft <- flextable(summary_dt)
-  #   # ft <- set_table_properties(ft, width = 1, layout = "autofit")
-  #   # ft <- myReport_theme(ft)
-  #   # print("i am preparing summary dt")
-  #   # print(ft)
-  #   ft
-  # }
-  
   # data <- reactive({
   #   data.frame(
   #     Kategorie = sample(c("A", "B", "C"), 100, replace = TRUE)
@@ -345,6 +338,32 @@ server <- function(input, output) {
     }
   })
   
+  summary_germline <- reactive({
+    sprintf("%s (%s)", germline_dt()$Gene_symbol, paste0(germline_dt()$HGVSc,"/",germline_dt()$HGVSp))
+  })
+
+  summary_somatic <- reactive({
+    sprintf("%s (%s)", somatic_dt()$Gene_symbol, paste0(somatic_dt()$HGVSc,"/",somatic_dt()$HGVSp))
+  })
+
+  summary_fusion <- reactive({
+    sprintf("%s::%s gene fusion", fusion_dt()$gene1, fusion_dt()$gene2)
+  })
+  
+  germline_interpretation <- reactive({
+    variants <- sprintf("%s variant was found in the %s gene.", paste0(germline_dt()$HGVSc,"/",germline_dt()$HGVSp), germline_dt()$Gene_symbol)
+    links <- paste0("(https://www.oncokb.org/gene/", germline_dt()$Gene_symbol, ")")
+    full_text <- paste(variants, links)
+    return(full_text)
+  })
+  
+  somatic_interpretation <- reactive({
+    variants <- sprintf("%s variant was found in the %s gene.", paste0(somatic_dt()$HGVSc,"/",somatic_dt()$HGVSp), somatic_dt()$Gene_symbol)
+    links <- paste0("(https://www.oncokb.org/gene/", somatic_dt()$Gene_symbol, ")")
+    full_text <- paste(variants, links)
+    return(full_text)
+  })
+  
   
   output$download_report <- downloadHandler(
     filename = function() {
@@ -352,105 +371,195 @@ server <- function(input, output) {
     },
     content = function(file) {
       doc <- read_docx(path = template_path())   # Load template
-      
-      note_style <- fp_text(font.size = 7, font.family = "Helvetica")
-      
-      # tryCatch({
-      #   doc <- cursor_reach(doc, "<<summary_text>>")
-      #   doc <- body_remove(doc)
-      #   doc <- body_add_par(doc, summary_text())
-      # }, error = function(e) {
-      #   # V případě, že značka není nalezena, přidej text na konec
-      #   doc <- body_add_par(doc, "Summary:", style = "heading 2")
-      #   doc <- body_add_par(doc, summary_text())
-      # })
+      note_style <- fp_text(font.size = 7, font.family = "Helvetica") # font for comments
 
       tryCatch({
-        doc <- cursor_reach(doc, "<<germline_table>>")
+        doc <- cursor_reach(doc, "<<patient_info>>")
+        # Normaly here would be body_remove(doc), but also it would add empty row between titul in template 
+        # and text/table from placeholder which I dont want to. Solution is to add text before and after placeholder
+        # and remove placeholder at last.
+        #
+        # Move the cursor to the placeholder <<patient_info>> in the document.
+        # After all content (headings and text) has been inserted before this placeholder,
+        # the placeholder itself is now removed to finalize the layout.
+        doc <- body_add_par(doc, paste0("Patient ID: ", "MR1507"), pos = "before")
+        doc <- body_add_par(doc, paste0("Diagnosis: ", "Diffuse midline glioma, H3 K27-altered"), pos = "after")
+        doc <- body_add_par(doc, paste0("Report date: ", format(Sys.Date(), "%B %d, %Y")), pos = "after")
+
+        doc <- cursor_reach(doc, "<<patient_info>>")
         doc <- body_remove(doc)
+      }, error = function(e) {
+        message("Placeholder <<patient_info>> was not found.")
+      })
+      
+      
+      tryCatch({
+        doc <- cursor_reach(doc, "<<summary_germline>>")
+        
+        if (!is.null(germline_dt()) || nrow(germline_dt()) > 0) {
+          for (variant_text in summary_germline()) {
+            doc <- body_add_par(doc, variant_text, pos = "before")
+          }
+        }
+        doc <- cursor_reach(doc, "<<summary_germline>>")
+        doc <- body_remove(doc)
+      }, error = function(e) {
+        message("Placeholder <<summary_germline>> was not found. No pathogenic varints will not be added.")
+      })
+
+      tryCatch({
+        doc <- cursor_reach(doc, "<<summary_somatic>>")
+
+        if (!is.null(somatic_dt()) || nrow(somatic_dt()) > 0) {
+          for (variant_text in summary_somatic()) {
+            doc <- body_add_par(doc, variant_text, pos = "before")
+          }
+        }
+        doc <- cursor_reach(doc, "<<summary_somatic>>")
+        doc <- body_remove(doc)
+      }, error = function(e) {
+        message("Placeholder <<summary_somatic>> was not found. No pathogenic varints will not be added.")
+      })
+      
+      tryCatch({
+        doc <- cursor_reach(doc, "<<summary_fusion>>")
+        
+        if (!is.null(fusion_dt()) || nrow(fusion_dt()) > 0) {
+          for (variant_text in summary_fusion()) {
+            doc <- body_add_par(doc, variant_text, pos = "before")
+          }
+        }
+        doc <- cursor_reach(doc, "<<summary_fusion>>")
+        doc <- body_remove(doc)
+      }, error = function(e) {
+        message("Placeholder <<summary_fusion>> was not found. No gene fusion will not be added.")
+      })
+      
+      tryCatch({
+        doc <- cursor_reach(doc, "<<details_table>>")
+        # doc <- body_remove(doc)
+        
+        if (ncol(details_dt()) == 1) {    # if (is.null(details_dt()) || nrow(details_dt()) == 0) {
+          doc <- body_add_par(doc, "No analysis metadata available.")
+        } else {
+          doc <- body_add_flextable(doc, preprare_details_dt(details_dt()), pos = "before")
+        }
+        doc <- cursor_reach(doc, "<<details_table>>")
+        doc <- body_remove(doc)
+      }, error = function(e) {
+        message("Placeholder <<details_table>> was not found. Details table will not be added.")
+      })
+      
+      tryCatch({
+        doc <- cursor_reach(doc, "<<germline_table>>")
+        
         if (is.null(germline_dt()) || nrow(germline_dt()) == 0) {
           doc <- body_add_par(doc, "No variants with known or potential clinical significance in genes associated with hereditary cancer-predisposing syndromes were found.")
         } else {
-          doc <- body_add_flextable(doc, preprare_germline_dt(germline_dt()))
+          doc <- body_add_flextable(doc, preprare_germline_dt(germline_dt()), pos = "before")
           # Vysvětlivka pod tabulkou
-          doc <- body_add_fpar(doc, fpar(ftext("MAF – minor allele frequency – Non-Finnish European population (gnomAD database)", prop = note_style)))
-          doc <- body_add_fpar(doc, fpar(ftext("AD – autosomal dominant inheritance", prop = note_style)))
-          doc <- body_add_fpar(doc, fpar(ftext("AR – autosomal recessive inheritance", prop = note_style)))
-          doc <- body_add_fpar(doc, fpar(ftext("XLR – X-linked recessive", prop = note_style)))
+          doc <- body_add_fpar(doc, fpar(ftext("MAF – minor allele frequency – Non-Finnish European population (gnomAD database)", prop = note_style)), pos = "after")
+          doc <- body_add_fpar(doc, fpar(ftext("AD – autosomal dominant inheritance", prop = note_style)), pos = "after")
+          doc <- body_add_fpar(doc, fpar(ftext("AR – autosomal recessive inheritance", prop = note_style)), pos = "after")
+          doc <- body_add_fpar(doc, fpar(ftext("XLR – X-linked recessive", prop = note_style)), pos = "after")
         }
+        doc <- cursor_reach(doc, "<<germline_table>>")
+        doc <- body_remove(doc)
       }, error = function(e) {   # No placeholder in template
           message("Placeholder <<germline_table>> was not found. Germline table will not be added.")
       })
 
       tryCatch({
         doc <- cursor_reach(doc, "<<somatic_table>>")
-        doc <- body_remove(doc)
+
         if (is.null(somatic_dt()) || nrow(somatic_dt()) == 0) {
           doc <- body_add_par(doc, "No variants with known or potential clinical significance were found.")
         } else {
-          doc <- body_add_flextable(doc, preprare_somatic_dt(somatic_dt()))
+          doc <- body_add_flextable(doc, preprare_somatic_dt(somatic_dt()), pos = "before")
         }
+        doc <- cursor_reach(doc, "<<somatic_table>>")
+        doc <- body_remove(doc)
       }, error = function(e) {   # No placeholder in template
            message("Placeholder <<somatic_table>> was not found. Somatic table will not be added.")
       })
       
       tryCatch({
         doc <- cursor_reach(doc, "<<fusion_table>>")
-        doc <- body_remove(doc)
+        
         if (is.null(fusion_dt()) || nrow(fusion_dt()) == 0) {
           doc <- body_add_par(doc, "No clinically relevant fusion genes were found.")
         } else {
-          doc <- body_add_flextable(doc, preprare_fusion_dt(fusion_dt()))
+          doc <- body_add_flextable(doc, preprare_fusion_dt(fusion_dt()), pos = "before")
         }
+        doc <- cursor_reach(doc, "<<fusion_table>>")
+        doc <- body_remove(doc)
       }, error = function(e) {
-          message("Placeholder <<fusion_table>> was not found. Fusion table will not be added.")
+        message("Placeholder <<fusion_table>> was not found. Fusion table will not be added.")
       })
+      
       
       tryCatch({
         doc <- cursor_reach(doc, "<<mutational_sign_table>>")
-        doc <- body_remove(doc)
+
         if (is.null(mut_sign_dt()) || nrow(mut_sign_dt()) == 0) {
           doc <- body_add_par(doc, "No data about mutational signatures were found.")
         } else {
-          doc <- body_add_flextable(doc, preprare_mut_sign_dt(mut_sign_dt()))
+          doc <- body_add_flextable(doc, preprare_mut_sign_dt(mut_sign_dt()), pos = "before")
         }
+        doc <- cursor_reach(doc, "<<mutational_sign_table>>")
+        doc <- body_remove(doc)
       }, error = function(e) {
         message("Placeholder <<mutational_sign_table>> was not found. Mutational signatures table will not be added.")
       })
 
       tryCatch({
         doc <- cursor_reach(doc, "<<expression_table>>")
-        doc <- body_remove(doc)
         
         dt <- expression_dt()
-        
         if (is.null(dt) || nrow(dt) == 0) {
           doc <- body_add_par(doc, "No data from expression profile analysis were found.")
         } else {
-          pathways <- unique(dt$pathway) # Rozdělení podle pathways
+          pathways <- rev(unique(dt$pathway)) # Musím převrátit, jinak bude seznam pathways v opačném pořadí
           for (p in pathways) {
             subset_dt <- dt[pathway == p, .(gene, expression_level, FC, therapeutic_option)]
-            doc <- body_add_par(doc, p, style = "heading 5") # Přidej nadpis (podsekce) s názvem pathway
-            doc <- body_add_flextable(doc, preprare_expression_dt(subset_dt))
+            doc <- body_add_flextable(doc, preprare_expression_dt(subset_dt), pos = "before")
+            doc <- body_add_par(doc, p, style = "heading 5", pos = "before") # Přidej nadpis (podsekce) s názvem pathway
           }
         }
+        doc <- cursor_reach(doc, "<<expression_table>>")
+        doc <- body_remove(doc)
       }, error = function(e) {
         message("Placeholder <<expression_table>> was not found. Expression profile table will not be added.")
       })
 
       tryCatch({
-        doc <- cursor_reach(doc, "<<summary_table>>")
-        doc <- body_remove(doc)
+        doc <- cursor_reach(doc, "<<germline_interpretation>>")
         
-        if (ncol(summary_dt()) == 1) {    # if (is.null(summary_dt()) || nrow(summary_dt()) == 0) {
-          doc <- body_add_par(doc, "No analysis metadata available.")
-        } else {
-          doc <- body_add_flextable(doc, preprare_summary_dt(summary_dt()))
+        if (!is.null(germline_dt()) && nrow(germline_dt()) > 0) {
+          for (variant_text in germline_interpretation()) {
+            doc <- body_add_par(doc, variant_text, pos = "before")
+          }
         }
+        doc <- cursor_reach(doc, "<<germline_interpretation>>")
+        doc <- body_remove(doc)
       }, error = function(e) {
-        message("Placeholder <<summary_table>> was not found. Summary table will not be added.")
+        message("Placeholder <<germline_interpretation>> was not found. No pathogenic variants will be added.")
       })
       
+      
+      tryCatch({
+        doc <- cursor_reach(doc, "<<somatic_interpretation>>")
+        
+        if (!is.null(somatic_dt()) && nrow(somatic_dt()) > 0) {
+          for (variant_text in somatic_interpretation()) {
+            doc <- body_add_par(doc, variant_text, pos = "before")
+          }
+        }
+        doc <- cursor_reach(doc, "<<somatic_interpretation>>")
+        doc <- body_remove(doc)
+      }, error = function(e) {
+        message("Placeholder <<somatic_interpretation>> was not found. No pathogenic varints will not be added.")
+      })
       # # Pro obrázek
       # tryCatch({
       #   doc <- cursor_reach(doc, "<<plot1>>")
