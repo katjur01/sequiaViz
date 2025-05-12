@@ -35,8 +35,8 @@ box::use(
   # plotly[plot_ly,plotlyOutput,renderPlotly,layout],
   # reactable,
   # reactable[colDef],
-  htmltools[tags,p],
-  shinyWidgets[pickerInput,prettySwitch],
+  htmltools[tags,p,span],
+  shinyWidgets[pickerInput,prettySwitch,dropdown],
   shinyjs[useShinyjs, runjs,toggle],
   utils[str],
   # fresh[create_theme,bs4dash_vars,bs4dash_yiq,bs4dash_layout,bs4dash_sidebar_light,bs4dash_status,bs4dash_color]
@@ -121,8 +121,14 @@ ui <- function(id){
                 fluidRow(
                   div(style = "display: flex; flex-wrap: wrap; width: 100%;",
                     do.call(tagList, lapply(patients_list(), function(sample) {
-                      bs4Card(title = sample, icon=icon("person"), collapsible = FALSE,width = 12,
-                        # případně přidejte další prvky UI, například:
+                      bs4Card(
+                        title = tagList(tags$head(tags$style(HTML(".card-title {float: none !important;}")),
+                                                  tags$style(HTML(".card-title { font-size: 20px; }"))),
+                          span(sample),
+                          div(style = "float: right; margin-left: auto;",
+                            dropdown(right = TRUE, size = "xs", icon = icon("download"), style = "material-flat", width = "auto"))
+                        ), icon = icon("person"), collapsible = FALSE, width = 12, 
+                        
                         summary_2testing$ui(ns(paste0("summary_table2_", sample)))
                       )
                     }))
@@ -359,7 +365,7 @@ server <- function(id) {
 ##################    
     ## run network graph module    
     
-    # networkGraph_cytoscape$server("network_graph", shared_data)
+    networkGraph_cytoscape$server("network_graph", shared_data)
     
     
 

@@ -345,6 +345,61 @@ server <- function(id, shared_data) {
     #################################################
     ### Selected variant or fusion data + buttons ###
     #################################################
+    observe({
+      germ_vars <- as.data.table(shared_data$germline_data())
+      fusions <- as.data.table(shared_data$fusion_data())
+      tissue_table <- copy(tissue_dt())  # Výchozí tabulka
+      
+      # Výchozí hodnota pro selected_dt
+      selected_dt(NULL)
+      
+      if ((is.null(germ_vars) || nrow(germ_vars) == 0) &&
+          (is.null(fusions) || nrow(fusions) == 0)) {
+        message("No germline variants or fusions selected.")
+        result_dt(tissue_table)
+      } else {
+        # Přidání germline variant
+        if (!is.null(germ_vars) && nrow(germ_vars) > 0) {
+          selected_variants <- germ_vars[, .(Gene_symbol, variant = var_name)]
+          selected_variants <- unique(selected_variants, by = "Gene_symbol")
+          tissue_table <- merge(tissue_table, selected_variants, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
+        }
+        
+        # Přidání fúzí
+        if (!is.null(fusions) && nrow(fusions) > 0) {
+          fusions <- fusions[, .(Gene_symbol = c(gene1, gene2), fusion = paste(paste(gene1, gene2, sep = "-"), collapse = ", "))]
+          fusions <- unique(fusions, by = "Gene_symbol")
+          tissue_table <- merge(tissue_table, fusions, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
+        }
+        
+        result_dt(tissue_table)
+        message("Updated result_dt with germline variants and/or fusions.")
+      }
+      
+      # Vytvoření selected_dt
+      if ((!is.null(germ_vars) && nrow(germ_vars) > 0) || (!is.null(fusions) && nrow(fusions) > 0)) {
+        selected_variants <- if (!is.null(germ_vars) && nrow(germ_vars) > 0) {
+          unique(germ_vars[, var_name := "yes"])
+        } else {
+          data.frame(Gene_symbol = character(0))
+        }
+        
+        selected_fusions <- if (!is.null(fusions) && nrow(fusions) > 0) {
+          unique(fusions[, fusion := "yes"])
+        } else {
+          data.frame(Gene_symbol = character(0))
+        }
+        
+        combined_selected <- merge(selected_variants, selected_fusions, by = "Gene_symbol", all = TRUE)
+        pathways_info <- subTissue_dt()[feature_name %in% combined_selected$Gene_symbol, .(Gene_symbol = feature_name, all_kegg_paths_name)]
+        combined_selected <- merge(combined_selected, pathways_info, by = "Gene_symbol", all.x = TRUE)
+        setDF(combined_selected)
+        
+        selected_dt(combined_selected)
+      } else {
+        selected_dt(data.frame(Gene_symbol = character(0), variant = character(0), fusion = character(0), all_kegg_paths_name = character(0)))
+      }
+    })
     
     
     
