@@ -1,4 +1,6 @@
 .networkGraph-tissue-wrapper .btn-group-container-sw {
-  flex-wrap: wrap;
-  display: flex; // radši přidat, kdyby tam někdy nebyl
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  width: 100%;
 }
+

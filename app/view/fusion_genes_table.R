@@ -11,6 +11,7 @@ box::use(
   reactablefmtr[pill_buttons,icon_assign],
   data.table[fifelse,setcolorder],
   shinyalert[shinyalert,useShinyalert],
+  data.table[data.table,uniqueN],
 )
 box::use(
   app/logic/load_data[get_inputs,load_data],
@@ -24,7 +25,7 @@ input_data <- function(sample){
   filenames <- get_inputs("per_sample_file")
   # message("Loading data for fusion: ", filenames$fusions)
   data <- prepare_fusion_genes_table(load_data(filenames$fusions,"fusion",sample),sample)
-  return(as.data.frame(data))
+  return(data)
 }
 
 ##############  pozn  #####################
@@ -75,6 +76,17 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       input_data(selected_samples) 
     })
 
+    
+    observe({
+      req(dt())
+      overview_dt <- data.table(
+        high_confidence = uniqueN(dt()[arriba.confidence %in% "high"]),
+        potencially_fused = uniqueN(dt()[arriba.confidence %in% c("medium", "low", NA)]))
+      shared_data$fusion_overview[[ selected_samples ]] <- overview_dt
+    })
+
+    
+    
   # Call generate_columnsDef to generate colDef setting for reactable
     column_defs <- reactive({
       message("Generating colDef for fusion")
@@ -89,7 +101,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       pathogenic_fusions <- selected_fusions() # seznam fúzí, které byly označeny jako patogenní
       
       message("Rendering Reactable for fusion")
-      reactable(dt(),
+      reactable(as.data.frame(dt()),
                           columns = column_defs(),
                           class = "fusion-table",
                           resizable = TRUE,
@@ -132,7 +144,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
                                  gene2_in_row %in% pathogenic_fusions$gene2) |
                                 (gene1_in_row %in% pathogenic_fusions$gene2 & 
                                  gene2_in_row %in% pathogenic_fusions$gene1)) {
-                              list(backgroundColor = "#ffcccc", fontWeight = "bold")
+                              list(backgroundColor = "#B5E3B6", fontWeight = "bold")
                             } else {
                               NULL
                             }
@@ -167,16 +179,38 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       selected_rows <- getReactableState("fusion_genes_tab", "selected")
       req(selected_rows)
       
-      new_variants <- dt()[selected_rows, c("gene1","gene2")]  # Získání vybraných fúzí
+      new_variants <- dt()[selected_rows, c("gene1","gene2","overall_support")]  # Získání vybraných fúzí
+      new_variants$sample <- selected_samples
       current_variants <- selected_fusions()  # Stávající přidané varianty
       new_unique_variants <- new_variants[!(new_variants$gene1 %in% current_variants$gene1 &       # Porovnání - přidáme pouze ty varianty, které ještě nejsou v tabulce
                                               new_variants$gene2 %in% current_variants$gene2), ]
       
       if (nrow(new_unique_variants) > 0) {      # Přidáme pouze unikátní varianty
         selected_fusions(rbind(current_variants, new_unique_variants))
-        shared_data$fusion_data(selected_fusions())
-        message("Updated fusion_data in shared_data:", shared_data$fusion_data())
+        # shared_data$fusion_data(selected_fusions())
+        # message("Updated fusion_data in shared_data:", shared_data$fusion_data())
       }
+      
+      # Aktualizace globální proměnné shared_data$germline_data:
+      global_data <- shared_data$fusion_data()
+      
+      if (is.null(global_data) || nrow(global_data) == 0 || !("sample" %in% names(global_data))) {
+        global_data <- data.table(
+          sample = character(),
+          gene1 = character(),
+          gene2 = character(),
+          overall_support = integer()
+        )
+      }
+      message("## selected_fusions(): ", selected_fusions())
+      message("## global_data: ", global_data)
+      # Odstraníme data, která patří právě tomuto pacientovi
+      global_data <- global_data[sample != selected_samples]
+      
+      # Přidáme nově aktualizované lokální data daného pacienta
+      updated_global_data <- rbind(global_data, selected_fusions())
+      shared_data$fusion_data(updated_global_data)
+      message("## shared_data$fusion_data(): ", shared_data$fusion_data())
     })
     
     output$selectFusion_tab <- renderReactable({

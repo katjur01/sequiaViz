@@ -17,6 +17,12 @@
 #
 # script_dir <- dirname(rstudioapi::getSourceEditorContext()$path)
 # setwd(paste0(script_dir))
+# working with git - checkout to different branch
+# git status
+# git checkout dev (git checkout -b new_branch)
+# git add .
+# git commit -m "Uložení aktuálních změn do nové větve"
+# git push -u origin dev
 
 box::use(
   rhino,
@@ -29,8 +35,8 @@ box::use(
   # plotly[plot_ly,plotlyOutput,renderPlotly,layout],
   # reactable,
   # reactable[colDef],
-  htmltools[tags,p],
-  shinyWidgets[pickerInput,prettySwitch],
+  htmltools[tags,p,span],
+  shinyWidgets[pickerInput,prettySwitch,dropdown],
   shinyjs[useShinyjs, runjs,toggle],
   utils[str],
   # fresh[create_theme,bs4dash_vars,bs4dash_yiq,bs4dash_layout,bs4dash_sidebar_light,bs4dash_status,bs4dash_color]
@@ -43,11 +49,13 @@ box::use(
 )
 
 box::use(
+  app/view/summary_2testing,
   app/view/summary_table,
   app/view/fusion_genes_table,
   app/view/germline_var_call_table,
 #   # app/view/variant_calling_table,
   app/view/expression_profile_table,
+  app/view/expression_profile_plot,
   app/view/dropdown_button[igvDropdown_ui,igvDropdown_server,colFilterDropdown_ui,colFilterDropdown_server],
   app/logic/patients_list[patients_list,set_patient_to_sample],
   app/view/IGV,
@@ -83,12 +91,15 @@ ui <- function(id){
   dashboardPage(
     header = dashboardHeader(
       nav = navbarMenu(
-        navbarTab("Expression profile", tabName = ns("expression_profile")),
+        navbarTab("Summary 2.0 dev", tabName = ns("summary2")),
+        navbarTab("Summary", tabName = ns("summary")),
         navbarTab("Network graph", tabName = ns("network_graph")),
-        navbarTab("Fusion genes", tabName = ns("fusion_genes")),
         navbarTab("Variant calling", tabName = ns("variant_calling")),
-        navbarTab("Hidden IGV Item", tabName = ns("hidden_igv")),
-        navbarTab("Summary", tabName = ns("summary"))
+        navbarTab("Expression profile", tabName = ns("expression_profile")),
+
+        navbarTab("Fusion genes", tabName = ns("fusion_genes")),
+        navbarTab("Hidden IGV Item", tabName = ns("hidden_igv"))
+
       )
     ),
     sidebar = dashboardSidebar(disable = TRUE),
@@ -106,6 +117,26 @@ ui <- function(id){
           #         )),
           body = dashboardBody(#style = "background-color: white;",
             tabItems(
+              tabItem(tabName = ns("summary2"),
+                fluidRow(
+                  div(style = "display: flex; flex-wrap: wrap; width: 100%;",
+                    do.call(tagList, lapply(patients_list(), function(sample) {
+                      bs4Card(
+                        title = tagList(tags$head(tags$style(HTML(".card-title {float: none !important;}")),
+                                                  tags$style(HTML(".card-title { font-size: 20px; }"))),
+                          span(sample),
+                          div(style = "float: right; margin-left: auto;",
+                            dropdown(right = TRUE, size = "xs", icon = icon("download"), style = "material-flat", width = "auto"))
+                        ), icon = icon("person"), collapsible = FALSE, width = 12, 
+                        
+                        summary_2testing$ui(ns(paste0("summary_table2_", sample)))
+                      )
+                    }))
+                  )
+                )
+                
+              )
+              ,
               tabItem(h3("SUMMARY"),tabName = ns("summary"),
                       fluidRow(
                           summary_table$summaryUI(ns("summaryUI"))
@@ -165,12 +196,11 @@ ui <- function(id){
                                              tabPanel("Genes of Interest",
                                                       tabName = ns("genesOfinterest_panel"), value = "genesOfinterest",
                                                       expression_profile_table$ui_genesOfInterest(ns(paste0("genesOfinterest_tab_", patient)), patient),
-                                                      expression_profile_table$ui_plots(ns(paste0("genesOfinterest_plots_", patient)), patient)),
-                                             # ),
+                                                      expression_profile_plot$ui(ns(paste0("genesOfinterest_plots_", patient)), patient)),
                                              tabPanel("All Genes",
                                                       tabName = ns("allGenes_panel"), value = "allGenes",
                                                       expression_profile_table$ui_allGenes(ns(paste0("allGenes_tab_", patient)), patient),
-                                                      expression_profile_table$ui_plots(ns(paste0("allGenes_plots_", patient)), patient))
+                                                      expression_profile_plot$ui(ns(paste0("allGenes_plots_", patient)), patient))
 
 # )
                                              )
@@ -210,7 +240,8 @@ ui <- function(id){
 server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    shared_data <- reactiveValues(germline_data = reactiveVal(NULL), fusion_data = reactiveVal(NULL))
+    shared_data <- reactiveValues(germline_data = reactiveVal(NULL), fusion_data = reactiveVal(NULL), 
+                                  germline_overview = list(), fusion_overview = list())
   
     
     # observeEvent(input$showPlots_switch, {
@@ -219,12 +250,12 @@ server <- function(id) {
     # 
 ## run summary module
     summary_table$summaryServer("summaryUI", session)
+    
+    lapply(patients_list(), function(patient) {
+      summary_2testing$server(paste0("summary_table2_", patient),patient, shared_data)
+    })
 
-  # lapply(patients_list(), function(patient) {
-  #   summary_table$summaryServer(paste0("summaryUI_", patient), session)
-  # })
-#
-#
+
     getColFilterValues <- function(flag,expr_flag) {
       reactive({
         colnames_list <- colFilter(flag,expr_flag)
@@ -304,21 +335,21 @@ server <- function(id) {
       req(all_colnames_val_expression())
       colFilterDropdown_ui(ns("colFilter_dropdown_expression"), all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting,columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$dropdown_btn)
       })
-
+    
     observe({
       req(all_colnames_val_expression())
       selected_columns_expression <- colFilterDropdown_server("colFilter_dropdown_expression", all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting)
 
       lapply(names(samples_expr), function(patient) {
-        expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$table)
+        expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns),all_colnames_val_expression())
         expression_profile_table$server_genesOfInterest(paste0("genesOfinterest_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns),all_colnames_val_expression())
         })
     })
 
 
     lapply(names(samples_expr), function(patient) {
-      expression_profile_table$server_plots(paste0("allGenes_plots_", patient), patient,"all_genes")
-      expression_profile_table$server_plots(paste0("genesOfinterest_plots_", patient), patient,"genes_of_interest")
+      expression_profile_plot$server(paste0("allGenes_plots_", patient), patient,"all_genes")
+      expression_profile_plot$server(paste0("genesOfinterest_plots_", patient), patient,"genes_of_interest")
     })
       
 

@@ -218,7 +218,8 @@ columnName_map <- function(tag, expr_flag = NULL, all_columns = NULL){
         static_columns <- list(
           feature_name = "Gene name",
           geneid = "Gene ID",
-          pathway = "Pathway")
+          pathway = "Pathway",
+          mean_log2FC = "Mean log2FC")
     }
 
     for (col in all_columns) {
@@ -241,14 +242,13 @@ columnName_map <- function(tag, expr_flag = NULL, all_columns = NULL){
     dropdown_btn <- append(static_columns,dropdown_btn)
     table <- c(static_columns,table)
     map_list <- list(dropdown_btn = dropdown_btn, table = table)
-    
   } else {
     print("NOT germline, expression or fusion")
   }
   return(map_list)
 }
 
-custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
+custom_colDef_setting <- function(tag, session = NULL, column_names = NULL,log2FC = NULL){
   if (tag == "fusion"){
     custom_colDef <- list(
       gene1 = colDef(minWidth = 120,filterable = TRUE,sticky = "left"),
@@ -323,7 +323,20 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
                           #     target = "_blank",
                           #     icon("external-link-alt", lib = "font-awesome"),
                           #     style = "margin-left: 6px; color: #007bff; text-decoration: none;"))},
-      clinvar_sig = colDef(minWidth = 140,filterable = TRUE,filterInput = selectFilter("tbl-germline")),
+      clinvar_sig = colDef(minWidth = 140,filterable = TRUE,filterInput = selectFilter("tbl-germline"),
+                           cell = function(value) {
+                                    if (is.na(value)) {
+                                      return(NULL)  # Do not render anything for NA values
+                                    }
+                                    # div(class = paste0("clinvar-tag clinvar-", tolower(value)),value)}
+                             tags$div(
+                               lapply(strsplit(value, "/")[[1]], function(v) {
+                                 v_trimmed <- trimws(v)
+                                 class_name <- paste0("clinvar-tag clinvar-", tolower(gsub(" ", "_", v_trimmed)))
+                                 tags$span(class = class_name, v_trimmed)
+                               })
+                             )}
+                           ),
       snpDB = colDef(maxWidth = 120,filterable = TRUE
                      # header = function(value) {
                      #   tagList(value, tags$a(
@@ -333,9 +346,24 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
                      #     style = "margin-left: 6px; color: #007bff; text-decoration: none;"
                      #     ))}
                      ),
-      CGC_Germline = colDef(width = 130),
-      trusight_genes = colDef(width = 140),
-      fOne = colDef(width = 100),
+      CGC_Germline = colDef(width = 130,
+                            cell = function(value) {
+                              if (is.na(value)) {
+                                return(NULL)  # Do not render anything for NA values
+                              }
+                              div(class = paste0("db-", tolower(value)),value)}),
+      trusight_genes = colDef(width = 140,
+                              cell = function(value) {
+                                if (is.na(value)) {
+                                  return(NULL)  # Do not render anything for NA values
+                                }
+                                div(class = paste0("db-", tolower(value)),value)}),
+      fOne = colDef(width = 100,
+                    cell = function(value) {
+                      if (is.na(value)) {
+                        return(NULL)  # Do not render anything for NA values
+                      }
+                      div(class = paste0("db-", tolower(value)),value)}),
       Consequence = colDef(minWidth = 170,filterable = TRUE,filterInput = selectFilter("tbl-germline")),
       HGVSc = colDef(minWidth = 100),
       HGVSp = colDef(minWidth = 100),
@@ -431,6 +459,16 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
       col <- column_names[i]
       border_style <- NULL
       
+      # # Přidání sloupce mean_log2FC s datovými bary, pokud existuje
+      # if ("mean_log2FC" %in% column_names) {
+      #   dynamic_columns[["mean_log2FC"]] <- colDef(
+      #     cell = data_bars(data$mean_log2FC, 
+      #                      fill_color = c("lightblue", "orange"),
+      #                      number_fmt = scales::number_format(accuracy = 0.01),
+      #                      text_position = "outside-end")
+      #   )
+      # }
+      
       if (grepl("^log2FC_", col)) {
         # První log2FC dostane čáru na oddělení od statických sloupců
         if (i == log2fc_indices[1]) {
@@ -496,20 +534,25 @@ custom_colDef_setting <- function(tag, session = NULL, column_names = NULL){
 }
 
 #' @export
-custom_colGroup_setting <- function(tag){
-  if (tag == "expression"){
-    custom_colGroup <- lapply(get_tissue_list(), function(tissue) {
-        group_name <- gsub("_", " ", tissue)
-        colGroup(name = group_name, columns = c(
-            paste0("log2FC_", tissue),
-            paste0("p_value_", tissue),
-            paste0("p_adj_", tissue)
-        ))
-    })
+custom_colGroup_setting <- function(tag, tissues = NULL) {
+  if (tag == "expression") {
+    if (is.null(tissues)) {
+      tissues <- get_tissue_list()
+    }
+    
+    custom_colGroup <- lapply(tissues, function(tissue) {
+      group_name <- gsub("_", " ", tissue)
+      colGroup(name = group_name, columns = c(
+        paste0("log2FC_", tissue),
+        paste0("p_value_", tissue),
+        paste0("p_adj_", tissue)))})
+    
+    return(custom_colGroup)
   }
-  # message("custom_colGroup: ",custom_colGroup)
-  return(custom_colGroup)
+  
+  return(NULL)
 }
+
 
 set_pathway_colors <- function(){
   pathway_colors <- list(

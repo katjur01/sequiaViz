@@ -132,9 +132,9 @@ prepare_expression_table <- function(combined_dt,expr_flag){
     wide_dt <- dcast(combined_dt,
                      sample + feature_name + geneid + pathway ~ tissue,
                      value.var = c("log2FC", "p_value", "p_adj"))
-    
+    wide_dt[, mean_log2FC := rowMeans(.SD, na.rm = TRUE), .SDcols = patterns("^log2FC_")]
     # Column ordering
-    column_order <- c("sample", "feature_name", "geneid", "pathway",as.vector(rbind(log2FC_cols, p_value_cols, p_adj_cols)))
+    column_order <- c("sample", "feature_name", "geneid", "pathway", "mean_log2FC",as.vector(rbind(log2FC_cols, p_value_cols, p_adj_cols)))
     wide_dt <- wide_dt[, column_order, with = FALSE]
     
     # tissue_cols <- unlist(lapply(unique(combined_dt$tissue), function(tissue) {
@@ -223,7 +223,7 @@ colFilter <- function(flag,expr_flag = NULL){
         keep_columns <- c("feature_name", "geneid", "all_kegg_paths_name")
         hide_columns <- c("refseq_id", "type", "all_kegg_gene_names", "gene_definition", "num_of_paths")
       } else {
-        keep_columns <- c("feature_name", "geneid", "pathway")
+        keep_columns <- c("feature_name", "geneid", "pathway", "mean_log2FC")
         hide_columns <- NULL
       }
       

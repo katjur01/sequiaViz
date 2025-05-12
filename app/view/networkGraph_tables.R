@@ -5,6 +5,7 @@ box::use(
   htmltools[tags, div,HTML],
   reactable[reactable,colDef,renderReactable,reactableOutput,JS],
   shinyjs[addClass,removeClass],
+  utils[head]
 )
 
 selectedTab_UI <- function(id){
@@ -49,7 +50,7 @@ tab_server <- function(id, tissue_dt, subTissue_dt, selected_nodes,selected_dt) 
     ##### reactable calling #####
     output$network_tab <- renderReactable({
       message("Rendering Reactable for network")
-      reactable(tissue_dt(),
+      reactable(as.data.frame(tissue_dt()),
                 columns = list(
                   feature_name = colDef(name = "Gene name", maxWidth = 100, filterable = TRUE),
                   geneid = colDef(name = "Ensembl id", width = 140, show = F),
@@ -139,13 +140,14 @@ tab_server <- function(id, tissue_dt, subTissue_dt, selected_nodes,selected_dt) 
       if (is.null(data) || nrow(data) == 0) {
         return(NULL)
       }
-      
       required_columns <- c("Gene_symbol", "var_name", "fusion", "all_kegg_paths_name")
       missing_columns <- setdiff(required_columns, colnames(data))
       # dont show empty columns
       for (col in missing_columns) {
         data[[col]] <- ""
       }
+      # Vyber jen relevantní sloupce
+      data <- data[, c("Gene_symbol", "var_name", "fusion", "all_kegg_paths_name")]
       
       reactable(
         data,
