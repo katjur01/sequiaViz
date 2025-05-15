@@ -125,7 +125,7 @@ ui <- function(id) {
                                      ")),
                                  dropdownButton(
                                    label = NULL,
-                                   right = FALSE,
+                                   right = TRUE,
                                    width = "240px",
                                    icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
                                    selectInput(ns("export_data_table"), "Select data:",
@@ -134,13 +134,11 @@ ui <- function(id) {
                                                choices = c("CSV" = "csv", "TSV" = "tsv", "Excel" = "xlsx")),
                                    downloadButton(ns("Table_download"),"Download")
                                  ),
-                                 #actionButton(ns("reset"),label = HTML('<i class="fa-solid fa-filter fa-2sm" style="color: #74C0FC";></i>')),
                                  dropdownButton(
                                    label = NULL,
-                                   right = FALSE,
-                                   #width = "240px",
+                                   right = TRUE,
+                                   width = "480px",
                                    icon = HTML('<i class="fa-solid fa-filter fa-2sm" style="color: #74C0FC";></i>'),
-                                   #"blabla"
                                    tagList(
                                      prettyCheckboxGroup(
                                        inputId = ns("colFilter_checkBox"),
@@ -171,14 +169,16 @@ ui <- function(id) {
                                    )
                                  ),
                                  br(),
+                                 br(),
+                                 br(),
                                  do.call(tabsetPanel, c(
                                    lapply(seq_along(patient_names), function(i) {
                                      tabPanel(patient_names[i], reactableOutput(ns(paste0("my_table", i))))
                                    }),
                                    id = ns("tabset")
                                  )),
-                                 br(),
-                                 reactableOutput(ns("selected_checkbox_table")), 
+                                 # br(),
+                                 # reactableOutput(ns("selected_checkbox_table")), 
                                  hr())),
                                bsCollapsePanel(
                                  "Tumor variant frequency histogram",
@@ -197,7 +197,7 @@ ui <- function(id) {
                                  #verbatimTextOutput(ns("debug_checkbox_data")),
                                  div(
                                    style = "width: 80%; margin: auto;",
-                                   use_spinner(plotOutput(ns("Histogram")))),
+                                   use_spinner(plotOutput(ns("Histogram"),height = "480px"))),
                                hr()),
                                bsCollapsePanel("Predicted variant impact overview",
                                                dropdownButton(
@@ -207,8 +207,6 @@ ui <- function(id) {
                                                  icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
                                                  selectInput(ns("export_chart_pie"), "Select chart:",
                                                     choices = c("Consequence","SIFT","PolyPhen")),
-                                                 # selectInput(ns("export_format_pie"), "Select format:",
-                                                 #             choices = c("PNG" = "png","HTML" = "html")),
                                                  actionButton(ns("Pie_download"),"Download as PNG",icon = icon("download"))
                                                ),
                                                br(),
@@ -568,7 +566,7 @@ server <- function(id,session) {
         geom_vline(xintercept = selected_data()[["tumor_variant_freq"]], color = "blue", linetype = "dashed", size = 1) +
         annotate("text", x = selected_data()[["tumor_variant_freq"]],
            y = rep(Inf, length(selected_data()[["tumor_variant_freq"]])),  # top of the plot
-           label = paste0(selected_data()[["var_name"]], "                          "),
+           label = paste0(selected_data()[["var_name"]], "                                        "),
            vjust = -0.5, size = 5, angle = 90, color = "blue")+
         scale_x_continuous(breaks = seq(0,1,by=0.05),minor_breaks = seq(0, 1, by = 0.01))+
         scale_y_continuous(expand=expansion(mult = c(0, 0.01)),breaks = seq(0,100,by=1),minor_breaks = seq(0,100,by=1))+
@@ -589,7 +587,7 @@ server <- function(id,session) {
 
     output$Histogram <- renderPlot({
       h()
-      })
+      }, height = 480)
 
 
     # Dynamically set plot height based on data
