@@ -18,8 +18,9 @@
 box::use(
   # Shiny core
   shiny[NS, sliderInput, wellPanel, fluidRow, column, tagList, br, uiOutput, plotOutput, downloadButton, actionButton, numericInput, renderPlot, checkboxGroupInput, fluidPage, selectInput,
-        icon,div,tabPanel,moduleServer,downloadHandler,observe, observeEvent,reactive,renderUI,updateCheckboxGroupInput,updateSliderInput,updateNumericInput,req,hr],
-  reactable[colDef,reactableOutput,renderReactable,reactable],
+        icon,div,tabPanel,moduleServer,downloadHandler,observe, observeEvent,reactive,renderUI,updateCheckboxGroupInput,updateSliderInput,updateNumericInput,req,hr,verbatimTextOutput,
+        renderPrint],
+  reactable[colDef,reactableOutput,renderReactable,reactable,getReactableState],
   # Shiny Modules (helper functions)
   shinyjs[useShinyjs, runjs, toggle],
   shinyBS[bsCollapse,bsCollapsePanel],
@@ -39,17 +40,16 @@ box::use(
   networkD3[sankeyNetwork, saveNetwork,renderSankeyNetwork,sankeyNetworkOutput],
   circlize,
   ggplot2[ggsave, ggplot, geom_density, aes, labs, theme, element_text, scale_x_continuous, scale_y_continuous, 
-          geom_histogram,expansion,margin,element_rect,element_line,scale_color_manual,unit],
+          geom_histogram,expansion,margin,element_rect,element_line,scale_color_manual,unit,geom_vline,annotate],
   
   # Data manipulation and export
   #dplyr[select, mutate, filter, bind_rows],
   dplyr,
   data.table[fread],
   openxlsx[write.xlsx],
-  
+  billboarder[billboarderOutput,renderBillboarder,billboarder,bb_piechart,bb_title,bb_pie,bb_export,billboarderProxy],
   # Webshot for rendering images
   webshot[webshot],
-  
   # Other utility functions
   utils[str]
 )
@@ -177,10 +177,9 @@ ui <- function(id) {
                                    }),
                                    id = ns("tabset")
                                  )),
+                                 br(),
+                                 reactableOutput(ns("selected_checkbox_table")), 
                                  hr())),
-                               bsCollapsePanel("Predicted variant impact overview",
-                                "Here will be shwon 3 different pie charts of consequences, SIFT and PolyPhen annotations",               
-                                hr()),
                                bsCollapsePanel(
                                  "Tumor variant frequency histogram",
                                  
@@ -195,10 +194,37 @@ ui <- function(id) {
                                  ),
                                  br(),
                                  br(),
-                                 use_spinner(div(
+                                 #verbatimTextOutput(ns("debug_checkbox_data")),
+                                 div(
                                    style = "width: 80%; margin: auto;",
-                                   use_spinner(plotOutput(ns("Histogram"))))),
+                                   use_spinner(plotOutput(ns("Histogram")))),
                                hr()),
+                               bsCollapsePanel("Predicted variant impact overview",
+                                               dropdownButton(
+                                                 label = "Export Pie Plots",
+                                                 right = TRUE,
+                                                 width = "240px",
+                                                 icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
+                                                 selectInput(ns("export_chart_pie"), "Select chart:",
+                                                    choices = c("Consequence","SIFT","PolyPhen")),
+                                                 # selectInput(ns("export_format_pie"), "Select format:",
+                                                 #             choices = c("PNG" = "png","HTML" = "html")),
+                                                 actionButton(ns("Pie_download"),"Download as PNG",icon = icon("download"))
+                                               ),
+                                               br(),
+                                               br(),
+                                               fluidRow(
+                                                 column(4,
+                                                        use_spinner(billboarderOutput(ns("pie1")))
+                                                 ),
+                                                 column(4,
+                                                        use_spinner(billboarderOutput(ns("pie2")))
+                                                 ),
+                                                 column(4,
+                                                        use_spinner(billboarderOutput(ns("pie3")))
+                                                 )
+                                               ),
+                                               hr()),
                                bsCollapsePanel(
                                  "Sankey diagram",
                                  dropdownButton(
@@ -234,7 +260,63 @@ server <- function(id,session) {
     file_paths <- list.files("D:/Diplomka/secondary_analysis/per_sample_final_var_tabs/tsv_formated", full.names = TRUE)
     patient_names <- substr(basename(file_paths),1,6)
     data_list <- load_and_prepare("D:/Diplomka/secondary_analysis/per_sample_final_var_tabs/tsv_formated")
-
+  
+    b <- billboarder()
+    b <- bb_piechart(b,data = data.frame(
+        category = c("A", "B"),
+        value = c(30, 70)
+      ))
+    b <- bb_title(b,text = "Chart 1")
+    
+    pie_plot_data <- reactive({
+      req(input$tabset)
+      selected_tab_id <- which(patient_names == input$tabset)
+      pie_data <- filtered_data[[selected_tab_id]]()
+      pie_data$SIFT[pie_data$SIFT == "."] <- "unknown"
+      pie_data$Consequence[pie_data$Consequence == "."] <- "unknown"
+      pie_data$PolyPhen[pie_data$PolyPhen == "."] <- "unknown"
+      return(pie_data)
+    })
+    
+    prepare_pie_chart <- function(column){
+      data_clean <- gsub("_", " ", gsub("\\(.*\\)", "", pie_plot_data()[[column]]))
+      data_pie_prepared <- as.data.frame(table(data_clean))
+      return(data_pie_prepared)  
+    }
+    
+    output$pie1 <- renderBillboarder({
+      data_pie_prepared <- prepare_pie_chart("Consequence")
+      b <- billboarder()
+      b <- bb_piechart(b,data = data_pie_prepared)
+      b <- bb_pie(b,label = list(
+        format = htmlwidgets::JS("function(value, ratio, id) { return Math.round(ratio * 100) + '%'; }")
+      ))
+      b <- bb_title(b,text = "Consequence")
+      b
+    })
+    
+    output$pie2 <- renderBillboarder({
+      data_pie_prepared <- prepare_pie_chart("SIFT")
+      b <- billboarder()
+      b <- bb_piechart(b,data = data_pie_prepared)
+      b <- bb_pie(b,label = list(
+        format = htmlwidgets::JS("function(value, ratio, id) { return Math.round(ratio * 100) + '%'; }")
+      ))
+      b <- bb_title(b,text = "SIFT")
+      b
+    })
+    
+    output$pie3 <- renderBillboarder({
+      data_pie_prepared <- prepare_pie_chart("PolyPhen")
+      b <- billboarder()
+      b <- bb_piechart(b,data = data_pie_prepared)
+      b <- bb_pie(b,label = list(
+        format = htmlwidgets::JS("function(value, ratio, id) { return Math.round(ratio * 100) + '%'; }")
+      ))
+      b <- bb_title(b,text = "PolyPhen")
+      b
+    })
+    
     output$Table_download <- downloadHandler(
       filename = function() {
         switch(input$export_format_table,
@@ -265,7 +347,17 @@ server <- function(id,session) {
         )
       }
     )
-
+    
+    observeEvent(input$Pie_download,{
+      shiny_id <- switch (input$export_chart_pie,
+              "Consequence" = "pie1",
+              "SIFT" = "pie2",
+              "PolyPhen" = "pie3"
+              )
+      proxy <- billboarderProxy(shinyId = shiny_id)
+      bb_export(proxy, filename = "pie-chart")
+    })
+  
     output$Sankey_download <- downloadHandler(
       filename = function() {
         if (input$export_format == "html") {
@@ -434,14 +526,31 @@ server <- function(id,session) {
     output$sankey_plot <- renderSankeyNetwork({
       p()
     })
-
+    
+    selected_data <- reactive({
+      req(input$tabset)
+      selected_tab_id <- which(patient_names == input$tabset)
+      
+      selected_idx <- getReactableState(paste0("my_table", selected_tab_id), "selected")
+      
+      df <- filtered_data[[selected_tab_id]]()
+      df <- df[selected_idx, c("var_name", "tumor_variant_freq"), drop = FALSE]
+      return(df)
+    })
+    
+    
+    output$selected_checkbox_table <- renderReactable({
+      df <- selected_data()
+      reactable(df)
+    })
+    
     h <- reactive({
       req(input$tabset)
       data <- fread(paste0("D:/Diplomka/secondary_analysis/per_sample_final_var_tabs/tsv_formated/",
                                    input$tabset,
                                    ".variants.tsv"))
       data <- data[,"tumor_variant_freq", drop = FALSE]
-
+      
       # basic histogram
       ggplot(data, aes(x=tumor_variant_freq)) +
         geom_histogram(binwidth = 0.01,fill="#A7C6ED", color="#e9ecef", alpha=0.9)+
@@ -449,6 +558,18 @@ server <- function(id,session) {
         geom_density(aes(color = "Distribution curve"), size = 0.5) +  # <- klíčová změna
         scale_color_manual(values = c("Distribution curve" = "#333333"), name = "") +  # <- legenda
         labs(x="Tumor variant frequency",y="Number of found variants")+
+        #geom_vline(xintercept = 0.5, color = "blue", linetype = "dashed", size = 1) +
+        # geom_vline(xintercept = c(0.2,0.3), color = "blue", linetype = "dashed", size = 1) +
+        # annotate("text",
+        #          x = c(0.2,0.3),
+        #          y = rep(Inf, length(c(0.2,0.3))),  # top of the plot
+        #          label = c("Varianta 1                     ","Varianta B                     "),
+        #          vjust = -0.5, size = 5, angle = 90, color = "blue")+
+        geom_vline(xintercept = selected_data()[["tumor_variant_freq"]], color = "blue", linetype = "dashed", size = 1) +
+        annotate("text", x = selected_data()[["tumor_variant_freq"]],
+           y = rep(Inf, length(selected_data()[["tumor_variant_freq"]])),  # top of the plot
+           label = paste0(selected_data()[["var_name"]], "                          "),
+           vjust = -0.5, size = 5, angle = 90, color = "blue")+
         scale_x_continuous(breaks = seq(0,1,by=0.05),minor_breaks = seq(0, 1, by = 0.01))+
         scale_y_continuous(expand=expansion(mult = c(0, 0.01)),breaks = seq(0,100,by=1),minor_breaks = seq(0,100,by=1))+
         theme(
