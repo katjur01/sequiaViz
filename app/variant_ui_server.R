@@ -269,7 +269,7 @@ server <- function(id,session) {
     pie_plot_data <- reactive({
       req(input$tabset)
       selected_tab_id <- which(patient_names == input$tabset)
-      pie_data <- filtered_data[[selected_tab_id]]()
+      pie_data <- data_list[[selected_tab_id]]
       pie_data$SIFT[pie_data$SIFT == "."] <- "unknown"
       pie_data$Consequence[pie_data$Consequence == "."] <- "unknown"
       pie_data$PolyPhen[pie_data$PolyPhen == "."] <- "unknown"
