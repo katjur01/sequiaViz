@@ -1,0 +1,51 @@
+//.fusion-table-contant {    
+  
+    .fusion-table .rt-th .rt-text-content {
+      white-space: normal;
+      text-align: center;
+    }
+    .fusion-table .rt-th-header {
+      height: auto;
+      text-align: center;
+    }
+    .text-black {
+      color: black;
+    }
+    .fusion-table .rt-td {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .tag {
+      display: inline-block;
+      width: 83px;
+      padding: 0.125rem 0.75rem;
+      border-radius: 15px;
+      font-weight: 600;
+      font-size: 16px;
+    }
+    .called-true {
+      background: #E6F5E2;
+      color: #3E5236;
+    }
+    .called-false {
+      background: #F8D6D7;
+      color: #692B33;
+    }
+    .confidence-high {
+      background: #FFC78F;
+      color: #DC5801;
+    }
+    .confidence-medium {
+      background: #FEF8A6;
+      color: #A57C02;
+    }
+    .confidence-low {
+      background: #D9F2FE;
+      color: #428BBA;
+    }
+    .confidence-na {
+      display: none;
+    }
+//}

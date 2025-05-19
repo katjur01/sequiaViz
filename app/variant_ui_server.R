@@ -58,6 +58,7 @@ box::use(
   app/pomocnefunkce[default_col,load_and_prepare,add_library_column,
                             map_column_names,map_gene_region_names,map_clin_sig_names,use_spinner,
                             sankey_plot],
+  app/sankey_plot
 )
 
 # UI funkce pro modul nastavujici vzhled veskerych grafickych prvku
@@ -646,51 +647,88 @@ server <- function(id,session,shared_data) {
       selected_data(df) 
     })
     
-    h <- reactive({
-      req(input$tabset)
-      data <- fread(paste0("D:/Diplomka/secondary_analysis/per_sample_final_var_tabs/tsv_formated/",
-                                   input$tabset,
-                                   ".variants.tsv"))
-      data <- data[,"tumor_variant_freq", drop = FALSE]
-      
-      # basic histogram
-      ggplot(data, aes(x=tumor_variant_freq)) +
-        geom_histogram(binwidth = 0.01,fill="#A7C6ED", color="#e9ecef", alpha=0.9)+
-        #geom_density(color = "#333333", size = 0.5)+
-        geom_density(aes(color = "Distribution curve"), size = 0.5) +  # <- klíčová změna
-        scale_color_manual(values = c("Distribution curve" = "#333333"), name = "") +  # <- legenda
-        labs(x="Tumor variant frequency",y="Number of found variants")+
-        #geom_vline(xintercept = 0.5, color = "blue", linetype = "dashed", size = 1) +
-        # geom_vline(xintercept = c(0.2,0.3), color = "blue", linetype = "dashed", size = 1) +
-        # annotate("text",
-        #          x = c(0.2,0.3),
-        #          y = rep(Inf, length(c(0.2,0.3))),  # top of the plot
-        #          label = c("Varianta 1                     ","Varianta B                     "),
-        #          vjust = -0.5, size = 5, angle = 90, color = "blue")+
-        geom_vline(xintercept = selected_data()[["tumor_variant_freq"]], color = "blue", linetype = "dashed", size = 1) +
-        annotate("text", x = selected_data()[["tumor_variant_freq"]],
-           y = rep(Inf, length(selected_data()[["tumor_variant_freq"]])),  # top of the plot
-           label = paste0(selected_data()[["var_name"]], "                                        "),
-           vjust = -0.5, size = 5, angle = 90, color = "blue")+
-        scale_x_continuous(breaks = seq(0,1,by=0.05),minor_breaks = seq(0, 1, by = 0.01))+
-        scale_y_continuous(expand=expansion(mult = c(0, 0.01)),breaks = seq(0,100,by=1),minor_breaks = seq(0,100,by=1))+
-        theme(
-          axis.title.x = element_text(size=15,face="bold"),
-          axis.title.y = element_text(size=15,face="bold"),
-          axis.text.x = element_text(size=15,margin = margin(t=10)),
-          axis.text.y = element_text(size=15,margin = margin(r=10)),
-          panel.grid.major = element_line(color = "grey80"),
-          panel.grid.minor = element_line(color = "grey80"),
-          panel.background = element_rect(fill = "white", color = NA),
-          plot.background = element_rect(fill = "white", color = NA),
-          legend.text = element_text(size = 13),
-          legend.key.size = unit(0.5,"cm")
-        )
+    # h <- reactive({
+    #   req(input$tabset)
+    #   data <- fread(paste0("D:/Diplomka/secondary_analysis/per_sample_final_var_tabs/tsv_formated/",
+    #                                input$tabset,
+    #                                ".variants.tsv"))
+    #   data <- data[,"tumor_variant_freq", drop = FALSE]
+    #   
+    #   # basic histogram
+    #   ggplot(data, aes(x=tumor_variant_freq)) +
+    #     geom_histogram(binwidth = 0.01,fill="#A7C6ED", color="#e9ecef", alpha=0.9)+
+    #     #geom_density(color = "#333333", size = 0.5)+
+    #     geom_density(aes(color = "Distribution curve"), size = 0.5) +  # <- klíčová změna
+    #     scale_color_manual(values = c("Distribution curve" = "#333333"), name = "") +  # <- legenda
+    #     labs(x="Tumor variant frequency",y="Number of found variants")+
+    #     #geom_vline(xintercept = 0.5, color = "blue", linetype = "dashed", size = 1) +
+    #     # geom_vline(xintercept = c(0.2,0.3), color = "blue", linetype = "dashed", size = 1) +
+    #     # annotate("text",
+    #     #          x = c(0.2,0.3),
+    #     #          y = rep(Inf, length(c(0.2,0.3))),  # top of the plot
+    #     #          label = c("Varianta 1                     ","Varianta B                     "),
+    #     #          vjust = -0.5, size = 5, angle = 90, color = "blue")+
+    #     geom_vline(xintercept = selected_data()[["tumor_variant_freq"]], color = "blue", linetype = "dashed", size = 1) +
+    #     annotate("text", x = selected_data()[["tumor_variant_freq"]],
+    #        y = rep(Inf, length(selected_data()[["tumor_variant_freq"]])),  # top of the plot
+    #        label = paste0(selected_data()[["var_name"]], "                                        "),
+    #        vjust = -0.5, size = 5, angle = 90, color = "blue")+
+    #     scale_x_continuous(breaks = seq(0,1,by=0.05),minor_breaks = seq(0, 1, by = 0.01))+
+    #     scale_y_continuous(expand=expansion(mult = c(0, 0.01)),breaks = seq(0,100,by=1),minor_breaks = seq(0,100,by=1))+
+    #     theme(
+    #       axis.title.x = element_text(size=15,face="bold"),
+    #       axis.title.y = element_text(size=15,face="bold"),
+    #       axis.text.x = element_text(size=15,margin = margin(t=10)),
+    #       axis.text.y = element_text(size=15,margin = margin(r=10)),
+    #       panel.grid.major = element_line(color = "grey80"),
+    #       panel.grid.minor = element_line(color = "grey80"),
+    #       panel.background = element_rect(fill = "white", color = NA),
+    #       plot.background = element_rect(fill = "white", color = NA),
+    #       legend.text = element_text(size = 13),
+    #       legend.key.size = unit(0.5,"cm")
+    #     )
+    # 
+    # })
 
-    })
-
+    generate_vaf <- function(){
+      h <- reactive({
+        req(input$tabset)
+        data <- fread(paste0("D:/Diplomka/secondary_analysis/per_sample_final_var_tabs/tsv_formated/",
+                             input$tabset,
+                             ".variants.tsv"))
+        data <- data[,"tumor_variant_freq", drop = FALSE]
+        
+        ggplot(data, aes(x=tumor_variant_freq)) +
+          geom_histogram(binwidth = 0.01,fill="#A7C6ED", color="#e9ecef", alpha=0.9)+
+          geom_density(aes(color = "Distribution curve"), size = 0.5) +  # <- klíčová změna
+          scale_color_manual(values = c("Distribution curve" = "#333333"), name = "") +  # <- legenda
+          labs(x="Tumor variant frequency",y="Number of found variants")+
+          geom_vline(xintercept = selected_data()[["tumor_variant_freq"]], color = "blue", linetype = "dashed", size = 1) +
+          annotate("text", x = selected_data()[["tumor_variant_freq"]],
+                   y = rep(Inf, length(selected_data()[["tumor_variant_freq"]])),  # top of the plot
+                   label = paste0(selected_data()[["var_name"]], "                                        "),
+                   vjust = -0.5, size = 5, angle = 90, color = "blue")+
+          scale_x_continuous(breaks = seq(0,1,by=0.05),minor_breaks = seq(0, 1, by = 0.01))+
+          scale_y_continuous(expand=expansion(mult = c(0, 0.01)),breaks = seq(0,100,by=1),minor_breaks = seq(0,100,by=1))+
+          theme(
+            axis.title.x = element_text(size=15,face="bold"),
+            axis.title.y = element_text(size=15,face="bold"),
+            axis.text.x = element_text(size=15,margin = margin(t=10)),
+            axis.text.y = element_text(size=15,margin = margin(r=10)),
+            panel.grid.major = element_line(color = "grey80"),
+            panel.grid.minor = element_line(color = "grey80"),
+            panel.background = element_rect(fill = "white", color = NA),
+            plot.background = element_rect(fill = "white", color = NA),
+            legend.text = element_text(size = 13),
+            legend.key.size = unit(0.5,"cm")
+          )
+        
+      })
+      return(h)
+    }
+    
     output$Histogram <- renderPlot({
-      h()
+      generate_vaf()
       }, height = 480)
 
 

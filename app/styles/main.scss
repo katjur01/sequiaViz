@@ -1,0 +1,28 @@
+@use 'summary_table';
+@use 'fusion_genes_table';
+@use 'expression_profile_table';
+@use 'germline_varcall_table';
+@use 'networkGraph';
+
+.main-header {
+  padding-bottom: 1rem !important;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.main-header.navbar {
+  font-size: 23px;
+}
+
+
+.report-btn {
+  float: right; 
+  margin-left: auto;
+
+  .h3 {
+      .card-title {
+        float: right !important;
+      }
+  }
+
+  
+}
