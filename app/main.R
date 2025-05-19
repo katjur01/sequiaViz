@@ -48,9 +48,9 @@ box::use(
 )
 
 box::use(
-  app/pomocnefunkce[default_col,load_and_prepare,add_library_column,
-                            map_column_names,map_gene_region_names,map_clin_sig_names,use_spinner,
-                            sankey_plot],
+  app/prepare_main_table_and_filters[default_col,load_and_prepare,add_library_column,
+                            map_column_names,map_gene_region_names,map_clin_sig_names,use_spinner
+                            ],
   app/variant_ui_server,
   app/view/IGV
 )

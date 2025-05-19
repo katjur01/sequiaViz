@@ -1,0 +1,18 @@
+---
+title: "Ukázkový report"
+output: html_document
+---
+
+# Shrnutí
+
+Datum generování: `r Sys.Date()`
+
+{{summary_text}}
+
+# Graf
+
+{{category_plot}}
+
+# Tabulka
+
+{{summary_table}}

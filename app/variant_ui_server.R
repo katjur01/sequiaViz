@@ -55,10 +55,11 @@ box::use(
 )
 
 box::use(
-  app/pomocnefunkce[default_col,load_and_prepare,add_library_column,
-                            map_column_names,map_gene_region_names,map_clin_sig_names,use_spinner,
-                            sankey_plot],
-  app/sankey_plot
+  app/prepare_main_table_and_filters[default_col,load_and_prepare,add_library_column,
+                            map_column_names,map_gene_region_names,map_clin_sig_names,use_spinner],
+  app/vaf_plot[generate_vaf],
+  app/sankey_plot[sankey_plot],
+  app/pie_plots[prepare_pie_chart,make_pie_chart]
 )
 
 # UI funkce pro modul nastavujici vzhled veskerych grafickych prvku
@@ -118,22 +119,13 @@ ui <- function(id) {
              ),
       ),
       
-      column(width = 10,  # hlavní panel
-             #fluidPage
-             #dashboardBody(      
-               #bsCollapse(
-                               #id = "bsco",
-                               #multiple = TRUE,
-                               #open = "patient_panel1",
-                               #bsCollapsePanel(
+      column(width = 10,
                                 box(
                                  width = 12,
                                  title = tags$div(
                                    style = "padding-top: 8px;","Patient data"),
                                  closable = FALSE,
                                  collapsible = TRUE,
-                                 #value = "patient_panel1",
-                                 #style = "success",
                                  tagList(
                                  dropdownButton(
                                    label = NULL,
@@ -192,18 +184,7 @@ ui <- function(id) {
                                  div(style = "display: flex; justify-content: space-between; align-items: center; width: 100%;",
                                      actionButton(ns("confirm_selected"), label = "Confirm selected rows for this patient"),
                                      actionButton(ns("igv_button"), label = "Interactive Genome Viewer", class = "my-blue-btn")
-                                     # dropdownButton(
-                                     #   right = TRUE,
-                                     #   width = "240px",
-                                     #   icon = "Interactive Genome viewer",
-                                     #  "Here will be IGV innfo"
-                                     #   
-                                     # ),
                                  ),
-                                 #br(),
-                                 #hr(),
-                                 #reactableOutput(ns("selected_checkbox_table")),
-                                 #br(),
                                  uiOutput(ns("confirm_button_ui"))
                                  )),
                                box(
@@ -217,13 +198,10 @@ ui <- function(id) {
                                    right = TRUE,
                                    width = "240px",
                                    icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
-                                   #selectInput(ns("export_format"), "Select format:",
-                                               #choices = c("PNG" = "png")),
                                    downloadButton(ns("Hist_download"),"Download as PNG")
                                  ),
                                  br(),
                                  br(),
-                                 #verbatimTextOutput(ns("debug_checkbox_data")),
                                  div(
                                    style = "width: 80%; margin: auto;",
                                    use_spinner(plotOutput(ns("Histogram"),height = "480px")))
@@ -279,7 +257,6 @@ ui <- function(id) {
                                  br()
                                )
                                )
-                             #)
       )
     )
 }
@@ -294,13 +271,6 @@ server <- function(id,session,shared_data) {
     patient_names <- substr(basename(file_paths),1,6)
     data_list <- load_and_prepare("D:/Diplomka/secondary_analysis/per_sample_final_var_tabs/tsv_formated")
   
-    b <- billboarder()
-    b <- bb_piechart(b,data = data.frame(
-        category = c("A", "B"),
-        value = c(30, 70)
-      ))
-    b <- bb_title(b,text = "Chart 1")
-    
     pie_plot_data <- reactive({
       req(input$tabset)
       selected_tab_id <- which(patient_names == input$tabset)
@@ -311,44 +281,9 @@ server <- function(id,session,shared_data) {
       return(pie_data)
     })
     
-    prepare_pie_chart <- function(column){
-      data_clean <- gsub("_", " ", gsub("\\(.*\\)", "", pie_plot_data()[[column]]))
-      data_pie_prepared <- as.data.frame(table(data_clean))
-      return(data_pie_prepared)  
-    }
-    
-    output$pie1 <- renderBillboarder({
-      data_pie_prepared <- prepare_pie_chart("Consequence")
-      b <- billboarder()
-      b <- bb_piechart(b,data = data_pie_prepared)
-      b <- bb_pie(b,label = list(
-        format = htmlwidgets::JS("function(value, ratio, id) { return Math.round(ratio * 100) + '%'; }")
-      ))
-      b <- bb_title(b,text = "Consequence")
-      b
-    })
-    
-    output$pie2 <- renderBillboarder({
-      data_pie_prepared <- prepare_pie_chart("SIFT")
-      b <- billboarder()
-      b <- bb_piechart(b,data = data_pie_prepared)
-      b <- bb_pie(b,label = list(
-        format = htmlwidgets::JS("function(value, ratio, id) { return Math.round(ratio * 100) + '%'; }")
-      ))
-      b <- bb_title(b,text = "SIFT")
-      b
-    })
-    
-    output$pie3 <- renderBillboarder({
-      data_pie_prepared <- prepare_pie_chart("PolyPhen")
-      b <- billboarder()
-      b <- bb_piechart(b,data = data_pie_prepared)
-      b <- bb_pie(b,label = list(
-        format = htmlwidgets::JS("function(value, ratio, id) { return Math.round(ratio * 100) + '%'; }")
-      ))
-      b <- bb_title(b,text = "PolyPhen")
-      b
-    })
+    output$pie1 <- make_pie_chart("Consequence",pie_plot_data=pie_plot_data())
+    output$pie2 <- make_pie_chart("SIFT",pie_plot_data=pie_plot_data())
+    output$pie3 <- make_pie_chart("PolyPhen",pie_plot_data=pie_plot_data())
     
     output$Table_download <- downloadHandler(
       filename = function() {
@@ -647,92 +582,12 @@ server <- function(id,session,shared_data) {
       selected_data(df) 
     })
     
-    # h <- reactive({
-    #   req(input$tabset)
-    #   data <- fread(paste0("D:/Diplomka/secondary_analysis/per_sample_final_var_tabs/tsv_formated/",
-    #                                input$tabset,
-    #                                ".variants.tsv"))
-    #   data <- data[,"tumor_variant_freq", drop = FALSE]
-    #   
-    #   # basic histogram
-    #   ggplot(data, aes(x=tumor_variant_freq)) +
-    #     geom_histogram(binwidth = 0.01,fill="#A7C6ED", color="#e9ecef", alpha=0.9)+
-    #     #geom_density(color = "#333333", size = 0.5)+
-    #     geom_density(aes(color = "Distribution curve"), size = 0.5) +  # <- klíčová změna
-    #     scale_color_manual(values = c("Distribution curve" = "#333333"), name = "") +  # <- legenda
-    #     labs(x="Tumor variant frequency",y="Number of found variants")+
-    #     #geom_vline(xintercept = 0.5, color = "blue", linetype = "dashed", size = 1) +
-    #     # geom_vline(xintercept = c(0.2,0.3), color = "blue", linetype = "dashed", size = 1) +
-    #     # annotate("text",
-    #     #          x = c(0.2,0.3),
-    #     #          y = rep(Inf, length(c(0.2,0.3))),  # top of the plot
-    #     #          label = c("Varianta 1                     ","Varianta B                     "),
-    #     #          vjust = -0.5, size = 5, angle = 90, color = "blue")+
-    #     geom_vline(xintercept = selected_data()[["tumor_variant_freq"]], color = "blue", linetype = "dashed", size = 1) +
-    #     annotate("text", x = selected_data()[["tumor_variant_freq"]],
-    #        y = rep(Inf, length(selected_data()[["tumor_variant_freq"]])),  # top of the plot
-    #        label = paste0(selected_data()[["var_name"]], "                                        "),
-    #        vjust = -0.5, size = 5, angle = 90, color = "blue")+
-    #     scale_x_continuous(breaks = seq(0,1,by=0.05),minor_breaks = seq(0, 1, by = 0.01))+
-    #     scale_y_continuous(expand=expansion(mult = c(0, 0.01)),breaks = seq(0,100,by=1),minor_breaks = seq(0,100,by=1))+
-    #     theme(
-    #       axis.title.x = element_text(size=15,face="bold"),
-    #       axis.title.y = element_text(size=15,face="bold"),
-    #       axis.text.x = element_text(size=15,margin = margin(t=10)),
-    #       axis.text.y = element_text(size=15,margin = margin(r=10)),
-    #       panel.grid.major = element_line(color = "grey80"),
-    #       panel.grid.minor = element_line(color = "grey80"),
-    #       panel.background = element_rect(fill = "white", color = NA),
-    #       plot.background = element_rect(fill = "white", color = NA),
-    #       legend.text = element_text(size = 13),
-    #       legend.key.size = unit(0.5,"cm")
-    #     )
-    # 
-    # })
-
-    generate_vaf <- function(){
-      h <- reactive({
-        req(input$tabset)
-        data <- fread(paste0("D:/Diplomka/secondary_analysis/per_sample_final_var_tabs/tsv_formated/",
-                             input$tabset,
-                             ".variants.tsv"))
-        data <- data[,"tumor_variant_freq", drop = FALSE]
-        
-        ggplot(data, aes(x=tumor_variant_freq)) +
-          geom_histogram(binwidth = 0.01,fill="#A7C6ED", color="#e9ecef", alpha=0.9)+
-          geom_density(aes(color = "Distribution curve"), size = 0.5) +  # <- klíčová změna
-          scale_color_manual(values = c("Distribution curve" = "#333333"), name = "") +  # <- legenda
-          labs(x="Tumor variant frequency",y="Number of found variants")+
-          geom_vline(xintercept = selected_data()[["tumor_variant_freq"]], color = "blue", linetype = "dashed", size = 1) +
-          annotate("text", x = selected_data()[["tumor_variant_freq"]],
-                   y = rep(Inf, length(selected_data()[["tumor_variant_freq"]])),  # top of the plot
-                   label = paste0(selected_data()[["var_name"]], "                                        "),
-                   vjust = -0.5, size = 5, angle = 90, color = "blue")+
-          scale_x_continuous(breaks = seq(0,1,by=0.05),minor_breaks = seq(0, 1, by = 0.01))+
-          scale_y_continuous(expand=expansion(mult = c(0, 0.01)),breaks = seq(0,100,by=1),minor_breaks = seq(0,100,by=1))+
-          theme(
-            axis.title.x = element_text(size=15,face="bold"),
-            axis.title.y = element_text(size=15,face="bold"),
-            axis.text.x = element_text(size=15,margin = margin(t=10)),
-            axis.text.y = element_text(size=15,margin = margin(r=10)),
-            panel.grid.major = element_line(color = "grey80"),
-            panel.grid.minor = element_line(color = "grey80"),
-            panel.background = element_rect(fill = "white", color = NA),
-            plot.background = element_rect(fill = "white", color = NA),
-            legend.text = element_text(size = 13),
-            legend.key.size = unit(0.5,"cm")
-          )
-        
-      })
-      return(h)
-    }
     
     output$Histogram <- renderPlot({
-      generate_vaf()
+      req(input$tabset)
+      generate_vaf(data_list[[which(patient_names == input$tabset)]],selected_data=selected_data())
       }, height = 480)
 
-
-    # Dynamically set plot height based on data
     output$diagram <- renderUI({
       data <- plot_data()
       sankeyNetworkOutput(ns("sankey_plot"), height = data$plot_height)
