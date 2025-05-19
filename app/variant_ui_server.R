@@ -19,7 +19,7 @@ box::use(
   # Shiny core
   shiny[NS, sliderInput, wellPanel, fluidRow, column, tagList, br, uiOutput, plotOutput, downloadButton, actionButton, numericInput, renderPlot, checkboxGroupInput, fluidPage, selectInput,
         icon,div,tabPanel,moduleServer,downloadHandler,observe, observeEvent,reactive,renderUI,updateCheckboxGroupInput,updateSliderInput,updateNumericInput,req,hr,verbatimTextOutput,
-        renderPrint],
+        renderPrint,reactiveVal],
   reactable[colDef,reactableOutput,renderReactable,reactable,getReactableState],
   # Shiny Modules (helper functions)
   shinyjs[useShinyjs, runjs, toggle],
@@ -34,7 +34,7 @@ box::use(
   htmltools[tags, p, span,HTML],
   
   # shinyWidgets (Custom widgets)
-  shinyWidgets[pickerInput, prettySwitch, dropdownButton,prettyCheckboxGroup,updatePrettyCheckboxGroup],
+  shinyWidgets[pickerInput, prettySwitch, dropdownButton,prettyCheckboxGroup,updatePrettyCheckboxGroup,actionBttn,pickerOptions],
   
   # Network and data visualization
   networkD3[sankeyNetwork, saveNetwork,renderSankeyNetwork,sankeyNetworkOutput],
@@ -69,20 +69,27 @@ ui <- function(id) {
   patient_names <- substr(basename(file_paths), 1, 6)
   tagList(tags$head(
     tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"),
-    tags$style(HTML(".dropdown-toggle {border-radius: 0; padding: 0; background-color: transparent; border: none;}
+    tags$style(HTML(".dropdown-toggle {border-radius: 0; padding: 0; background-color: transparent; border: none; float: right;margin-top -1px;}
                     .checkbox label {font-weight: normal !important;}
                     .checkbox-group .checkbox {margin-bottom: 0px !important;}
-                    .pretty-checkbox-group .options-container {
-        column-count: 2;
-        column-gap: 20px;
-      }
+                    .pretty-checkbox-group .shiny-options-group {column-count: 2 !important; column-gap: 20px !important;}
+                    .pretty-checkbox-group label {font-weight: normal !important;}
+                    .my-blue-btn {background-color: #007bff;color: white;border: none;}
                     "))
+    
   ),
   br(),
   #fluidPage(
     fluidRow(
       column(width = 2,  # levý "sidebar"
-             wellPanel(
+             box(width = 12,
+                 title = tags$div(
+                   style = "padding-top: 8px;",
+                   "Filter data by:"
+                 ),
+                 closable = FALSE,
+                 collapsible = FALSE,
+                 tagList(
                sliderInput(ns("coverage"), tags$strong("Minimal coverage"), min = 0, max = 1000, value = 10),
                #br(),
                sliderInput(ns("gnomad_slider"), tags$strong("GnomAD NFE range"), min = 0, max = 1, value = c(0, 0.999), step = 0.00001),
@@ -105,29 +112,33 @@ ui <- function(id) {
                  choices = NULL, 
                  selected = c("Conflicting classifications of pathogenicity","Likely benign",
                               "Pathogenic","Uncertain significance","Benign")
-               ),
+               ))
                
              ),
       ),
       
       column(width = 10,  # hlavní panel
-             fluidPage(      bsCollapse(
-                               id = "bsco",
+             #fluidPage
+             #dashboardBody(      
+               #bsCollapse(
+                               #id = "bsco",
                                #multiple = TRUE,
-                               open = "patient_panel1",
-                               bsCollapsePanel(
-                                 title = "Patient data",
-                                 value = "patient_panel1",
-                                 style = "success",
+                               #open = "patient_panel1",
+                               #bsCollapsePanel(
+                                box(
+                                 width = 12,
+                                 title = tags$div(
+                                   style = "padding-top: 8px;","Patient data"),
+                                 closable = FALSE,
+                                 collapsible = TRUE,
+                                 #value = "patient_panel1",
+                                 #style = "success",
                                  tagList(
-                                 tags$style(HTML("
-                                     .dropdown-toggle {float: right;margin-top -1px;}
-                                     ")),
                                  dropdownButton(
                                    label = NULL,
                                    right = TRUE,
                                    width = "240px",
-                                   icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
+                                   icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC; margin-bottom: 0; padding-bottom: 0;"></i>'),
                                    selectInput(ns("export_data_table"), "Select data:",
                                                choices = c("All data" = "all", "Filtered data" = "filtered")),
                                    selectInput(ns("export_format_table"), "Select format:",
@@ -138,23 +149,24 @@ ui <- function(id) {
                                    label = NULL,
                                    right = TRUE,
                                    width = "480px",
-                                   icon = HTML('<i class="fa-solid fa-filter fa-2sm" style="color: #74C0FC";></i>'),
-                                   tagList(
-                                     prettyCheckboxGroup(
-                                       inputId = ns("colFilter_checkBox"),
-                                       label = "Show columns:",
-                                       choices = NULL,
-                                       selected = c(
-                                         "var_name", "library", "Gene_symbol", "HGVSp", "HGVSc",
-                                         "tumor_variant_freq", "tumor_depth", "gnomAD_NFE", "clinvar_sig",
-                                         "clinvar_DBN", "CGC_Somatic", "gene_region", "Consequence",
-                                         "all_full_annot_name"
-                                       ),
-                                       icon = icon("check"),
-                                       status = "primary",
-                                       outline = FALSE
-                                     )
-                                   ),
+                                   icon = HTML('<i class="fa-solid fa-filter fa-2sm" style="color: #74C0FC; margin-bottom: 0; padding-bottom: 0;"></i>'),
+                                   #tagList(
+                                     div(class = "pretty-checkbox-group",
+                                         prettyCheckboxGroup(
+                                           inputId = ns("colFilter_checkBox"),
+                                           label = HTML("<b>Show columns:</b>"),
+                                           choices = NULL,
+                                           selected = c(
+                                             "var_name", "library", "Gene_symbol", "HGVSp", "HGVSc",
+                                             "tumor_variant_freq", "tumor_depth", "gnomAD_NFE", "clinvar_sig",
+                                             "clinvar_DBN", "CGC_Somatic", "gene_region", "Consequence",
+                                             "all_full_annot_name"
+                                           ),
+                                           icon = icon("check"),
+                                           status = "primary",
+                                           outline = FALSE
+                                         )
+                                     ),
                                    div(style = "display: flex; gap: 10px; width: 100%;",
                                        actionButton(
                                          inputId = ns("show_all"),
@@ -168,21 +180,37 @@ ui <- function(id) {
                                        )
                                    )
                                  ),
-                                 br(),
-                                 br(),
-                                 br(),
-                                 do.call(tabsetPanel, c(
+                                 tags$div(style = "margin-top: 49px;"),
+                                 div(style = "width: 100%;",do.call(tabsetPanel, c(
                                    lapply(seq_along(patient_names), function(i) {
-                                     tabPanel(patient_names[i], reactableOutput(ns(paste0("my_table", i))))
+                                     tabPanel(patient_names[i], use_spinner(reactableOutput(ns(paste0("my_table", i)))))
                                    }),
                                    id = ns("tabset")
+                                 ))),
+                                 br(),
+                                 div(style = "display: flex; justify-content: space-between; align-items: center; width: 100%;",
+                                     actionButton(ns("confirm_selected"), label = "Confirm selected rows for this patient"),
+                                     actionButton(ns("igv_button"), label = "Interactive Genome Viewer", class = "my-blue-btn")
+                                     # dropdownButton(
+                                     #   right = TRUE,
+                                     #   width = "240px",
+                                     #   icon = "Interactive Genome viewer",
+                                     #  "Here will be IGV innfo"
+                                     #   
+                                     # ),
+                                 ),
+                                 #br(),
+                                 #hr(),
+                                 #reactableOutput(ns("selected_checkbox_table")),
+                                 #br(),
+                                 uiOutput(ns("confirm_button_ui"))
                                  )),
-                                 # br(),
-                                 # reactableOutput(ns("selected_checkbox_table")), 
-                                 hr())),
-                               bsCollapsePanel(
-                                 "Tumor variant frequency histogram",
-                                 
+                               box(
+                                 width = 12,
+                                 title = tags$div(
+                                   style = "padding-top: 8px;","Tumor variant frequency histogram"),
+                                 closable = FALSE,
+                                 collapsible = TRUE,
                                  dropdownButton(
                                    label = "Export Circos Plot",
                                    right = TRUE,
@@ -197,9 +225,13 @@ ui <- function(id) {
                                  #verbatimTextOutput(ns("debug_checkbox_data")),
                                  div(
                                    style = "width: 80%; margin: auto;",
-                                   use_spinner(plotOutput(ns("Histogram"),height = "480px"))),
-                               hr()),
-                               bsCollapsePanel("Predicted variant impact overview",
+                                   use_spinner(plotOutput(ns("Histogram"),height = "480px")))
+                               ),
+                               box(width = 12,
+                                   title = tags$div(
+                                     style = "padding-top: 8px;","Predicted variant impact overview"),
+                                   closable = FALSE,
+                                   collapsible = TRUE,
                                                dropdownButton(
                                                  label = "Export Pie Plots",
                                                  right = TRUE,
@@ -211,20 +243,21 @@ ui <- function(id) {
                                                ),
                                                br(),
                                                br(),
-                                               fluidRow(
-                                                 column(4,
-                                                        use_spinner(billboarderOutput(ns("pie1")))
-                                                 ),
-                                                 column(4,
-                                                        use_spinner(billboarderOutput(ns("pie2")))
-                                                 ),
-                                                 column(4,
-                                                        use_spinner(billboarderOutput(ns("pie3")))
-                                                 )
-                                               ),
-                                               hr()),
-                               bsCollapsePanel(
-                                 "Sankey diagram",
+                                   use_spinner(fluidRow(
+                                     column(4, billboarderOutput(ns("pie1"))
+                                     ),
+                                     column(4, billboarderOutput(ns("pie2"))
+                                     ),
+                                     column(4, billboarderOutput(ns("pie3"))
+                                     )
+                                   ))
+                                   ),
+                               box(
+                                 width = 12,
+                                 title = tags$div(
+                                   style = "padding-top: 8px;","Sankey diagram"),
+                                 closable = FALSE,
+                                 collapsible = TRUE,
                                  dropdownButton(
                                    label = "Export Sankey Plot",
                                    right = FALSE,
@@ -243,15 +276,16 @@ ui <- function(id) {
                                  ),
                                  use_spinner(uiOutput(ns("diagram"),heigth="90%",width="90%")),
                                  br()
-                               )),
-                             )
+                               )
+                               )
+                             #)
       )
-    ))
+    )
 }
 
 # Serverova funkce pro modul
 #' @export
-server <- function(id,session) {
+server <- function(id,session,shared_data) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     # nacteni a priprava dat
@@ -492,6 +526,8 @@ server <- function(id,session) {
           selection = "multiple",
           onClick = "select",
           wrap = FALSE,
+          highlight = TRUE,
+          #outlined = TRUE,
           defaultPageSize = 10,
           showPageSizeOptions = TRUE,
           pageSizeOptions = c(5,10, 20, 30, 50),
@@ -525,21 +561,89 @@ server <- function(id,session) {
       p()
     })
     
-    selected_data <- reactive({
+    selected_data <- reactiveVal()
+    observeEvent(input$confirm_selected, {
       req(input$tabset)
-      selected_tab_id <- which(patient_names == input$tabset)
       
+      selected_tab_id <- which(patient_names == input$tabset)
+      req(getReactableState(paste0("my_table", selected_tab_id), "selected"))
       selected_idx <- getReactableState(paste0("my_table", selected_tab_id), "selected")
       
       df <- filtered_data[[selected_tab_id]]()
-      df <- df[selected_idx, c("var_name", "tumor_variant_freq"), drop = FALSE]
-      return(df)
+      df <- df[selected_idx, c("var_name", "tumor_variant_freq","Gene_symbol","Consequence","clinvar_sig"), drop = FALSE]
+      df$position1 <- sub("^([^_]+)_([^_]+)_.*", "\\1:\\2", df$var_name)
+      df$patients <- input$tabset
+      
+      combined <- as.data.frame(rbind(selected_data(),df))
+      
+      combined <- combined[!duplicated(combined[c("var_name", "Gene_symbol", "patients")]), ]
+      
+      shared_data$selected_somatic_variants <- combined
+      selected_data(combined)
     })
     
-    
-    output$selected_checkbox_table <- renderReactable({
+    output$confirm_button_ui <- renderUI({
       df <- selected_data()
-      reactable(df)
+      req(!is.null(df), nrow(df) > 0)
+      tagList(
+        br(),
+        fluidRow(
+          column(
+            width = 9,
+            reactableOutput(ns("selected_variants_table"))
+          ),
+          column(
+            width = 3,
+            tags$div(style = "margin-top: 5px;"),
+            pickerInput(
+                inputId = ns("idpick"), 
+                label = "Select patients for IGV:", 
+                choices = patient_names, 
+                options = pickerOptions(
+                  actionsBox = FALSE, 
+                  size = 4,
+                  maxOptions = 4,
+                  dropupAuto = FALSE,
+                  maxOptionsText = "Select max. 4 patients"
+                  #selectedTextFormat = "count > 3"
+                ), 
+                multiple = TRUE
+              )
+            
+          )
+        ),
+        br(),
+        actionButton(ns("delete_variant"), "Delete variant")
+      )
+    })
+    
+    output$selected_variants_table <- renderReactable({
+      df <- selected_data()
+      reactable(df,
+                selection = "multiple",
+                onClick = "select",
+                highlight = TRUE,
+                wrap = FALSE,
+                #outlined = TRUE,
+                striped = TRUE,
+                defaultColDef = colDef(resizable = TRUE, show = TRUE, align = "center"),
+                columns = list("var_name"= colDef(name="Variant name",minWidth = 140),
+                               "Gene_symbol"=colDef(name="Gene symbol",minWidth = 110),
+                               "tumor_variant_freq"=colDef(show=FALSE),
+                               "Consequence"=colDef(minWidth = 140),
+                               "clinvar_sig"=colDef(name="ClinVar significance",minWidth = 140),
+                               "position1"=colDef(show=FALSE),
+                               "patients"=colDef(name="Detected for patient",minWidth = 120))
+                #style = "width: 1000px;"
+      )
+    })
+    
+    observeEvent(input$delete_variant,{
+      req(getReactableState("selected_variants_table","selected"))
+      selected_idx <- getReactableState("selected_variants_table","selected")
+      df <- selected_data()
+      df <- df[-selected_idx, , drop = FALSE]
+      selected_data(df) 
     })
     
     h <- reactive({

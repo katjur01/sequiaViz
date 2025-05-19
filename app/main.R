@@ -39,7 +39,7 @@ box::use(
   #bslib[accordion,accordion_panel],
   shinyBS[bsCollapse,bsCollapsePanel],
   networkD3,
-  dplyr,
+  dplyr[`%>%`],
   circlize,
   webshot,
   ggplot2,
@@ -51,7 +51,8 @@ box::use(
   app/pomocnefunkce[default_col,load_and_prepare,add_library_column,
                             map_column_names,map_gene_region_names,map_clin_sig_names,use_spinner,
                             sankey_plot],
-  app/variant_ui_server
+  app/variant_ui_server,
+  app/view/IGV
 )
 
 # box::use(
@@ -95,9 +96,11 @@ ui <- function(id){
   
 
   dashboardPage(
+    dark = NULL,
+    help = NULL,
     header = dashboardHeader(
       nav = navbarMenu(
-        navbarTab("Summary 2.0 dev", tabName = ns("summary2")),
+        #navbarTab("Summary 2.0 dev", tabName = ns("summary2")),
         navbarTab("Summary", tabName = ns("summary")),
         navbarTab("Network graph", tabName = ns("network_graph")),
         navbarTab("Variant calling", tabName = ns("variant_calling")),
@@ -111,9 +114,6 @@ ui <- function(id){
     sidebar = dashboardSidebar(disable = TRUE),
           body = dashboardBody(#style = "background-color: white;",
             tabItems(
-              tabItem(tabName = ns("summary2")
-              )
-              ,
               tabItem(tabName = ns("summary")
                       ),
               tabItem(tabName = ns("variant_calling"),
@@ -143,19 +143,19 @@ ui <- function(id){
               tabItem(tabName = ns("network_graph")
               ),
               tabItem(tabName = ns("hidden_igv"),
-                      # tags$style(HTML("
-                      #         #igv-igvDiv {
-                      #           width: 100%;
-                      #           height: auto;
-                      #           border: none;
-                      #           margin: 0 auto;
-                      #           padding: 20px;
-                      #           box-sizing: border-box;
-                      #         }
-                      #     ")),
-                      # box(id = ns("igv_page"), title = "IGV Viewer",width = 12, collapsible = FALSE
-                      #     #IGV$igv_ui(ns("igv"))
-                      # )
+                      tags$style(HTML("
+                              #igv-igvDiv {
+                                width: 100%;
+                                height: auto;
+                                border: none;
+                                margin: 0 auto;
+                                padding: 20px;
+                                box-sizing: border-box;
+                              }
+                          ")),
+                      box(id = ns("igv_page"), title = "IGV Viewer",width = 12, collapsible = FALSE,
+                          IGV$igv_ui(ns("igv"))
+                      )
               )
             )
           )
@@ -166,7 +166,10 @@ ui <- function(id){
 server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    variant_ui_server$server("somatic_var_call_tab",session)
+    shared_data <- reactiveValues()
+    variant_ui_server$server("somatic_var_call_tab",session, shared_data = shared_data)
+    IGV$igv_server("igv", shared_data = shared_data)
+    
 #     shared_data <- reactiveValues(germline_data = reactiveVal(NULL), fusion_data = reactiveVal(NULL), 
 #                                   germline_overview = list(), fusion_overview = list())
 #   
@@ -297,7 +300,7 @@ server <- function(id) {
 #     
 # 
 # 
-#     IGV$igv_server("igv")
+#     
 # 
 # 
 # 
