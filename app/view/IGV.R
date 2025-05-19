@@ -1,11 +1,11 @@
 box::use(
   shiny[br, NS,h3, tagList, div, observe, observeEvent, mainPanel, titlePanel, uiOutput, renderUI, HTML, fluidPage,fluidRow, moduleServer,
-        reactiveValues, column],
+        reactiveValues, column,req],
   htmltools[tags],
   bs4Dash[actionButton,box],
   shinyjs[useShinyjs, runjs],
   reactable,
-  reactable[reactableOutput,renderReactable,reactable,JS],
+  reactable[reactableOutput,renderReactable,reactable,JS,colDef],
 )
 
 # start_server <- function(){
@@ -55,25 +55,34 @@ igv_ui <- function(id) {
 }
 
 #' @export
-igv_server <- function(id) {
+igv_server <- function(id,shared_data) {
   moduleServer(id, function(input, output, session) {
     
-    values <- reactiveValues()
+    #values <- reactiveValues()
     
-    values$bookmark_df <- data.frame(
-      gene1 = c("KANSL1", "KMT2A", "METTL13"),
-      gene2 = c("LRRC37A4P", "MLLT3", "DNM3"),
-      position1 = c("17:45597764", "11:118482495", "1:171814013"),
-      position2 = c("17:45545676", "11:20365744", "1:171987759")
-    )
+    # values$bookmark_df <- data.frame(
+    #   gene1 = c("KANSL1", "KMT2A", "METTL13"),
+    #   #gene2 = c("LRRC37A4P", "MLLT3", "DNM3"),
+    #   position1 = c("17:45597764", "11:118482495", "1:171814013")
+    #   #position2 = c("17:45545676", "11:20365744", "1:171987759")
+    # )
+    
+    #values$bookmark_df <- shared_data$selected_somatic_variants
     
     output$bookmarks <- renderReactable({
-      reactable(values$bookmark_df,
+      req(shared_data$selected_somatic_variants)
+      reactable(shared_data$selected_somatic_variants,
                 pagination = FALSE,
                 striped = TRUE,
                 wrap = FALSE,
                 highlight = TRUE,
                 outlined = TRUE,
+                defaultColDef = colDef(resizable = TRUE, show = TRUE, align = "center"),
+                columns = list("var_name"= colDef(name="Variant name"),
+                               "Gene_symbol"=colDef(name="Gene symbol"),
+                               "tumor_variant_freq"=colDef(show=FALSE),
+                               "clinvar_sig"=colDef(name="ClinVar significance"),
+                               "position1"=colDef(show=FALSE)),
                 onClick = JS(sprintf("function(rowInfo, column) {
                   Shiny.setInputValue('%s', { index: rowInfo.index + 1 }, { priority: 'event' });
                 }", session$ns("bookmarks_click")))
@@ -93,7 +102,16 @@ igv_server <- function(id) {
           if (igvDiv) {
             var options = {
               genome: 'hg38',
-              locus: 'all'
+              locus: 'all',
+              tracks: [
+                {
+                  name: 'Local BAM Track',
+                  type: 'alignment',
+                  format: 'bam',
+                  url: 'DZ1601krev.bam',
+                  indexURL: 'DZ1601krev .bam.bai'
+                }
+            ]
             };
             igv.createBrowser(igvDiv, options).then(function(browser) {
               console.log('IGV browser created');
@@ -110,11 +128,11 @@ igv_server <- function(id) {
       selected <- input$bookmarks_click
       message("Clicked row info: ", selected$index)
       if (!is.null(selected)) {
-        position1 <- values$bookmark_df$position1[selected$index]
-        position2 <- values$bookmark_df$position2[selected$index]
-        positions <- paste0(position1, " ", position2)
+        position <- shared_data$selected_somatic_variants$position1[selected$index]
+        #position2 <- values$bookmark_df$position2[selected$index]
+        #positions <- paste0(position1, " ", position2)
         
-        message("Navigating to positions: ", positions)
+        message("Navigating to positions: ", position)
         
         runjs(sprintf("
           console.log('Navigating to positions: %s');
@@ -127,7 +145,7 @@ igv_server <- function(id) {
             });
           } else {
             console.log('IGV browser does not exist');
-          }", positions, positions))
+          }", position, position))
       }
     })
   })
