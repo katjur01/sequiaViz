@@ -6,13 +6,11 @@ box::use(
   shinyjs[useShinyjs, runjs],
   reactable,
   reactable[reactableOutput,renderReactable,reactable,JS],
+  processx[process,]
 )
-
-# start_server <- function(){
-#   setwd("/Users/katerinajuraskova/Desktop/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze/mapped/")
-#   data_server = serve_data('./')
-#   data_server$stop_server()
-# }
+box::use(
+  app/logic/igv_helper[build_igv_tracks,start_static_server,stop_static_server]
+)
 
 #' @export
 igv_ui <- function(id) {
@@ -39,7 +37,8 @@ igv_ui <- function(id) {
   ")),
     useShinyjs(),
     tags$head(
-      tags$script(src = "https://cdn.jsdelivr.net/npm/igv@2.15.12/dist/igv.min.js")
+      # tags$script(src = "https://cdn.jsdelivr.net/npm/igv@2.15.12/dist/igv.min.js")
+      tags$script(src = "https://cdn.jsdelivr.net/npm/igv@3.3.0/dist/igv.min.js")
     ),
     fluidRow(
       column(6, reactableOutput(ns("bookmarks")))),
@@ -59,6 +58,12 @@ igv_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     
     values <- reactiveValues()
+    
+    # Seznam vzorků
+    samples <- list(
+      list(name = "DZ1601", file = "DZ1601FFPE_001.bam"),
+      list(name = "MR1507", file = "MR1507FFPE_001.bam")
+    )
     
     values$bookmark_df <- data.frame(
       gene1 = c("KANSL1", "KMT2A", "METTL13"),
@@ -86,6 +91,8 @@ igv_server <- function(id) {
         div(id = session$ns("igv-igvDiv"))  # Zajistíme, že div má správný namespace
       })
       
+      track_block <- build_igv_tracks(samples)
+      
       # Krok 2: Po vykreslení spustíme JavaScript pro IGV s mírným zpožděním
       runjs(sprintf("
         setTimeout(function() {
@@ -93,7 +100,18 @@ igv_server <- function(id) {
           if (igvDiv) {
             var options = {
               genome: 'hg38',
-              locus: 'all'
+              locus: 'all',
+              tracks: [%s],
+              showNavigation: true,       // horní navigační lišta
+              showRuler: true,            // číslování pozice nahoře
+              showSampleName: true,       // pokud máš sampleName v tracku
+              showCenterGuide: true,      // vertikální linka ve středu
+              trackHeight: 300,           // výchozí výška jednoho BAM tracku
+              minTrackHeight: 50,
+              maxTrackHeight: 1000,
+              search: {
+                url: 'https://www.ncbi.nlm.nih.gov/gene/?term=$$'
+              }
             };
             igv.createBrowser(igvDiv, options).then(function(browser) {
               console.log('IGV browser created');
@@ -103,9 +121,9 @@ igv_server <- function(id) {
             console.error('IGV div not found.');
           }
         }, 20);  // Zpoždění 20 ms k zajištění, že div je vykreslen
-      ", session$ns("igv-igvDiv")))  # Přidáme správné ID divu s namespace
+      ", session$ns("igv-igvDiv"), track_block))  # Přidáme správné ID divu s namespace
     })
-    
+
     observeEvent(input$bookmarks_click, {
       selected <- input$bookmarks_click
       message("Clicked row info: ", selected$index)
@@ -135,51 +153,24 @@ igv_server <- function(id) {
 
 
 
-# ui <- fluidPage(
-#   box(id = "igv_page", title = "IGV Viewer",width = 10, collapsible = FALSE,
-#     igv_ui("igv")
-#   )
-# )
-# server <- function(input, output, session) {
-#   igv_server("igv")
-# }
-# shinyApp(ui, server, options = list(launch.browser = TRUE))
+ui <- fluidPage(
+  box(id = "igv_page", title = "IGV Viewer", width = 10, collapsible = FALSE,
+    igv_ui("igv")
+  )
+)
 
+server <- function(input, output, session) {
+  
+  # Spustíme statický server při startu celé aplikace
+  start_static_server(dir = "/home/katka/BioRoots/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_tkane/mapped")
+  
+  igv_server("igv")
+  
+  # Ukončení serveru při zavření celé session
+  session$onSessionEnded(function() {
+    stop_static_server()
+  })
+  
+}
 
-
-
-
-# {
-#   'name': 'DZ1601',
-#   'url': 'http://127.0.0.1:5000/DZ1601fuze.bam',
-#   'indexURL': 'http://127.0.0.1:5000/DZ1601fuze.bam.bai',
-#   'format': 'bam'
-# },
-# {
-#   'name': 'DZ1601 chimeric',
-#   'url': 'http://127.0.0.1:5000/DZ1601fuzeChimeric.out.bam',
-#   'indexURL': 'http://127.0.0.1:5000/DZ1601fuzeChimeric.out.bam.bai',
-#   'format': 'bam'
-# }
-
-# {
-#   'name': 'HG00103',
-#   'url': 'https://s3.amazonaws.com/1000genomes/data/HG00103/alignment/HG00103.alt_bwamem_GRCh38DH.20150718.GBR.low_coverage.cram',
-#   'indexURL': 'https://s3.amazonaws.com/1000genomes/data/HG00103/alignment/HG00103.alt_bwamem_GRCh38DH.20150718.GBR.low_coverage.cram.crai',
-#   'format': 'cram'
-# }
-# 
-# /*  tracks: [
-#   {
-#     'name': 'DZ1601',
-#     'url': 'http://127.0.0.1:5000/DZ1601fuze.bam',
-#     'indexURL': 'http://127.0.0.1:5000/DZ1601fuze.bam.bai',
-#     'format': 'bam'
-#   },
-#   {
-#     'name': 'DZ1601 chimeric',
-#     'url': 'http://127.0.0.1:5000/DZ1601fuzeChimeric.out.bam',
-#     'indexURL': 'http://127.0.0.1:5000/DZ1601fuzeChimeric.out.bam.bai',
-#     'format': 'bam'
-#   }
-# ] */
+shinyApp(ui, server, options = list(launch.browser = TRUE))
