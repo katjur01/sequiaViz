@@ -1,8 +1,4 @@
-@use 'summary_table';
-@use 'fusion_genes_table';
-@use 'expression_profile_table';
 @use 'germline_varcall_table';
-@use 'networkGraph';
 
 .main-header {
   padding-bottom: 1rem !important;

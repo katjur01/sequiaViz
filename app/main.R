@@ -36,7 +36,6 @@ box::use(
   shinyWidgets[pickerInput,prettySwitch,dropdown],
   shinyjs[useShinyjs, runjs,toggle],
   utils[str],
-  #bslib[accordion,accordion_panel],
   shinyBS[bsCollapse,bsCollapsePanel],
   networkD3,
   dplyr[`%>%`],
@@ -52,7 +51,8 @@ box::use(
                             map_column_names,map_gene_region_names,map_clin_sig_names,use_spinner
                             ],
   app/variant_ui_server,
-  app/view/IGV
+  app/view/IGV,
+  app/logic/igv_helper[build_igv_tracks,start_static_server,stop_static_server]
 )
 
 # box::use(
@@ -100,6 +100,7 @@ ui <- function(id){
     help = NULL,
     header = dashboardHeader(
       nav = navbarMenu(
+        inputId = ns("main_navbar"),
         #navbarTab("Summary 2.0 dev", tabName = ns("summary2")),
         navbarTab("Summary", tabName = ns("summary")),
         navbarTab("Network graph", tabName = ns("network_graph")),
@@ -107,7 +108,7 @@ ui <- function(id){
         navbarTab("Expression profile", tabName = ns("expression_profile")),
 
         navbarTab("Fusion genes", tabName = ns("fusion_genes")),
-        navbarTab("Hidden IGV Item", tabName = ns("hidden_igv"))
+        navbarTab("IGV", tabName = ns("hidden_igv"))
 
       )
     ),
@@ -168,7 +169,19 @@ server <- function(id) {
     ns <- session$ns
     shared_data <- reactiveValues()
     variant_ui_server$server("somatic_var_call_tab",session, shared_data = shared_data)
+    
+    #start_static_server(dir = "D:/Diplomka/primary_analysis/230426_MOII_e117_tkane/mapped")
     IGV$igv_server("igv", shared_data = shared_data)
+
+    #Ukončení serveru při zavření celé session
+    # session$onSessionEnded(function() {
+    #   stop_static_server()
+    # })
+    
+    # observeEvent(input[[ns("go2igv_button")]], {
+    #   # Switch to the IGV tab
+    #   updateTabItems(session, "main_navbar", selected = ns("hidden_igv"))
+    # })
     
 #     shared_data <- reactiveValues(germline_data = reactiveVal(NULL), fusion_data = reactiveVal(NULL), 
 #                                   germline_overview = list(), fusion_overview = list())

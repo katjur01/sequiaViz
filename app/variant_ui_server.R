@@ -1,56 +1,27 @@
 # HLAVNI SKRIPT
 
-# nacteni knihoven a pomocnych funkci
-# library(shiny)
-# library(reactable)
-# library(data.table)
-# library(htmltools)
-# library(shinyWidgets)
-# library(bslib)
-# library(networkD3)
-# library(dplyr)
-# library(circlize)
-# library(webshot)
-# library(ggplot2)
-# library(openxlsx)
-
-
 box::use(
-  # Shiny core
   shiny[NS, sliderInput, wellPanel, fluidRow, column, tagList, br, uiOutput, plotOutput, downloadButton, actionButton, numericInput, renderPlot, checkboxGroupInput, fluidPage, selectInput,
         icon,div,tabPanel,moduleServer,downloadHandler,observe, observeEvent,reactive,renderUI,updateCheckboxGroupInput,updateSliderInput,updateNumericInput,req,hr,verbatimTextOutput,
         renderPrint,reactiveVal],
   reactable[colDef,reactableOutput,renderReactable,reactable,getReactableState],
   # Shiny Modules (helper functions)
   shinyjs[useShinyjs, runjs, toggle],
-  shinyBS[bsCollapse,bsCollapsePanel],
-  # bs4Dash UI elements
   bs4Dash[dashboardPage, dashboardHeader, dashboardSidebar, dashboardBody, sidebarMenu, menuItem, menuSubItem, dashboardControlbar, 
           tabItems, tabItem, bs4Card, infoBox, tabBox, tabsetPanel, bs4ValueBox, controlbarMenu, controlbarItem, 
           column, box, boxLabel, descriptionBlock, boxProfile, boxProfileItem, attachmentBlock, boxComment, userBlock, 
           updateTabItems, boxDropdown, boxDropdownItem, dropdownDivider, navbarMenu, navbarTab],
-  
-  # Useful HTML tools
   htmltools[tags, p, span,HTML],
-  
-  # shinyWidgets (Custom widgets)
-  shinyWidgets[pickerInput, prettySwitch, dropdownButton,prettyCheckboxGroup,updatePrettyCheckboxGroup,actionBttn,pickerOptions],
-  
-  # Network and data visualization
+  shinyWidgets[pickerInput, prettySwitch, dropdownButton,prettyCheckboxGroup,updatePrettyCheckboxGroup,actionBttn,pickerOptions,dropdown],
   networkD3[sankeyNetwork, saveNetwork,renderSankeyNetwork,sankeyNetworkOutput],
   circlize,
   ggplot2[ggsave, ggplot, geom_density, aes, labs, theme, element_text, scale_x_continuous, scale_y_continuous, 
           geom_histogram,expansion,margin,element_rect,element_line,scale_color_manual,unit,geom_vline,annotate],
-  
-  # Data manipulation and export
-  #dplyr[select, mutate, filter, bind_rows],
-  dplyr,
+  dplyr[anti_join],
   data.table[fread],
   openxlsx[write.xlsx],
   billboarder[billboarderOutput,renderBillboarder,billboarder,bb_piechart,bb_title,bb_pie,bb_export,billboarderProxy],
-  # Webshot for rendering images
   webshot[webshot],
-  # Other utility functions
   utils[str]
 )
 
@@ -77,7 +48,39 @@ ui <- function(id) {
                     .pretty-checkbox-group .shiny-options-group {column-count: 2 !important; column-gap: 20px !important;}
                     .pretty-checkbox-group label {font-weight: normal !important;}
                     .my-blue-btn {background-color: #007bff;color: white;border: none;}
+                    .dropdown-menu .bootstrap-select .dropdown-toggle {border: 1px solid #ced4da !important; background-color: #fff !important;
+                      color: #495057 !important; height: 38px !important; font-size: 16px !important; border-radius: 4px !important; 
+                      box-shadow: none !important;}
+    
+  .sw-dropdown-content {
+  border: 1px solid #ced4da !important;  /* standard Bootstrap gray */
+  border-radius: 4px !important;
+  box-shadow: none !important;
+
+  background-color: white !important; /* ensure white background */
+  }
+  
+  .glyphicon-triangle-bottom {
+  font-size: 12px !important;      /* smaller size */
+  line-height: 12px !important;    /* keep line height consistent */
+  vertical-align: middle;           /* optional, to align nicely */
+}
+
+.glyphicon-triangle-bottom {
+  display: none !important;
+  width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#app-somatic_var_call_tab-igv_dropdownButton {
+  width: 230px !important;
+  height: 38px !important;
+  font-size: 16px !important;
+}
+
                     "))
+    
     
   ),
   br(),
@@ -182,9 +185,46 @@ ui <- function(id) {
                                  ))),
                                  br(),
                                  div(style = "display: flex; justify-content: space-between; align-items: center; width: 100%;",
-                                     actionButton(ns("confirm_selected"), label = "Confirm selected rows for this patient"),
-                                     actionButton(ns("igv_button"), label = "Interactive Genome Viewer", class = "my-blue-btn")
+                                     actionButton(ns("confirm_selected"), label = "Confirm selected rows"),
+                                     #actionButton(ns("igv_button"), label = "Interactive Genome Viewer", class = "my-blue-btn")
+                                     div(
+                                       style = "height: 38px;font-size: 16px;",
+                                       dropdown(
+                                         inputId = ns("igv_dropdownButton"),
+                                         label = "Interactive Genome Viewer",
+                                         #style = "simple",   # Avoids extra styling interference
+                                         status = "primary",      # No color style
+                                         #size = NULL,
+                                         icon = NULL,
+                                         right = TRUE,
+                                         width = 230,
+                                         pickerInput(
+                                           inputId = ns("idpick"), 
+                                           label = "Select patients for IGV:", 
+                                           choices = patient_names, 
+                                           options = pickerOptions(
+                                             actionsBox = FALSE, 
+                                             size = 4,
+                                             maxOptions = 4,
+                                             dropupAuto = FALSE,
+                                             maxOptionsText = "Select max. 4 patients"
+                                             #selectedTextFormat = "count > 3"
+                                           ), 
+                                           multiple = TRUE
+                                         ),
+                                         div(style = "display: flex; justify-content: center; margin-top: 10px;",
+                                             actionBttn(
+                                               inputId = ns("go2igv_button"),
+                                               label = "Go to IGV",
+                                               style = "stretch",
+                                               color = "primary",
+                                               size = "sm",
+                                               individual = TRUE)
+                                         )
+                                       )
+                                     )
                                  ),
+                                 
                                  uiOutput(ns("confirm_button_ui"))
                                  )),
                                box(
@@ -263,27 +303,20 @@ ui <- function(id) {
 
 # Serverova funkce pro modul
 #' @export
-server <- function(id,session,shared_data) {
+server <- function(id,session,shared_data,parent_session = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     # nacteni a priprava dat
     file_paths <- list.files("D:/Diplomka/secondary_analysis/per_sample_final_var_tabs/tsv_formated", full.names = TRUE)
     patient_names <- substr(basename(file_paths),1,6)
     data_list <- load_and_prepare("D:/Diplomka/secondary_analysis/per_sample_final_var_tabs/tsv_formated")
-  
-    pie_plot_data <- reactive({
-      req(input$tabset)
-      selected_tab_id <- which(patient_names == input$tabset)
-      pie_data <- data_list[[selected_tab_id]]
-      pie_data$SIFT[pie_data$SIFT == "."] <- "unknown"
-      pie_data$Consequence[pie_data$Consequence == "."] <- "unknown"
-      pie_data$PolyPhen[pie_data$PolyPhen == "."] <- "unknown"
-      return(pie_data)
-    })
     
-    output$pie1 <- make_pie_chart("Consequence",pie_plot_data=pie_plot_data())
-    output$pie2 <- make_pie_chart("SIFT",pie_plot_data=pie_plot_data())
-    output$pie3 <- make_pie_chart("PolyPhen",pie_plot_data=pie_plot_data())
+    observeEvent(input$go2igv_button, {
+      if (!is.null(parent_session)) {
+        # Use parent session to update tabs
+        updateTabItems(parent_session, "main_navbar", selected = "hidden_igv")
+      }
+    })
     
     output$Table_download <- downloadHandler(
       filename = function() {
@@ -474,30 +507,63 @@ server <- function(id,session,shared_data) {
         )
       })
     })
-
-    plot_data <- reactive({
-       req(input$tabset)
-       selected_tab_id <- which(patient_names == input$tabset)
-       sankey_plot(filtered_data[[selected_tab_id]]())
-     })
-
-    p <- reactive({
-      data <- plot_data()
-      sankeyNetwork(
-        Links = data$links, Nodes = data$nodes,
-        Source = "IDsource", Target = "IDtarget",
-        Value = "value", NodeID = "name",
-        sinksRight = FALSE, fontSize = 15,
-        height = data$plot_height, width = "100%"
+    
+    output$confirm_button_ui <- renderUI({
+      df <- selected_data_actual_patient()
+      req(!is.null(df), nrow(df) > 0)
+      tagList(
+        br(),
+        fluidRow(
+          column( width = 10, reactableOutput(ns("selected_variants_table"))),
+          column( width = 3,)),
+        br(),
+        actionButton(ns("delete_variant"), "Delete variant")
       )
     })
-
-    # Render Sankey Network when data is available
-    output$sankey_plot <- renderSankeyNetwork({
-      p()
+    
+    output$selected_variants_table <- renderReactable({
+      df <- selected_data_actual_patient()
+      reactable(df,
+                selection = "multiple",
+                onClick = "select",
+                highlight = TRUE,
+                wrap = FALSE,
+                #outlined = TRUE,
+                striped = TRUE,
+                defaultColDef = colDef(resizable = TRUE, show = TRUE, align = "center"),
+                columns = list("var_name"= colDef(name="Variant name",minWidth = 140),
+                               "Gene_symbol"=colDef(name="Gene symbol",minWidth = 110),
+                               "tumor_variant_freq"=colDef(show=FALSE),
+                               "Consequence"=colDef(minWidth = 140),
+                               "clinvar_sig"=colDef(name="ClinVar significance",minWidth = 140),
+                               "position1"=colDef(show=FALSE),
+                               "patients"=colDef(name="Detected for patient",minWidth = 120,show=FALSE))
+      )
+    })
+    
+    observeEvent(input$delete_variant, {
+      req(getReactableState("selected_variants_table", "selected"))
+      
+      selected_idx <- getReactableState("selected_variants_table", "selected")
+      
+      df_patient <- selected_data_actual_patient()
+      selected_rows <- df_patient[selected_idx, ]
+      
+      # Odstranit přesně shodné řádky z selected_data()
+      df_all <- selected_data()
+      df_all_new <- anti_join(df_all, selected_rows, by = colnames(df_all))
+      
+      # Update obou datasetů
+      df_patient_new <- anti_join(df_patient, selected_rows, by = colnames(df_patient))
+      
+      selected_data(df_all_new)
+      selected_data_actual_patient(df_patient_new)
+      shared_data$selected_variants <- df_all_new
     })
     
     selected_data <- reactiveVal()
+    selected_data_actual_patient <- reactiveVal()
+    
     observeEvent(input$confirm_selected, {
       req(input$tabset)
       
@@ -514,79 +580,60 @@ server <- function(id,session,shared_data) {
       
       combined <- combined[!duplicated(combined[c("var_name", "Gene_symbol", "patients")]), ]
       
-      shared_data$selected_somatic_variants <- combined
       selected_data(combined)
+      selected_data_actual_patient(subset(combined,patients == input$tabset))
+      shared_data$selected_variants <- combined
     })
     
-    output$confirm_button_ui <- renderUI({
+    
+    
+    observeEvent(input$tabset,{
+      req(selected_data())
       df <- selected_data()
-      req(!is.null(df), nrow(df) > 0)
-      tagList(
-        br(),
-        fluidRow(
-          column(
-            width = 9,
-            reactableOutput(ns("selected_variants_table"))
-          ),
-          column(
-            width = 3,
-            tags$div(style = "margin-top: 5px;"),
-            pickerInput(
-                inputId = ns("idpick"), 
-                label = "Select patients for IGV:", 
-                choices = patient_names, 
-                options = pickerOptions(
-                  actionsBox = FALSE, 
-                  size = 4,
-                  maxOptions = 4,
-                  dropupAuto = FALSE,
-                  maxOptionsText = "Select max. 4 patients"
-                  #selectedTextFormat = "count > 3"
-                ), 
-                multiple = TRUE
-              )
-            
-          )
-        ),
-        br(),
-        actionButton(ns("delete_variant"), "Delete variant")
-      )
+      selected_data_actual_patient(subset(df,patients == input$tabset))
     })
     
-    output$selected_variants_table <- renderReactable({
-      df <- selected_data()
-      reactable(df,
-                selection = "multiple",
-                onClick = "select",
-                highlight = TRUE,
-                wrap = FALSE,
-                #outlined = TRUE,
-                striped = TRUE,
-                defaultColDef = colDef(resizable = TRUE, show = TRUE, align = "center"),
-                columns = list("var_name"= colDef(name="Variant name",minWidth = 140),
-                               "Gene_symbol"=colDef(name="Gene symbol",minWidth = 110),
-                               "tumor_variant_freq"=colDef(show=FALSE),
-                               "Consequence"=colDef(minWidth = 140),
-                               "clinvar_sig"=colDef(name="ClinVar significance",minWidth = 140),
-                               "position1"=colDef(show=FALSE),
-                               "patients"=colDef(name="Detected for patient",minWidth = 120))
-                #style = "width: 1000px;"
-      )
-    })
-    
-    observeEvent(input$delete_variant,{
-      req(getReactableState("selected_variants_table","selected"))
-      selected_idx <- getReactableState("selected_variants_table","selected")
-      df <- selected_data()
-      df <- df[-selected_idx, , drop = FALSE]
-      selected_data(df) 
-    })
-    
-    
+    #vaf diagram
     output$Histogram <- renderPlot({
       req(input$tabset)
-      generate_vaf(data_list[[which(patient_names == input$tabset)]],selected_data=selected_data())
-      }, height = 480)
+      generate_vaf(data_list[[which(patient_names == input$tabset)]],selected_data=selected_data_actual_patient(),input$tabset)
+    }, height = 480)
+    
+    #pie plots
+    pie_plot_data <- reactive({
+      req(input$tabset)
+      selected_tab_id <- which(patient_names == input$tabset)
+      pie_data <- data_list[[selected_tab_id]]
+      pie_data$SIFT[pie_data$SIFT == "."] <- "unknown"
+      pie_data$Consequence[pie_data$Consequence == "."] <- "unknown"
+      pie_data$PolyPhen[pie_data$PolyPhen == "."] <- "unknown"
+      return(pie_data)
+    })
+    
+    observeEvent(input$tabset, {
+      pie_plot_data <- pie_plot_data()
+      output$pie1 <- make_pie_chart("Consequence",pie_plot_data)
+      output$pie2 <- make_pie_chart("SIFT",pie_plot_data)
+      output$pie3 <- make_pie_chart("PolyPhen",pie_plot_data)
+    })
+    
+    #sankey network
+    plot_data <- reactive({
+       req(input$tabset)
+       selected_tab_id <- which(patient_names == input$tabset)
+       sankey_plot(filtered_data[[selected_tab_id]]())
+     })
+
+    output$sankey_plot <- renderSankeyNetwork({
+      data <- plot_data()
+      sankeyNetwork(
+        Links = data$links, Nodes = data$nodes,
+        Source = "IDsource", Target = "IDtarget",
+        Value = "value", NodeID = "name",
+        sinksRight = FALSE, fontSize = 15,
+        height = data$plot_height, width = "100%"
+      )
+    })
 
     output$diagram <- renderUI({
       data <- plot_data()
