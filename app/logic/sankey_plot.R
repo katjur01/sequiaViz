@@ -1,13 +1,16 @@
-box::use(data.table[fread,setcolorder],
-         reactable[colDef],
-         networkD3[sankeyNetwork],
-         dplyr[count,group_by,summarise,n,left_join,select],
-         circlize)
+# app/sankey_plot.R
+
+box::use(
+  data.table[fread,setcolorder],
+     reactable[colDef],
+     networkD3[sankeyNetwork],
+     dplyr[count,group_by,summarise,n,left_join,select],
+     circlize
+)
 
 #' @export
 sankey_plot <- function(data){
-  df <- fread("D:/Diplomka/Apka/kegg_tab.tsv")
-  
+  df <- fread("/home/annamo/sequiaViz/input_files/kegg_tab.tsv")
   data_sub <- data[,list(var_name,Gene_symbol,`Annotation source`,Gene)]
   data_sub2_refseq <- df[, list(refseq_id,kegg_paths_name)]
   data_sub2_refseq[,refseq_id := as.character(refseq_id)]
@@ -15,40 +18,23 @@ sankey_plot <- function(data){
   data_sub2_ensemble <- df[, list(ensembl_id,kegg_paths_name)]
   data_sankey_ensemble <- merge(data_sub,data_sub2_ensemble,by.x = "Gene", by.y = "ensembl_id")
   data_sankey <- rbind(data_sankey_ensemble,data_sankey_refseq)
-  
   links <- data.frame(
     source = c(data_sankey[, var_name], data_sankey[, Gene_symbol]),
     target = c(data_sankey[, Gene_symbol], data_sankey[, kegg_paths_name]),
     value = c(rep(3, length(data_sankey[, var_name])), rep(1, length(data_sankey[, Gene_symbol])))
   )
-  
   links <- unique(links)
-  
-  # Výpočet počtu odchozích spojení pro každý zdroj (source)
   outgoing_counts <- group_by(links, source)
   outgoing_counts <- summarise(outgoing_counts, value = n(), .groups = "drop")
-  
-  # Sloučení počtu odchozích spojení s původními daty
   links <- left_join(links, outgoing_counts, by = c("target" = "source"))
-  
-  # Úprava hodnoty na základě přítomnosti NAs
   links$value <- ifelse(is.na(links$value.y), links$value.x, links$value.y)
-  
-  # Výběr relevantních sloupců
   links <- select(links, source, target, value)
-  
-  # Přejmenování pro přehlednost
   colnames(links)[colnames(links) == "value.x"] <- "value"
-  
-  # Vytvoření seznamu uzlů
   nodes <- data.frame(
     name = unique(c(as.character(links$source), as.character(links$target)))
   )
-  
   links$IDsource <- match(links$source, nodes$name) - 1
   links$IDtarget <- match(links$target, nodes$name) - 1
-  
   plot_height <- nrow(nodes) * 15
-  
   return(list(links = links, nodes = nodes, plot_height = plot_height))
 }

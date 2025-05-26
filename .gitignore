@@ -22,7 +22,6 @@
 
 # renv and input data directories
 renv/
-input_files/
 report_results/
 
 Caddyfile

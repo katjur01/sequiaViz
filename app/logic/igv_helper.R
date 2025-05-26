@@ -28,48 +28,37 @@ build_igv_tracks <- function(samples) {
 #' @export
 start_static_server <- function(dir) {
   port <- getOption("igv.port")
-  
-  # if (!requireNamespace("processx", quietly = TRUE)) {
-  #   stop("Balíček 'processx' není nainstalovaný. Nainstaluj ho přes install.packages('processx').")
-  # }
-  
   # Zjisti, jestli port už něco používá
-  #server_check <- system(paste0("lsof -ti tcp:", port), intern = TRUE)
+  server_check <- system(paste0("lsof -ti tcp:", port), intern = TRUE)
   
-  # # Pokud ano – zabij starý proces
-  # if (length(server_check) > 0) {
-  #   message("⚠️ Port ", port, " je obsazený. Ukončuji předchozí proces...")
-  #   for (pid in server_check) {
-  #     system(paste("kill -9", pid))
-  #   }
-  #   Sys.sleep(1)
-  # }
-  
-  # Spusť server
+  # Pokud ano – zabij starý proces
+  if (length(server_check) > 0) {
+    message("⚠️ Port ", port, " je obsazený. Ukončuji předchozí proces...")
+    for (pid in server_check) {
+      system(paste("kill -9", pid))
+    }
+    Sys.sleep(1)
+  }
   assign("cors_server", process$new(
     "npx",
     c("http-server", dir, "-p", as.character(port), "--cors", "--no-cache"),
     stdout = NULL, stderr = NULL,
     supervise = TRUE
   ), envir = .GlobalEnv)
-  
-  #Sys.sleep(1)
-  message("✅ IGV statický server běží na http://127.0.0.1:", port)
+  message("Static server running on http://127.0.0.1:", port)
 }
 
 #' @export
 stop_static_server <- function() {
   if (exists("cors_server", envir = .GlobalEnv, inherits = FALSE)) {
     proc <- get("cors_server", envir = .GlobalEnv)
-    
     if (!is.null(proc) && inherits(proc, "process") && proc$is_alive()) {
       proc$kill()
-      message("🛑 IGV statický server byl ukončen.")
+      message("Static server stoped")
     }
-    
     rm("cors_server", envir = .GlobalEnv)
   } else {
-    message("ℹ️ Žádný IGV statický server neběží (proměnná neexistuje).")
+    message("No static server running")
   }
 }
 
