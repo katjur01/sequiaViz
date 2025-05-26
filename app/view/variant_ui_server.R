@@ -31,7 +31,8 @@ box::use(
 #' @export
 ui <- function(id) {
   ns <- NS(id)
-  file_paths <- list.files("/home/annamo/sequiaViz/input_files/tsv_formated",full.names = TRUE)
+  tsv_path <- paste0(getwd(),"/input_files/tsv")
+  file_paths <- list.files(tsv_path,full.names = TRUE)
   patient_names <- substr(basename(file_paths), 1, 6)
   tagList(tags$head(
     tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"),
@@ -227,10 +228,12 @@ server <- function(id, parent_session = NULL, shared_data) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     # nacteni a priprava dat ___________________________________________________
-    file_paths <- list.files("/home/annamo/sequiaViz/input_files/tsv_formated", full.names = TRUE)
+    tsv_path <- paste0(getwd(),"/input_files/tsv")
+    file_paths <- list.files(tsv_path, full.names = TRUE)
     patient_names <- substr(basename(file_paths),1,6)
-    data_list <- load_and_prepare("/home/annamo/sequiaViz/input_files/tsv_formated")
-
+    data_list <- load_and_prepare(tsv_path)
+    all_columns <- unique(unlist(lapply(data_list, colnames)))
+    
     observeEvent(input$go2igv_button, {
       selected_empty <- is.null(shared_data$selected_variants) || (is.data.frame(shared_data$selected_variants) && nrow(shared_data$selected_variants) == 0)
       bam_empty <- is.null(shared_data$bam_files) || length(shared_data$bam_files) == 0
@@ -283,8 +286,8 @@ server <- function(id, parent_session = NULL, shared_data) {
     observe({
       updatePrettyCheckboxGroup(
         inputId = "colFilter_checkBox",
-        choiceNames = map_column_names(colnames(data_list[[1]])),
-        choiceValues = colnames(data_list[[1]]),
+        choiceNames = map_column_names(all_columns),
+        choiceValues = all_columns,
         selected = c(
           "var_name", "library", "Gene_symbol", "HGVSp", "HGVSc",
           "tumor_variant_freq", "tumor_depth", "gnomAD_NFE","snpDB","COSMIC","HGMD", "clinvar_sig",
@@ -296,7 +299,7 @@ server <- function(id, parent_session = NULL, shared_data) {
     observeEvent(input$show_all,{
       updatePrettyCheckboxGroup(
         inputId = "colFilter_checkBox",
-        selected = colnames(data_list[[1]])
+        selected = all_columns
       )
     })
     observeEvent(input$show_default,{
@@ -315,6 +318,10 @@ server <- function(id, parent_session = NULL, shared_data) {
       req(input$colFilter_checkBox)
       selected_columns <- input$colFilter_checkBox
       updated_columns <- default_col()
+      missing_columns <- setdiff(all_columns, names(updated_columns))
+      for (col_name in missing_columns) {
+        updated_columns[[col_name]] <- colDef(show=FALSE)
+      }
       for (col_name in names(updated_columns)) {
         updated_columns[[col_name]]$show <- col_name %in% selected_columns
       }
@@ -344,7 +351,7 @@ server <- function(id, parent_session = NULL, shared_data) {
           defaultPageSize = 10,
           showPageSizeOptions = TRUE,
           pageSizeOptions = c(5,10, 20, 30, 50),
-          defaultColDef = colDef(resizable = TRUE, show = TRUE, align = "center"),
+          defaultColDef = colDef(resizable = TRUE, align = "center"),
           striped = TRUE,
           defaultSorted = list("fOne" = "desc", "CGC_Somatic" = "desc"),
           columns = reactive_columns()
