@@ -4,13 +4,13 @@ box::use(
   data.table[fread,setcolorder],
      reactable[colDef],
      networkD3[sankeyNetwork],
-     dplyr[count,group_by,summarise,n,left_join,select],
-     circlize
+     dplyr[count,group_by,summarise,n,left_join,select]
 )
 
 #' @export
 sankey_plot <- function(data){
-  df <- fread("/home/annamo/sequiaViz/input_files/kegg_tab.tsv")
+  kegg_path <- paste0(getwd(),"/input_files/kegg_tab.tsv")
+  df <- fread(kegg_path)
   data_sub <- data[,list(var_name,Gene_symbol,`Annotation source`,Gene)]
   data_sub2_refseq <- df[, list(refseq_id,kegg_paths_name)]
   data_sub2_refseq[,refseq_id := as.character(refseq_id)]
