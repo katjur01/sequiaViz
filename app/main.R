@@ -71,7 +71,6 @@ server <- function(id) {
     ns <- session$ns
     shared_data <- reactiveValues()
     variant_ui_server$server("somatic_var_call_tab", parent_session = session, shared_data = shared_data)
-    
     bam_path <- paste0(getwd(),"/input_files/bam")
     start_static_server(dir = bam_path)
     IGV$igv_server("igv", shared_data = shared_data)

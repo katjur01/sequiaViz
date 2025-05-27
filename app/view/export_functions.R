@@ -6,7 +6,7 @@ box::use(
   utils[write.csv, write.table],
   billboarder[bb_export, billboarderProxy],
   networkD3[saveNetwork],
-  webshot[webshot],
+  webshot2[webshot],
   ggplot2[ggsave]
 )
 
@@ -15,10 +15,13 @@ box::use(
 get_table_download_handler <- function(input, patient_names, filtered_data, data_list) {
   downloadHandler(
     filename = function() {
+      file_name <- switch(input$export_data_table,
+          "filtered" = paste0(input$tabset,"_filtered_data"),
+          "all" = paste0(input$tabset,"_all_data"))
       switch(input$export_format_table,
-             "csv" = "table_export.csv",
-             "tsv" = "table_export.tsv",
-             "xlsx" = "table_export.xlsx")
+             "csv" = paste0(file_name,".csv"),
+             "tsv" = paste0(file_name,".tsv"),
+             "xlsx" = paste0(file_name,".xlsx"))
     },
     content = function(file) {
       index <- which(patient_names == input$tabset)
@@ -45,7 +48,11 @@ handle_pie_download <- function(input) {
                        "SIFT" = "pie2",
                        "PolyPhen" = "pie3")
     proxy <- billboarderProxy(shinyId = shiny_id)
-    bb_export(proxy, filename = "pie-chart")
+    file_name <- switch(input$export_chart_pie,
+                        "Consequence" = paste0(input$tabset,"_consequence_pie_chart"),
+                        "SIFT" = paste0(input$tabset,"_SIFT_pie_chart"),
+                        "PolyPhen" = paste0(input$tabset,"_PolyPhen_pie_chart"))
+    bb_export(proxy, filename = file_name)
   })
 }
 
@@ -55,17 +62,17 @@ get_sankey_download_handler <- function(input, p) {
   downloadHandler(
     filename = function() {
       if (input$export_format == "html") {
-        "sankey.html"
+        paste0(input$tabset,"_sankey.html")
       } else {
-        "sankey.png"
+        paste0(input$tabset,"_sankey.png")
       }
     },
     content = function(file) {
       if (input$export_format == "html") {
-        saveNetwork(p(), file, selfcontained = TRUE)
+        saveNetwork(p, file, selfcontained = TRUE)
       } else {
         temp_html <- tempfile(fileext = ".html")
-        saveNetwork(p(), temp_html, selfcontained = TRUE)
+        saveNetwork(p, temp_html, selfcontained = TRUE)
         webshot(temp_html, file, vwidth = 733, vheight = 317)
         unlink(temp_html)
       }
@@ -75,11 +82,11 @@ get_sankey_download_handler <- function(input, p) {
 
 # Export histogramu TVF
 #' @export
-get_hist_download_handler <- function(h) {
+get_hist_download_handler <- function(patient,h) {
   downloadHandler(
-    filename = "TVF_histogram.png",
+    filename = paste0(patient,"_TVF_histogram.png"),
     content = function(file) {
-      ggsave(file, h(), width = 12, height = 4)
+      ggsave(file, h, width = 12, height = 4)
     }
   )
 }

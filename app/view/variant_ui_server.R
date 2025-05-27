@@ -10,7 +10,8 @@ box::use(
   shinyWidgets[pickerInput, dropdownButton,prettyCheckboxGroup,updatePrettyCheckboxGroup,actionBttn,pickerOptions,dropdown],
   networkD3[sankeyNetwork,renderSankeyNetwork,sankeyNetworkOutput],
   data.table[fread],
-  billboarder[billboarderOutput]
+  billboarder[billboarderOutput],
+  ggplot2[ggsave]
 )
 
 box::use(
@@ -61,7 +62,7 @@ ui <- function(id) {
            closable = FALSE,
            collapsible = FALSE,
            tagList(
-             sliderInput(ns("coverage"), tags$strong("Minimal coverage"), min = 0, max = 1000, value = 10),
+             sliderInput(ns("coverage"), tags$strong("Minimal tumor coverage depth"), min = 0, max = 1000, value = 10),
              sliderInput(ns("gnomad_slider"), tags$strong("GnomAD NFE range"), min = 0, max = 1, value = c(0, 0.999), step = 0.00001),
              fluidRow(
                column(6, numericInput(ns("gnom_od"), label = NULL, value = 0, min = 0, max = 1, step = 0.00001)),
@@ -359,20 +360,6 @@ server <- function(id, parent_session = NULL, shared_data) {
       })
     })
     
-    #export dat ________________________________________________________________
-    output$Table_download <- get_table_download_handler(
-      input = input,
-      patient_names = patient_names,
-      filtered_data = filtered_data,
-      data_list = data_list
-    )
-    handle_pie_download(input)
-    output$Sankey_download <- get_sankey_download_handler(
-      input = input,
-      p = p  # p = reaktivní funkce vracející sankey objekt
-    )
-    output$Hist_download <- get_hist_download_handler(h = h)
-    
     # prace s vybranymi variantami, nacteni pomocne tabulky ____________________
     selected_data <- reactiveVal()
     selected_data_actual_patient <- reactiveVal()
@@ -408,10 +395,13 @@ server <- function(id, parent_session = NULL, shared_data) {
     
     
     # vykresleni VAF diagramu __________________________________________________
-    output$Histogram <- renderPlot({
+    h <- reactive({
       req(input$tabset)
       generate_vaf(data_list[[which(patient_names == input$tabset)]],selected_data=selected_data_actual_patient(),input$tabset)
-    }, height = 480)
+    })
+    output$Histogram <- renderPlot({
+      h()
+    },height = 480)
     
     # vykresleni kolacovych diagramu ___________________________________________
     pie_plot_data <- reactive({
@@ -431,6 +421,7 @@ server <- function(id, parent_session = NULL, shared_data) {
     })
     
     # sankey network ___________________________________________________________
+    p <-reactiveVal()
     plot_data <- reactive({
        req(input$tabset)
        selected_tab_id <- which(patient_names == input$tabset)
@@ -438,18 +429,33 @@ server <- function(id, parent_session = NULL, shared_data) {
      })
     output$sankey_plot <- renderSankeyNetwork({
       data <- plot_data()
-      sankeyNetwork(
+      p(sankeyNetwork(
         Links = data$links, Nodes = data$nodes,
         Source = "IDsource", Target = "IDtarget",
         Value = "value", NodeID = "name",
         sinksRight = FALSE, fontSize = 15,
         height = data$plot_height, width = "100%"
-      )
+      ))
+      p()
     })
     output$diagram <- renderUI({
       data <- plot_data()
       sankeyNetworkOutput(ns("sankey_plot"), height = data$plot_height)
     })
+    
+    #export dat ________________________________________________________________
+    output$Table_download <- get_table_download_handler(
+      input = input,
+      patient_names = patient_names,
+      filtered_data = filtered_data,
+      data_list = data_list
+    )
+    handle_pie_download(input)
+    output$Sankey_download <- get_sankey_download_handler(
+      input = input,
+      p = p()
+    )
+    output$Hist_download <- get_hist_download_handler(input$tabset,h=h())
   })
 }
 

@@ -29,16 +29,16 @@ build_igv_tracks <- function(samples) {
 start_static_server <- function(dir) {
   port <- getOption("igv.port")
   # Zjisti, jestli port už něco používá
-  server_check <- system(paste0("lsof -ti tcp:", port), intern = TRUE)
-  
-  # Pokud ano – zabij starý proces
-  if (length(server_check) > 0) {
-    message("⚠️ Port ", port, " je obsazený. Ukončuji předchozí proces...")
-    for (pid in server_check) {
-      system(paste("kill -9", pid))
-    }
-    Sys.sleep(1)
-  }
+  # server_check <- system(paste0("lsof -ti tcp:", port), intern = TRUE)
+  # 
+  # # Pokud ano – zabij starý proces
+  # if (length(server_check) > 0) {
+  #   message("⚠️ Port ", port, " je obsazený. Ukončuji předchozí proces...")
+  #   for (pid in server_check) {
+  #     system(paste("kill -9", pid))
+  #   }
+  #   Sys.sleep(1)
+  # }
   assign("cors_server", process$new(
     "npx",
     c("http-server", dir, "-p", as.character(port), "--cors", "--no-cache"),

@@ -1,7 +1,7 @@
 # app/pie_plots.R
 
 box::use(
-  billboarder[billboarderOutput,renderBillboarder,billboarder,bb_piechart,bb_title,bb_pie,bb_export,billboarderProxy,bb_colors_manual])
+  billboarder[billboarderOutput,renderBillboarder,billboarder,bb_piechart,bb_tooltip,bb_title,bb_pie,bb_export,billboarderProxy,bb_colors_manual])
 
 #' @export
 prepare_pie_chart <- function(column,pie_plot_data){
@@ -19,6 +19,11 @@ make_pie_chart <- function(type,pie_plot_data){
     b <-bb_colors_manual(b,"Set2")
     b <- bb_pie(b,label = list(
       format = htmlwidgets::JS("function(value, ratio, id) { return Math.round(ratio * 100) + '%'; }")
+    ))
+    b <- bb_tooltip(b,format = list(
+      value = htmlwidgets::JS("function(value, ratio, id, index) {
+        return value;
+      }")
     ))
     b <- bb_title(b,text = type)
     b
