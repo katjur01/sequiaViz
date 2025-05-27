@@ -6,7 +6,7 @@ box::use(
 
 options(igv.port = 8080)
 
-# Vygeneruje track objekty pro JavaScript
+# Generate track objects for JavaScript
 #' @export
 build_igv_tracks <- function(samples) {
   port <- getOption("igv.port")
@@ -22,9 +22,7 @@ build_igv_tracks <- function(samples) {
 }
 
 
-# Spouští CORS-kompatibilní server pomocí npx http-server přes processx
-## !! nakonci cesty NESMÍ být lomítko !!
-## !! cesta musí být úplná !!
+# Starts CORS compatible server using npx http-server through processx
 #' @export
 start_static_server <- function(dir) {
   port <- getOption("igv.port")
@@ -48,6 +46,7 @@ start_static_server <- function(dir) {
   message("Static server running on http://127.0.0.1:", port)
 }
 
+# Stops static server
 #' @export
 stop_static_server <- function() {
   if (exists("cors_server", envir = .GlobalEnv, inherits = FALSE)) {

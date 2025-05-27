@@ -1,4 +1,4 @@
-# app/sankey_plot.R
+# app/logic/sankey_plot.R
 
 box::use(
   data.table[fread,setcolorder],
@@ -7,6 +7,7 @@ box::use(
      dplyr[count,group_by,summarise,n,left_join,select]
 )
 
+# Create Sankey plot
 #' @export
 sankey_plot <- function(data){
   kegg_path <- paste0(getwd(),"/input_files/kegg_tab.tsv")

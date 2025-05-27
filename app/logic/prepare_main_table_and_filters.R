@@ -1,12 +1,11 @@
-# app/prepare_main_table_and_filters.R
+# app/logic/prepare_main_table_and_filters.R
 
-# nacteni knihoven
 box::use(data.table[fread,setcolorder],
          reactable[colDef],
          dplyr[count,group_by,summarise,n,left_join,select]
          )
 
-# funkce prida ke zpracovavanym datum sloupce in library
+# Add library column
 #' @export
 add_library_column <- function(data_list) {
   all_values <- unique(unlist(lapply(data_list, function(data) data$Gene_symbol)))
@@ -20,7 +19,7 @@ add_library_column <- function(data_list) {
   return(data_list_with_library)
 }
 
-# funkce nacte a pripravi zobrazovana data
+# Load and prepare patient data
 #' @export
 load_and_prepare <- function(directory){
   tsv_files <- list.files(directory, pattern = "\\.tsv$", full.names = TRUE)
@@ -39,7 +38,7 @@ load_and_prepare <- function(directory){
   return(data_list_l)
 }
 
-# funkce pri automatickem nacteni moznych sloupcu prepisuje nazvy predem ocekavanych na vhodnejsi podobu
+# During automatic loading of possible columns override the names of expected columns with more appropriate versions
 #' @export
 map_column_names <- function(column_names) {
   name_mapping <- list(
@@ -93,7 +92,7 @@ map_column_names <- function(column_names) {
   }))
 }
 
-# funkce pri automatickem nacteni moznych oblastni genu prepisuje nazvy predem ocekavanych na vhodnejsi podobu
+# During automatic loading of possible gene regions override the names of expected columns with more appropriate versions
 #' @export
 map_gene_region_names <- function(gene_region_names){
   gene_region_mapping <- list(
@@ -117,7 +116,7 @@ map_gene_region_names <- function(gene_region_names){
   }))
 } 
 
-# funkce pri automatickem nacteni moznych clinvar_sig prepisuje nazvy predem ocekavanych na vhodnejsi podobu
+# During automatic loading of possible clinvar_sig override the names of expected columns with more appropriate versions
 #' @export
 map_clin_sig_names <- function(clin_sig_names){
   clin_sig_mapping <- list(

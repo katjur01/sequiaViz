@@ -1,4 +1,4 @@
-# app/selected_variants.R
+# app/view/selected_variants.R
 
 box::use(
   shiny[req, tagList, fluidRow, column, br, actionButton],
@@ -6,7 +6,7 @@ box::use(
   dplyr[anti_join]
 )
 
-# UI komponenta: tabulka a tlačítko
+# UI component: button and table
 #' @export
 render_selected_variants_ui <- function(ns, selected_data_actual_patient) {
   df <- selected_data_actual_patient()
@@ -22,7 +22,7 @@ render_selected_variants_ui <- function(ns, selected_data_actual_patient) {
   )
 }
 
-# Tabulka vybraných variant
+# Table of selected variants
 #' @export
 render_selected_variants_table <- function(df) {
   reactable(df,
@@ -44,7 +44,7 @@ render_selected_variants_table <- function(df) {
   )
 }
 
-# Odstranění variant
+# Delete selected variants
 #' @export
 handle_delete_variant <- function(selected_data, selected_data_actual_patient, shared_data) {
   selected_idx <- getReactableState("selected_variants_table", "selected")
@@ -59,7 +59,7 @@ handle_delete_variant <- function(selected_data, selected_data_actual_patient, s
   shared_data$selected_variants <- df_all_new
 }
 
-# Přidání vybraných variant
+# Add selected variants
 #' @export
 handle_confirm_selected <- function(tabset_id, patients, filtered_data, selected_data, selected_data_actual_patient, shared_data) {
   selected_tab_id <- which(patients == tabset_id)

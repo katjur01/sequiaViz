@@ -1,4 +1,4 @@
-#app/variant_ui_server.R
+#app/view/variant_ui_server.R
 
 box::use(
   shiny[NS, sliderInput, fluidRow, column, tagList, br, uiOutput, plotOutput, downloadButton, actionButton, numericInput, renderPlot, checkboxGroupInput, fluidPage, selectInput,
@@ -10,8 +10,7 @@ box::use(
   shinyWidgets[pickerInput, dropdownButton,prettyCheckboxGroup,updatePrettyCheckboxGroup,actionBttn,pickerOptions,dropdown],
   networkD3[sankeyNetwork,renderSankeyNetwork,sankeyNetworkOutput],
   data.table[fread],
-  billboarder[billboarderOutput],
-  ggplot2[ggsave]
+  billboarder[billboarderOutput]
 )
 
 box::use(
@@ -27,7 +26,7 @@ box::use(
   app/view/export_functions[get_table_download_handler,handle_pie_download,get_sankey_download_handler,get_hist_download_handler]
 )
 
-# UI funkce pro modul nastavujici vzhled veskerych grafickych prvku v zalozce somatic variants
+# UI function setting the appearance for all graphical elements for Somatic Variants tab
 
 #' @export
 ui <- function(id) {
@@ -197,7 +196,9 @@ ui <- function(id) {
       ),
      box(
        width = 12,
-       title = tags$div(style = "padding-top: 8px;","Sankey diagram"),
+       title = tags$div(style = "padding-top: 8px;",
+                        title = "Only the variants documented in KEGG database are used for Sankey plot.",
+                        "Sankey diagram"),
        closable = FALSE,
        collapsible = TRUE,
        dropdownButton(
@@ -223,12 +224,12 @@ ui <- function(id) {
   )
 }
 
-# Serverova funkce pro modul definující funkce veskerych prvku v zalozce somatic variants
+# Server function setting the function of all elements for Somatic variants tab
 #' @export
 server <- function(id, parent_session = NULL, shared_data) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    # nacteni a priprava dat ___________________________________________________
+    # Loading and preparation of data __________________________________________
     tsv_path <- paste0(getwd(),"/input_files/tsv")
     file_paths <- list.files(tsv_path, full.names = TRUE)
     patient_names <- substr(basename(file_paths),1,6)
@@ -252,7 +253,7 @@ server <- function(id, parent_session = NULL, shared_data) {
     })
     
     
-    # automaticka priprava zvolenych filteru ___________________________________
+    # Automatic preparation of filters _________________________________________
     observe({
     updateCheckboxGroupInput(
       inputId = "gene_regions",
@@ -270,7 +271,7 @@ server <- function(id, parent_session = NULL, shared_data) {
       )
     })
 
-    #uprava filtru GnomAD NFE
+    # Adjustment of the GnomAD NFE filter
     observeEvent(input$gnomad_slider, {
       updateNumericInput(session, "gnom_od", value = input$gnomad_slider[1])
       updateNumericInput(session, "gnom_do", value = input$gnomad_slider[2])
@@ -282,7 +283,7 @@ server <- function(id, parent_session = NULL, shared_data) {
       updateSliderInput(session, "gnomad_slider", value = c(input$gnom_od, input$gnom_do))
     })
     
-    # zakladni nastaveni zobrazovanych sloupcu a jejich aktualizace ____________
+    # Default configuration of displayed columns and their update ______________
     default_columns <- default_col()
     observe({
       updatePrettyCheckboxGroup(
@@ -314,7 +315,7 @@ server <- function(id, parent_session = NULL, shared_data) {
       )
     })
     
-    # aktualizace zobrazovanych sloupcu na zaklade zvolenych ___________________
+    # Update of visible columns according to user selection ____________________
     reactive_columns <- reactive({
       req(input$colFilter_checkBox)
       selected_columns <- input$colFilter_checkBox
@@ -329,7 +330,7 @@ server <- function(id, parent_session = NULL, shared_data) {
       return(updated_columns)
     })
     
-    # filtrace zobrazenych dat _________________________________________________
+    # Filtering of displayed data ______________________________________________
     filtered_data <- lapply(1:length(data_list), function(i) {
       reactive({
         df <- data_list[[i]]
@@ -338,7 +339,7 @@ server <- function(id, parent_session = NULL, shared_data) {
       })
     })
 
-    # vykresleni dat do tabulky ________________________________________________
+    # Rendering data into a table ______________________________________________
     lapply(1:length(data_list), function(i) {
       output[[paste0("my_table", i)]] <- renderReactable({
         #req(input$tabset == patient_names[i])
@@ -360,7 +361,7 @@ server <- function(id, parent_session = NULL, shared_data) {
       })
     })
     
-    # prace s vybranymi variantami, nacteni pomocne tabulky ____________________
+    # Handling selected variants and loading a helper table ____________________
     selected_data <- reactiveVal()
     selected_data_actual_patient <- reactiveVal()
     output$confirm_button_ui <- renderUI({
@@ -382,7 +383,6 @@ server <- function(id, parent_session = NULL, shared_data) {
       df <- selected_data()
       selected_data_actual_patient(subset(df, patients == input$tabset))
     })
-    
     observe({
       bam_list <- NULL
       if (!is.null(input$idpick) && length(input$idpick) > 0) {
@@ -394,7 +394,7 @@ server <- function(id, parent_session = NULL, shared_data) {
     })
     
     
-    # vykresleni VAF diagramu __________________________________________________
+    # Rendering the VAF diagram ________________________________________________
     h <- reactive({
       req(input$tabset)
       generate_vaf(data_list[[which(patient_names == input$tabset)]],selected_data=selected_data_actual_patient(),input$tabset)
@@ -403,7 +403,7 @@ server <- function(id, parent_session = NULL, shared_data) {
       h()
     },height = 480)
     
-    # vykresleni kolacovych diagramu ___________________________________________
+    # Rendering the pie plots __________________________________________________
     pie_plot_data <- reactive({
       req(input$tabset)
       selected_tab_id <- which(patient_names == input$tabset)
@@ -420,7 +420,7 @@ server <- function(id, parent_session = NULL, shared_data) {
       output$pie3 <- make_pie_chart("PolyPhen",pie_plot_data)
     })
     
-    # sankey network ___________________________________________________________
+    # Rendering the Sankey network _____________________________________________
     p <-reactiveVal()
     plot_data <- reactive({
        req(input$tabset)
@@ -443,7 +443,7 @@ server <- function(id, parent_session = NULL, shared_data) {
       sankeyNetworkOutput(ns("sankey_plot"), height = data$plot_height)
     })
     
-    #export dat ________________________________________________________________
+    # Export of data ___________________________________________________________
     output$Table_download <- get_table_download_handler(
       input = input,
       patient_names = patient_names,
@@ -458,5 +458,3 @@ server <- function(id, parent_session = NULL, shared_data) {
     output$Hist_download <- get_hist_download_handler(input$tabset,h=h())
   })
 }
-
-#runApp('sequiaViz')

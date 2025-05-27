@@ -1,4 +1,4 @@
-# app/export_functions.R
+# app/view/export_functions.R
 
 box::use(
   shiny[downloadHandler, observeEvent, reactive, req],
@@ -10,7 +10,7 @@ box::use(
   ggplot2[ggsave]
 )
 
-# Export tabulky (CSV, TSV, XLSX)
+# Export table (CSV, TSV, XLSX)
 #' @export
 get_table_download_handler <- function(input, patient_names, filtered_data, data_list) {
   downloadHandler(
@@ -39,7 +39,7 @@ get_table_download_handler <- function(input, patient_names, filtered_data, data
   )
 }
 
-# Export koláčového grafu
+# Export pie plots (PNG)
 #' @export
 handle_pie_download <- function(input) {
   observeEvent(input$Pie_download, {
@@ -56,7 +56,7 @@ handle_pie_download <- function(input) {
   })
 }
 
-# Export Sankey grafu (HTML, PNG)
+# Export Sankey plot (HTML, PNG)
 #' @export
 get_sankey_download_handler <- function(input, p) {
   downloadHandler(

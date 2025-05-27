@@ -1,8 +1,9 @@
-# app/pie_plots.R
+# app/logic/pie_plots.R
 
 box::use(
   billboarder[billboarderOutput,renderBillboarder,billboarder,bb_piechart,bb_tooltip,bb_title,bb_pie,bb_export,billboarderProxy,bb_colors_manual])
 
+# Prepares data for pie plots
 #' @export
 prepare_pie_chart <- function(column,pie_plot_data){
   data_clean <- gsub("_", " ", gsub("\\(.*\\)", "", pie_plot_data[[column]]))
@@ -10,6 +11,7 @@ prepare_pie_chart <- function(column,pie_plot_data){
   return(data_pie_prepared)  
 }
 
+# Creates pie plots from input data
 #' @export
 make_pie_chart <- function(type,pie_plot_data){
   renderBillboarder({

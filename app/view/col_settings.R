@@ -4,7 +4,7 @@ box::use(
   reactable[colDef]
 )
 
-# funkce definuje zakladni parametry vsech sloupcu v datech - nazev, viditelnost, moznost filtrace
+# Define default parameters of standard columns
 #' @export
 default_col <- function(){
   default_columns <- list(

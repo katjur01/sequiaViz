@@ -4,6 +4,7 @@ box::use(
   shinycssloaders[withSpinner],
 )
 
+# Makes spinner while rendering UI elements
 #' @export
 use_spinner <- function(ui_element){
   spinner <- withSpinner(ui_element,type=3,color = "#060606",color.background = "#EEEEEE" )

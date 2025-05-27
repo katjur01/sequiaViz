@@ -1,17 +1,19 @@
+# app/view/IGV.R
+
 box::use(
   shiny[br, NS,h3, tagList, div, observe, observeEvent, mainPanel, titlePanel, uiOutput, renderUI, HTML, fluidPage,fluidRow, moduleServer,
         reactiveValues, column,req, isolate,modalDialog,modalButton,showModal],
   htmltools[tags],
   bs4Dash[actionButton,box],
   shinyjs[useShinyjs, runjs],
-  reactable,
   reactable[reactableOutput,renderReactable,reactable,JS,colDef],
-  processx[process,]
+  processx[process]
 )
 box::use(
   app/logic/igv_helper[build_igv_tracks,start_static_server,stop_static_server]
 )
 
+# UI function for IGV tab
 #' @export
 igv_ui <- function(id) {
   ns <- NS(id)
@@ -31,13 +33,12 @@ igv_ui <- function(id) {
     fluidRow(
       column(2, actionButton(ns("loadIGVButton"), "Load IGV Viewer"))
     ),
-    
     br(),
     uiOutput(ns("igvDivOutput"))
-    
   )
 }
 
+# Server function for IGV tab
 #' @export
 igv_server <- function(id,shared_data) {
   moduleServer(id, function(input, output, session) {
