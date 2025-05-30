@@ -61,8 +61,8 @@ igv_server <- function(id) {
     
     # Seznam vzorků
     samples <- list(
-      list(name = "DZ1601", file = "DZ1601FFPE_001.bam"),
-      list(name = "MR1507", file = "MR1507FFPE_001.bam")
+      list(name = "DZ1601", file = "DZ1601fuze.bam"),
+      list(name = "MR1507", file = "MR1507fuze.bam")
     )
     
     values$bookmark_df <- data.frame(
@@ -152,25 +152,25 @@ igv_server <- function(id) {
 }
 
 
-
-ui <- fluidPage(
-  box(id = "igv_page", title = "IGV Viewer", width = 10, collapsible = FALSE,
-      igv_ui("igv")
-  )
-)
-
-server <- function(input, output, session) {
-  
-  # Spustíme statický server při startu celé aplikace
-  start_static_server(dir = "/home/katka/BioRoots/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_tkane/mapped")
-  
-  igv_server("igv")
-  
-  # Ukončení serveru při zavření celé session
-  session$onSessionEnded(function() {
-    stop_static_server()
-  })
-  
-}
-
-shinyApp(ui, server, options = list(launch.browser = TRUE))
+# 
+# ui <- fluidPage(
+#   box(id = "igv_page", title = "IGV Viewer", width = 10, collapsible = FALSE,
+#       igv_ui("igv")
+#   )
+# )
+# 
+# server <- function(input, output, session) {
+#   
+#   # Spustíme statický server při startu celé aplikace
+#   start_static_server(dir = "/Users/katerinajuraskova/Desktop/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze/mapped")
+#   
+#   igv_server("igv")
+#   
+#   # Ukončení serveru při zavření celé session
+#   session$onSessionEnded(function() {
+#     stop_static_server()
+#   })
+#   
+# }
+# 
+# shinyApp(ui, server, options = list(launch.browser = TRUE))

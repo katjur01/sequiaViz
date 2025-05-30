@@ -5,35 +5,66 @@ box::use(
   shiny[h3,tags,icon],
 )
 
+
 #' @export
 patients_list <- function(){
-  patients <- c("DZ1601","LK0302","MR1507","VH0452")
+  patients <- c("FZ0711")
   return(patients)
 }
 
 #' @export
 sample_list_fuze <- function(){
-  patients <- c("DZ1601fuze","LK0302fuze","MR1507fuze","VH0452fuze")
+  patients <- c("FZ0711fuze")
   return(patients)
 }
 
 #' @export
 sample_list_som <- function(){
-  patients <- c("DZ1601","MR1507","VH0452")
+  patients <- c("FZ0711")
   return(patients)
 }
 
 #' @export
 sample_list_germ <- function(){
-  patients <- c("DZ1601krev","MR1507krev","VH0452krev")
+  patients <- c("FZ0711krev")
   return(patients)
 }
 
 #' @export
 sample_list_expr <- function(){
-  patients <- c("DZ1601","MR1507")
+  patients <- c("FZ0711")
   return(patients)
 }
+#' 
+#' #' @export
+#' patients_list <- function(){
+#'   patients <- c("DZ1601","LK0302","MR1507","VH0452")
+#'   return(patients)
+#' }
+#' 
+#' #' @export
+#' sample_list_fuze <- function(){
+#'   patients <- c("DZ1601fuze","LK0302fuze","MR1507fuze","VH0452fuze")
+#'   return(patients)
+#' }
+#' 
+#' #' @export
+#' sample_list_som <- function(){
+#'   patients <- c("DZ1601","MR1507","VH0452")
+#'   return(patients)
+#' }
+#' 
+#' #' @export
+#' sample_list_germ <- function(){
+#'   patients <- c("DZ1601krev","MR1507krev","VH0452krev")
+#'   return(patients)
+#' }
+#' 
+#' #' @export
+#' sample_list_expr <- function(){
+#'   patients <- c("DZ1601","MR1507")
+#'   return(patients)
+#' }
 
 #' @export
 set_patient_to_sample <- function(tag){

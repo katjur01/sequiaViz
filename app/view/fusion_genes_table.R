@@ -51,9 +51,7 @@ ui <- function(id) {
     ),
     tags$br(),
     fluidRow(
-      column(1,actionButton(ns("delete_button"), "Delete fusion", status = "danger")),
-      column(1,),
-      column(1,actionButton(ns("confirm_btn"), "Confirm fusion", status = "success"))
+      column(1,actionButton(ns("delete_button"), "Delete fusion", status = "danger"))
     )
 
     # actionButton(ns("delete_button"), "Delete fusion", status = "danger"),

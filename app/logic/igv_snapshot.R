@@ -1,65 +1,78 @@
 ## run in conda enviromant: /mnt/ssd/ssd_1/conda_envs/igv_test
+## in enviroment: igv, xvfb
+
 # app/logic/igv_snapshot.R
 
-box::use(
-  data.table,
-  openxlsx[read.xlsx],
-  stringr[str_replace_all]
-)
-
-x <- 1
-header_list <- lapply(1:length(fusions_tab$chrom_break_pos), function(x){
-  paste(
-    paste0("goto ",fusions_tab$chrom_break_pos[x])
-    ,"viewaspairs"
-    ,"maxPanelHeight 10000"
-    ,"preference SAM.SHOW_SOFT_CLIPPED true"
-    ,"preference IGV.Bounds 94,0,1280,1024"
-    ,"preference SAM.SHOW_JUNCTION_TRACK true"
-    ,"preference SAM.COLOR_BY NONE"
-    ,paste0("snapshot DZ1601fuze_%03d.svg")
-  )
-})
-head_l <- rbind(header_list)
-header <- paste("new"
-                ,"genome hg38"
-                ,"load /mnt/share/share/710000-CEITEC/713000-cmm/713009-slaby/base/sequencing_results/primary_data/230426_MOII_e117_fuze/mapped/DZ1601fuze.bam"
-                ,"load /mnt/share/share/710000-CEITEC/713000-cmm/713009-slaby/base/sequencing_results/primary_data/230426_MOII_e117_fuze/mapped/DZ1601fuze/DZ1601fuzeChimeric.out.bam"
-                ,"snapshotDirectory /mnt/share/share/710000-CEITEC/713000-cmm/713016-bioit/base/workspace/katka/scripts/DZ1601fuze"
-
-                ,"exit"
-                ,sep = "\n")
-
-cat(header,file = "batch_file_2.txt")
-return(batch_file_name)
-}
-                                 chrom_break_pos = fusions_tab$chrom_break_pos[x],
-                                 # snapshot_name = paste(fusions_tab$id[x],fusions_tab$fusion_genes[x],sep="_"),
-                                 snapshot_name = paste(sample_name,"_%03d.svg"),
-                                 output_dir = output_dir,
-                                 batch_file_name = paste(fusions_tab$fusion_genes[x],"temp_batch.txt",sep="_"))
-
-# createIGVBatchFile <- function(bam_file,chimeric_file,chrom_break_pos,snapshot_name,batch_file_name,output_dir,genome_build = "hg38"){
-#   
-#   header <- paste("new"
-#                   ,paste0("genome ",genome_build)
-#                   ,paste0("load ",bam_file)
-#                   ,paste0("load ",chimeric_file)
-#                   ,paste0("snapshotDirectory ",output_dir)
-#                   ,paste0("goto ",chrom_break_pos)
-#                   ,"viewaspairs"
-#                   ,"maxPanelHeight 10000"
-#                   ,"preference SAM.SHOW_SOFT_CLIPPED true"
-#                   ,"preference IGV.Bounds 94,0,1280,1024"
-#                   ,"preference SAM.SHOW_JUNCTION_TRACK true"
-#                   ,"preference SAM.COLOR_BY NONE"
-#                   ,paste0("snapshot ",snapshot_name,".png")
-#                   ,"exit"
-#                   ,sep = "\n")
-#   
-#   cat(header,file = batch_file_name)
-#   return(batch_file_name)
+# box::use(
+#   data.table[as.data.table],
+#   openxlsx[read.xlsx],
+#   stringr[str_replace_all]
+# )
+library(data.table)
+library(openxlsx)
+library(stringr)
+# 
+# x <- 1
+# header_list <- lapply(1:length(fusions_tab$chrom_break_pos), function(x){
+#   paste(
+#     paste0("goto ",fusions_tab$chrom_break_pos[x])
+#     ,"viewaspairs"
+#     ,"maxPanelHeight 10000"
+#     ,"preference SAM.SHOW_SOFT_CLIPPED true"
+#     ,"preference IGV.Bounds 94,0,1280,1024"
+#     ,"preference SAM.SHOW_JUNCTION_TRACK true"
+#     ,"preference SAM.COLOR_BY NONE"
+#     ,paste0("snapshot ",sample_name,"_%03d.svg")
+#   )
+# })
+# head_l <- rbind(header_list)
+# # header <- paste("new"
+# #                 ,"genome hg38"
+# #                 ,"load /mnt/share/share/710000-CEITEC/713000-cmm/713009-slaby/base/sequencing_results/primary_data/230426_MOII_e117_fuze/mapped/DZ1601fuze.bam"
+# #                 ,"load /mnt/share/share/710000-CEITEC/713000-cmm/713009-slaby/base/sequencing_results/primary_data/230426_MOII_e117_fuze/mapped/DZ1601fuze/DZ1601fuzeChimeric.out.bam"
+# #                 ,"snapshotDirectory /mnt/share/share/710000-CEITEC/713000-cmm/713016-bioit/base/workspace/katka/scripts/DZ1601fuze"
+# # 
+# #                 ,"exit"
+# #                 ,sep = "\n")
+# header <- paste("new"
+#                 ,"genome hg38"
+#                 ,"load /input_files/reanalysed_data/primary_analysis/fuze/mapped/FZ0711fuze.bam"
+#                 ,"load /input_files/reanalysed_data/primary_analysis/fuze/mapped/FZ0711fuze/FZ0711fuzeChimeric.out.bam"
+#                 ,"snapshotDirectory /mnt/share/share/710000-CEITEC/713000-cmm/713016-bioit/base/workspace/katka/scripts/DZ1601fuze"
+#                 
+#                 ,"exit"
+#                 ,sep = "\n")
+# 
+# cat(header,file = "batch_file_2.txt")
+# return(batch_file_name)
 # }
+                                 # chrom_break_pos = fusions_tab$chrom_break_pos[x],
+                                 # # snapshot_name = paste(fusions_tab$id[x],fusions_tab$fusion_genes[x],sep="_"),
+                                 # snapshot_name = paste(sample_name,"_%03d.svg"),
+                                 # output_dir = output_dir,
+                                 # batch_file_name = paste(fusions_tab$fusion_genes[x],"temp_batch.txt",sep="_"))
+
+createIGVBatchFile <- function(bam_file,chimeric_file,chrom_break_pos,snapshot_name,batch_file_name,output_dir,genome_build = "hg38"){
+
+  header <- paste("new"
+                  ,paste0("genome ",genome_build)
+                  ,paste0("load ",bam_file)
+                  ,paste0("load ",chimeric_file)
+                  ,paste0("snapshotDirectory ",output_dir)
+                  ,paste0("goto ",chrom_break_pos)
+                  ,"viewaspairs"
+                  ,"maxPanelHeight 10000"
+                  ,"preference SAM.SHOW_SOFT_CLIPPED true"
+                  ,"preference IGV.Bounds 94,0,1280,1024"
+                  ,"preference SAM.SHOW_JUNCTION_TRACK true"
+                  ,"preference SAM.COLOR_BY NONE"
+                  ,paste0("snapshot ",snapshot_name,".png")
+                  ,"exit"
+                  ,sep = "\n")
+
+  cat(header,file = batch_file_name)
+  return(batch_file_name)
+}
 
 
 createIGVBatchFileFromXlsx <- function(xlsx_file,sample_name,zoom = 251){
@@ -93,7 +106,7 @@ createIGVBatchFileFromXlsx <- function(xlsx_file,sample_name,zoom = 251){
   fusions_tab$fusion_genes <- str_replace_all(fusions_tab$fusion_genes,"[.,()-]","_")
   fusions_tab <- unique(fusions_tab)
   
-  fusions_tab[, svg_path := sprintf(paste0("./app/www/igv_snapshot/",sample_name,"/",sample_name,"_%03d.svg"), .I)]
+  fusions_tab[, svg_path := sprintf(paste0("./www/igv_snapshot/",sample_name,"/",sample_name,"_%03d.svg"), .I)]
   
   setorder(fusions_tab,gene1)
   
@@ -113,8 +126,8 @@ runIGVSnapshot <- function(IGV_batch_file){
 
 run_all <- function(args){
   
-  if (!dir.exists("./app/www/igv_snapshot")) {
-    dir.create("./app/www/igv_snapshot") # Pokud složka neexistuje, vytvoř ji
+  if (!dir.exists("./www/igv_snapshot")) {
+    dir.create("./www/igv_snapshot") # Pokud složka neexistuje, vytvoř ji
   }
   
   ## to test
@@ -126,7 +139,9 @@ run_all <- function(args){
   # bam_file <- "./input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze/mapped/DZ1601fuze.bam"
   # chimeric_file <-  "./input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze/mapped/DZ1601fuze/DZ1601fuzeChimeric.out.bam"
 
-  a <- "./input_files/MOII_e117/117_fusions/results/DZ1601fuze_fusions.xlsx"
+
+  # a <- "./input_files/reanalysed_data/fusions/results/FZ0711fuze_fusions.xlsx"
+  # a <- "./input_files/MOII_e117/117_fusions/results/DZ1601fuze_fusions.xlsx"
   path <- "./"
 
   
@@ -134,14 +149,14 @@ run_all <- function(args){
     
     xlsx_file <- a
     sample_name <- paste0(gsub("_fusions.xlsx","",basename(a)))
-    bam_file <-  paste0("./input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze","/mapped/", sample_name,".bam")
-    chimeric_file <-  paste0("./input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze/","/mapped/", sample_name,"Chimeric.out.bam")
+    bam_file <-  paste0("./input_files/reanalysed_data/primary_analysis/fuze","/mapped/", sample_name,".bam")
+    chimeric_file <-  paste0("./input_files/reanalysed_data/primary_analysis/fuze/","/mapped/", sample_name,"/",sample_name,"Chimeric.out.bam")
     output_dir <- paste0("./app/www/igv_snapshot/",sample_name)
     
     if (file.exists(output_dir)){
       setwd(file.path(path))
     } else {
-      dir.create(file.path(path, output_dir))
+      dir.create(file.path(output_dir))
       setwd(file.path(path))
     }
     
@@ -163,7 +178,7 @@ run_all <- function(args){
   # merge all sample tables into one
   files = list.files(pattern = "_fusions_dt.xlsx", full.names = F, all.files = T,recursive = TRUE)
   dt <- rbindlist(lapply(files, fread, header=TRUE))
-  fwrite(dt,file = "MOII_all_fusions.xlsx", sep = "\t")
+  fwrite(dt,file = "all_fusions.xlsx", sep = "\t")
 }
 
 
