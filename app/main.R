@@ -365,7 +365,7 @@ server <- function(id) {
 ##################    
     ## run network graph module    
     
-    networkGraph_cytoscape$server("network_graph", shared_data)
+    # networkGraph_cytoscape$server("network_graph", shared_data)
     
     
 
