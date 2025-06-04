@@ -48,7 +48,7 @@ input_data <- function(sample,expr_flag){
 ui <- function(id, patient){
   ns <- NS(id)
   tagList(
-    radioGroupButtons(ns("selectPlot_btn"),label = "",choices = c("Heatmap","Volcano plot"),status = "mygrey",individual = TRUE),
+    radioGroupButtons(ns("selectPlot_btn"),label = "",choices = c("Volcano plot","Heatmap"),status = "mygrey",individual = TRUE),
     uiOutput(ns("selected_plot_ui"))
   )
 }
@@ -115,9 +115,6 @@ server <- function(id, patient, expr_flag) {
       } else if (input$selectPlot_btn == "Volcano plot") {
         tagList(
           fluidRow(
-            plotOutput(outputId = ns("ggvolcanoPlot"))
-          ),
-          fluidRow(
             column(6, div(class = "filterTab-select-tissue",
                           radioGroupButtons(ns("selected_tissue"), "Choose a tissue :", choices = get_tissue_list(), justified = TRUE)))
           ),
@@ -128,6 +125,9 @@ server <- function(id, patient, expr_flag) {
             column(1, numericInput(ns("logfc_cutoff"), "log2FC cutoff:", value = 1, min = 0, step = 0.1)),
             column(1, numericInput(ns("top_n"), "Gene labels:", value = 20, min = 0, step = 1))
           )
+          # fluidRow(
+          #   plotOutput(outputId = ns("ggvolcanoPlot"))
+          # )
         )
       }
     })

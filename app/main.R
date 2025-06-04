@@ -365,13 +365,21 @@ server <- function(id) {
 ##################    
     ## run network graph module    
     
-    networkGraph_cytoscape$server("network_graph", shared_data)
+    # networkGraph_cytoscape$server("network_graph", shared_data)
     
     
 
 
-    IGV$igv_server("igv")
 
+    # # Spustíme statický server při startu celé aplikace
+    # start_static_server(dir = "/Users/katerinajuraskova/Desktop/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze/mapped")
+    # 
+    # IGV$igv_server("igv")
+    # 
+    # # Ukončení serveru při zavření celé session
+    # session$onSessionEnded(function() {
+    #   stop_static_server()
+    # })
 
 
 

@@ -18,9 +18,11 @@
 *.xlsx
 *.xls
 *.tsv
+*temp_batch.txt
 
 # renv and input data directories
 renv/
 input_files/
 report_results/
+www/
 

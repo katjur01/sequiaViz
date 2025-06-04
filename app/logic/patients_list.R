@@ -5,6 +5,37 @@ box::use(
   shiny[h3,tags,icon],
 )
 
+
+#' #' @export
+#' patients_list <- function(){
+#'   patients <- c("FZ0711")
+#'   return(patients)
+#' }
+#' 
+#' #' @export
+#' sample_list_fuze <- function(){
+#'   patients <- c("FZ0711fuze")
+#'   return(patients)
+#' }
+#' 
+#' #' @export
+#' sample_list_som <- function(){
+#'   patients <- c("FZ0711")
+#'   return(patients)
+#' }
+#' 
+#' #' @export
+#' sample_list_germ <- function(){
+#'   patients <- c("FZ0711krev")
+#'   return(patients)
+#' }
+#' 
+#' #' @export
+#' sample_list_expr <- function(){
+#'   patients <- c("FZ0711")
+#'   return(patients)
+#' }
+
 #' @export
 patients_list <- function(){
   patients <- c("DZ1601","LK0302","MR1507","VH0452")

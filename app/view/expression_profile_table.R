@@ -41,7 +41,7 @@ box::use(
 input_data <- function(sample,expr_flag){
   input_files <- get_inputs("per_sample_file") 
   # message("Loading data for expression profile: ", input_files$expression.files)
-  data <- load_data(input_files$expression.files,"expression",sample,expr_flag) #expr_flag = "all_genes"|"genes_of_interest" #sample = "MR1507"
+  data <- load_data(input_files$expression.files,"expression",sample,expr_flag) #expr_flag = "all_genes"|"genes_of_interest" #sample = "FZ0711"
   dt <- prepare_expression_table(data,expr_flag)
   return(dt)
 }

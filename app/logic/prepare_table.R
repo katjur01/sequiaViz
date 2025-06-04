@@ -14,6 +14,7 @@ box::use(
 
 #' @export
 get_tissue_list <- function(){
+  # tissue_list <- c("Liver","Lung")
   input_files <- get_inputs("per_sample_file")
   tissue_list <- sort(unique(gsub(".*/([^/]+?)_(all_genes|genes_of_interest).*", "\\1", input_files$expression.files)))
   return(tissue_list)

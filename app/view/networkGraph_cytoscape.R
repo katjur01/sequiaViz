@@ -132,8 +132,9 @@ server <- function(id, shared_data) {
     result_dt <- reactiveVal(NULL)
     selected_dt <- reactiveVal(NULL)
     
-    # dt <- input_data("MR1507","all_genes")
-    dt <- input_data("DZ1601","all_genes")
+    dt <- input_data("MR1507","all_genes")
+    # dt <- input_data("FZ0711","all_genes")
+    #
     # # subTissue_dt <- fread("input_files/MOII_e117/RNAseq21_NEW/MR1507/Blood_all_genes_oneRow.tsv")
     # dt <- fread("input_files/MOII_e117/RNAseq21_NEW/MR1507/Blood_all_genes_oneRow.tsv")
     # pathway_dt <- unique(dt[grepl("Metabolic pathways", all_kegg_paths_name, fixed = TRUE),-c("all_kegg_gene_names","counts_tpm_round","size","mu","lower_than_p","higher_than_p","type","gene_definition")])

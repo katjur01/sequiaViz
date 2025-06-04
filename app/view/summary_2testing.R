@@ -70,11 +70,11 @@ ui <- function(id){
               title = span("Germline var call", class = "category"),
               tags$div(textOutput(ns("for_review_germ"))),
               tags$div(textOutput(ns("clinvar_N_germ"))),
-              icon = HTML('<span class="icon icon-gray" title="Analysis not available"><i class="fa-solid fa-circle-xmark"></i></span>'),
+              icon = HTML('<span class="icon icon-gray" title="Analysis not available"><i class="fa-solid fa-circle-check"></i></span>'), #fa-circle-xmark
               elevation = 2,
               collapsible = FALSE,
               headerBorder = FALSE,
-              style = "height:136px; overflow:auto;",
+              style = "height:140px; overflow:auto;",
               width = 12  # box zabere celou šířku levého sloupce
             )
           ),

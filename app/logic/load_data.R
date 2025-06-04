@@ -102,6 +102,8 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
   }
 }
 
+
+
 #' @export
 get_inputs <- function(flag){
   
@@ -135,7 +137,7 @@ get_inputs <- function(flag){
     expression_profile_filenames <- list.files(expression_profile_dirnames, pattern = "*.tsv", full.names = TRUE)
     # expression_profile_project <- "RNAseq21"
     # expression_profile_filenames <- list.files(paste(path, expression_profile_project, sep = "/"), pattern = "*_report.xlsx", full.names = TRUE)
-    # 
+    #
     return(list(var_call.somatic = somatic_variant_calling_filenames,
                 var_call.germline = germline_variant_calling_filenames,
                 var_call.structural = structural_variant_calling_filenames,
@@ -146,7 +148,7 @@ get_inputs <- function(flag){
     ))
     
   } else if (flag == "all_sample_file"){
-
+    
     ## somatic var call path
     somatic_variant_calling_project <- "117_WES_somatic"
     somatic_variant_calling_filenames <- list.files(paste(path, somatic_variant_calling_project,sep = "/"), pattern = "*.tsv", full.names = TRUE)
@@ -158,8 +160,8 @@ get_inputs <- function(flag){
     ## structural var call path
     structural_variant_calling_project <- "117_WES_structural"
     structural_variant_calling_filenames <- list.files(paste(path, structural_variant_calling_project, sep = "/"), pattern = "*.tsv", full.names = TRUE)
-  
-
+    
+    
     return(list(var_call.somatic = somatic_variant_calling_filenames,
                 var_call.germline = germline_variant_calling_filenames,
                 var_call.structural = structural_variant_calling_filenames
@@ -169,6 +171,78 @@ get_inputs <- function(flag){
     stop("Invalid tag. Use 'per_sample_file' or 'all_sample_file'.")
   }
 }
+
+
+#' #' @export
+#' get_inputs <- function(flag){
+#'   
+#'   library <- "reanalysed_data"
+#'   path = paste0("./input_files/", library)
+#'   
+#'   if (flag == "per_sample_file"){
+#'     
+#'     ## somatic var call path
+#'     somatic_variant_calling_project <- "somatic"
+#'     somatic_variant_calling_filenames <- list.files(paste(path, somatic_variant_calling_project,"per_sample_final_var_tabs/tsv_formated",sep = "/"), pattern = "*.tsv", full.names = TRUE)
+#'     
+#'     ## gemline var call path
+#'     germline_variant_calling_project <- "germline"
+#'     germline_variant_calling_filenames <- list.files(paste(path, germline_variant_calling_project,"per_sample_final_var_tabs/tsv_formated", sep = "/"), pattern = "*.tsv", full.names = TRUE)
+#'     
+#'     ## structural var call path
+#'     structural_variant_calling_project <- "structural"
+#'     structural_variant_calling_filenames <- list.files(paste(path, structural_variant_calling_project, sep = "/"), pattern = "*.tsv", full.names = TRUE)
+#'     
+#'     ## fusion var call path
+#'     fusion_genes_project <- "fusions"
+#'     fusion_genes_filenames <- list.files(paste(path, fusion_genes_project, "results", sep = "/"), pattern = "*.xlsx", full.names = TRUE)
+#'     
+#'     ## arriba folder path
+#'     arriba_res_folder <- paste(path, fusion_genes_project, "results", sep = "/")
+#'     
+#'     ## expression profile results path
+#'     expression_profile_project <- "rnaseq"
+#'     expression_profile_dirnames <- list.files(paste(path, expression_profile_project,sep = "/"), pattern = "*", full.names = TRUE)
+#'     expression_profile_filenames <- list.files(expression_profile_dirnames, pattern = "*.tsv", full.names = TRUE)
+#'     # expression_profile_project <- "RNAseq21"
+#'     # expression_profile_filenames <- list.files(paste(path, expression_profile_project, sep = "/"), pattern = "*_report.xlsx", full.names = TRUE)
+#'     # 
+#'     return(list(var_call.somatic = somatic_variant_calling_filenames,
+#'                 var_call.germline = germline_variant_calling_filenames,
+#'                 var_call.structural = structural_variant_calling_filenames,
+#'                 fusions = fusion_genes_filenames,
+#'                 arriba_res = arriba_res_folder,
+#'                 expression.files = expression_profile_filenames,
+#'                 expression.project = expression_profile_project
+#'     ))
+#'     
+#'   } else if (flag == "all_sample_file"){
+#'     
+#'     ## somatic var call path
+#'     somatic_variant_calling_project <- "somatic"
+#'     somatic_variant_calling_filenames <- list.files(paste(path, somatic_variant_calling_project,sep = "/"), pattern = "*.tsv", full.names = TRUE)
+#'     
+#'     ## gemline var call path
+#'     germline_variant_calling_project <- "germline"
+#'     germline_variant_calling_filenames <- list.files(paste(path, germline_variant_calling_project, sep = "/"), pattern = "*.tsv", full.names = TRUE)
+#'     
+#'     ## structural var call path
+#'     structural_variant_calling_project <- "structural"
+#'     structural_variant_calling_filenames <- list.files(paste(path, structural_variant_calling_project, sep = "/"), pattern = "*.tsv", full.names = TRUE)
+#'     
+#'     
+#'     return(list(var_call.somatic = somatic_variant_calling_filenames,
+#'                 var_call.germline = germline_variant_calling_filenames,
+#'                 var_call.structural = structural_variant_calling_filenames
+#'     ))
+#'     
+#'   } else {
+#'     stop("Invalid tag. Use 'per_sample_file' or 'all_sample_file'.")
+#'   }
+#' }
+
+
+
   
 
 
