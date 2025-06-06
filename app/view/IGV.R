@@ -54,23 +54,23 @@ igv_ui <- function(id) {
 }
 
 #' @export
-igv_server <- function(id) {
+igv_server <- function(id,shared_data) {
   moduleServer(id, function(input, output, session) {
     
-    values <- reactiveValues()
-    
-    # Seznam vzorků
-    samples <- list(
-      list(name = "DZ1601", file = "DZ1601fuze.bam"),
-      list(name = "MR1507", file = "MR1507fuze.bam")
-    )
-    
-    values$bookmark_df <- data.frame(
-      gene1 = c("KANSL1", "KMT2A", "METTL13"),
-      gene2 = c("LRRC37A4P", "MLLT3", "DNM3"),
-      position1 = c("17:45597764", "11:118482495", "1:171814013"),
-      position2 = c("17:45545676", "11:20365744", "1:171987759")
-    )
+    # values <- reactiveValues()
+    # 
+    # # Seznam vzorků
+    # samples <- list(
+    #   list(name = "DZ1601", file = "DZ1601fuze.bam"),
+    #   list(name = "MR1507", file = "MR1507fuze.bam")
+    # )
+    # 
+    # values$bookmark_df <- data.frame(
+    #   gene1 = c("KANSL1", "KMT2A", "METTL13"),
+    #   gene2 = c("LRRC37A4P", "MLLT3", "DNM3"),
+    #   position1 = c("17:45597764", "11:118482495", "1:171814013"),
+    #   position2 = c("17:45545676", "11:20365744", "1:171987759")
+    # )
     
     output$bookmarks <- renderReactable({
       reactable(values$bookmark_df,
@@ -86,11 +86,21 @@ igv_server <- function(id) {
     })
     
     observeEvent(input$loadIGVButton, {
-      # Krok 1: Vytvoření divu pro IGV
-      output$igvDivOutput <- renderUI({
-        div(id = session$ns("igv-igvDiv"))  # Zajistíme, že div má správný namespace
-      })
+      selected_empty <- is.null(shared_data$selected_variants) || 
+        (is.data.frame(shared_data$selected_variants) && nrow(shared_data$selected_variants) == 0)
+      bam_empty <- is.null(shared_data$bam_files) || length(shared_data$bam_files) == 0
       
+      if (selected_empty || bam_empty) {
+        showModal(modalDialog(
+          title = "Missing input",
+          "You have not selected variants or patients for visualization. Please return to the Somatic variant calling tab and define them.",
+          easyClose = TRUE,
+          footer = modalButton("OK")
+        ))
+      } else {
+        output$igvDivOutput <- renderUI({
+          div(id = session$ns("igv-igvDiv"))
+        })
       track_block <- build_igv_tracks(samples)
       
       # Krok 2: Po vykreslení spustíme JavaScript pro IGV s mírným zpožděním
@@ -122,6 +132,7 @@ igv_server <- function(id) {
           }
         }, 20);  // Zpoždění 20 ms k zajištění, že div je vykreslen
       ", session$ns("igv-igvDiv"), track_block))  # Přidáme správné ID divu s namespace
+      }
     })
 
     observeEvent(input$bookmarks_click, {
@@ -150,29 +161,29 @@ igv_server <- function(id) {
     })
   })
 }
-
-
-
-ui <- fluidPage(
-  box(id = "igv_page", title = "IGV Viewer", width = 10, collapsible = FALSE,
-    igv_ui("igv")
-  )
-)
-
-server <- function(input, output, session) {
-  
-  # Spustíme statický server při startu celé aplikace
-  start_static_server(dir = "/Users/katerinajuraskova/Desktop/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze/mapped")
-                        #"/home/katka/BioRoots/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_tkane/mapped")
-  
-  igv_server("igv")
-  
-  # Ukončení serveru při zavření celé session
-  session$onSessionEnded(function() {
-    stop_static_server()
-  })
-  
-}
-
-shinyApp(ui, server, options = list(launch.browser = TRUE))
-
+# 
+# 
+# 
+# ui <- fluidPage(
+#   box(id = "igv_page", title = "IGV Viewer", width = 10, collapsible = FALSE,
+#     igv_ui("igv")
+#   )
+# )
+# 
+# server <- function(input, output, session) {
+#   
+#   # Spustíme statický server při startu celé aplikace
+#   start_static_server(dir = "/Users/katerinajuraskova/Desktop/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze/mapped")
+#                         #"/home/katka/BioRoots/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_tkane/mapped")
+#   
+#   igv_server("igv")
+#   
+#   # Ukončení serveru při zavření celé session
+#   session$onSessionEnded(function() {
+#     stop_static_server()
+#   })
+#   
+# }
+# 
+# shinyApp(ui, server, options = list(launch.browser = TRUE))
+# 

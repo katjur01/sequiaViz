@@ -1,0 +1,548 @@
+#app/view/somatic_var_call_table.R
+
+box::use(
+  shiny[NS, sliderInput, fluidRow, column, tagList, br, uiOutput, plotOutput, downloadButton, actionButton, numericInput, renderPlot, checkboxGroupInput, fluidPage, selectInput,
+        icon,div,tabPanel,moduleServer,downloadHandler,observe, observeEvent,reactive,renderUI,updateCheckboxGroupInput,updateSliderInput,updateNumericInput,req,
+        reactiveVal,showModal,modalDialog,modalButton,isTruthy],
+  reactable[colDef,reactableOutput,renderReactable,reactable,getReactableState,JS],
+  bs4Dash[box,tabsetPanel,updateTabItems],
+  htmltools[tags, span,HTML],
+  shinyWidgets[pickerInput, dropdownButton,prettyCheckboxGroup,updatePrettyCheckboxGroup,actionBttn,pickerOptions,dropdown],
+  networkD3[sankeyNetwork,renderSankeyNetwork,sankeyNetworkOutput],
+  data.table[fread],
+  billboarder[billboarderOutput],
+  stats[setNames],
+  shinyalert[shinyalert,useShinyalert],
+  shinyjs[useShinyjs,hide,show],
+  data.table[data.table]
+)
+
+box::use(
+  app/logic/prepare_main_table_and_filters[map_column_names,map_gene_region_names,map_clin_sig_names],
+  app/logic/vaf_plot[generate_vaf],
+  app/logic/sankey_plot[sankey_plot],
+  app/logic/waiters[use_spinner],
+  app/view/col_settings[default_col],
+  app/view/selected_variants[render_selected_variants_ui,render_selected_variants_table,
+                        handle_delete_variant, handle_confirm_selected],
+  app/view/export_functions[get_table_download_handler,get_sankey_download_handler,get_hist_download_handler],
+  app/logic/load_data[get_inputs,load_data],
+  app/logic/prepare_table[prepare_somatic_table],
+  # app/logic/reactable_helpers[selectFilter,minRangeFilter,filterMinValue,generate_columnsDef]
+)
+
+
+# Load and process data table
+input_data <- function(sample){
+  filenames <- get_inputs("per_sample_file")
+  message("Loading data for somatic: ", filenames$var_call.somatic)
+  data <- prepare_somatic_table(load_data(filenames$var_call.somatic,"varcall",sample))
+  return(data)
+}
+
+# UI funkce pro modul nastavujici vzhled veskerych grafickych prvku v zalozce somatic variants
+
+ui <- function(id) {
+  ns <- NS(id)
+  useShinyjs()
+  tagList(
+     dropdownButton(label = NULL,right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC; margin-bottom: 0; padding-bottom: 0;"></i>'),
+       selectInput(ns("export_data_table"), "Select data:", choices = c("All data" = "all", "Filtered data" = "filtered")),
+       selectInput(ns("export_format_table"), "Select format:", choices = c("CSV" = "csv", "TSV" = "tsv", "Excel" = "xlsx")),
+       downloadButton(ns("Table_download"),"Download")),
+     uiOutput(ns("filterTab")),
+     tags$div(style = "margin-top: 49px;"),
+     br(),
+     use_spinner(reactableOutput(ns("somatic_var_call_tab"))),
+     tags$br(),
+     actionButton(ns("selectPathogenic_button"), "Select variants as possibly oncogenic", status = "info"),
+     tags$br(),
+     fluidRow(
+       column(5,reactableOutput(ns("selectPathogenic_tab")))),
+     tags$br(),
+     fluidRow(
+       column(1,actionButton(ns("delete_button"), "Delete variants", icon = icon("trash-can")))),
+     tags$br(),
+     uiOutput(ns("confirm_button_ui")),
+     box(width = 12, closable = FALSE,collapsible = TRUE, title = tags$div(style = "padding-top: 8px;","Tumor variant frequency histogram"),
+       dropdownButton(label = "Export Circos Plot",right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
+         downloadButton(ns("Hist_download"),"Download as PNG")),
+       br(),br(),
+       div(style = "width: 100%; margin: auto;",
+         use_spinner(plotOutput(ns("Histogram"),height = "480px"))
+       )
+     ),
+     box(width = 12,closable = FALSE,collapsible = TRUE,title = tags$div(style = "padding-top: 8px;","Sankey diagram"),
+       dropdownButton(label = "Export Sankey Plot",right = FALSE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
+         selectInput(ns("export_format"), "Select format:", choices = c("HTML" = "html", "PNG" = "png")),
+         downloadButton(ns("Sankey_download"),"Download")),
+       br(),
+       tags$div(style = "display: flex; justify-content: space-between; width: 100%;",
+         tags$span(style = "margin-left: 3cm;", "Variant"),
+         tags$span(style = "margin-right: 2cm;", "Gene"),
+         tags$span(style = "margin-right: 10cm;", "Pathway")),
+       uiOutput(ns("diagram"))
+     )
+  )
+}
+
+# Serverova funkce pro modul definující funkce veskerych prvku v zalozce somatic variants
+server <- function(id, selected_samples, shared_data) {
+  moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+    
+    # Call loading function to load data
+    data <- reactive({
+      message("Loading input data for somatic")
+      input_data(selected_samples)
+    })
+    
+    output$filterTab <- renderUI({
+      req(data())
+      filterTab_ui(ns("filterTab_dropdown"),data())
+    })
+    
+    
+    filter_state <- filterTab_server("filterTab_dropdown")
+    
+    selected_tumor_depth <- reactiveVal(NULL)
+    selected_gnomAD_min  <- reactiveVal(NULL)
+    selected_gene_region <- reactiveVal(NULL)
+    selected_clinvar_sig <- reactiveVal(NULL)
+
+
+    observeEvent(filter_state$confirm(), {
+      message("🟢 Confirm clicked – storing gene region filter")
+      selected_gene_region(filter_state$gene_regions())
+    })
+    
+    filtered_data <- reactive({
+      req(data())
+      dt <- data()
+      
+      if (!is.null(selected_tumor_depth())) {
+        dt <- dt[selected_tumor_depth() <= tumor_depth, ]
+      }
+      if (!is.null(selected_gnomAD_min())) {
+        dt <- dt[gnomAD_NFE <= selected_gnomAD_min()]
+      }
+      
+      if (!is.null(selected_gene_region()) && length(selected_gene_region()) > 0) {
+        dt <- dt[gene_region %in% selected_gene_region(), ]
+      }
+      if (!is.null(selected_clinvar_sig()) && length(selected_clinvar_sig()) > 0) {
+        dt <- dt[clinvar_sig %in% selected_clinvar_sig(), ]
+      }
+
+      return(dt)
+    })
+    
+    # # Reactive value to store selected rows
+    selected_variants <- reactiveVal(data.frame(patient = character(),var_name = character(), Gene_symbol = character()))
+    
+    output$somatic_var_call_tab <- renderReactable({
+      message("Rendering Reactable for somatic")
+      filtered_data <- filtered_data() 
+      pathogenic_variants <- selected_variants() # seznam variant, které byly označeny jako patogenní
+    
+      reactable(
+        as.data.frame(filtered_data),
+        resizable = TRUE,
+        showPageSizeOptions = TRUE,
+        pageSizeOptions = c(10, 20, 50, 100),
+        defaultPageSize = 20,
+        striped = TRUE,
+        wrap = FALSE,
+        highlight = TRUE,
+        outlined = TRUE,
+        defaultColDef = colDef(align = "center", sortNALast = TRUE),
+        defaultSorted = list("fOne" = "desc", "CGC_Somatic" = "desc"),
+        rowStyle = function(index) {
+          gene_in_row <- filtered_data$Gene_symbol[index]
+          var_in_row <- filtered_data$var_name[index]
+          if (var_in_row %in% pathogenic_variants$var_name &           # Pokud je aktuální řádek v seznamu patogenních variant, zvýrazníme ho
+              gene_in_row %in% pathogenic_variants$Gene_symbol) {
+            list(backgroundColor = "#B5E3B6",fontWeight = "bold")
+          } else {
+            NULL
+          }
+        },
+        selection = "multiple",
+        onClick = JS("function(rowInfo, column, event) {
+                        if (event.target.classList.contains('rt-expander') || event.target.classList.contains('rt-expander-button')) {
+                        } else {
+                            rowInfo.toggleRowSelected();}}"),
+        class = "somatic-table",
+        elementId = "tbl-somatic"
+        # columns = reactive_columns()
+      )
+    })
+    
+    
+    # Sledování vybraného řádku a varianty
+    selected_variant <- reactive({
+      selected_row <- getReactableState("somatic_var_call_tab", "selected")
+      req(selected_row)
+      filtered_data()[selected_row, c("var_name","Gene_symbol")]  # Získání varianty z vybraného řádku
+      message("data somatic tab: ", filtered_data()[selected_row, c("var_name","Gene_symbol")])
+    })
+    
+    # Akce po kliknutí na tlačítko pro přidání varianty
+    observeEvent(input$selectPathogenic_button, {
+      selected_rows <- getReactableState("somatic_var_call_tab", "selected")
+      req(selected_rows)
+      
+      new_variants <- filtered_data()[selected_rows, c("var_name", "Gene_symbol","tumor_variant_freq","tumor_depth", "Consequence",
+                                                       "HGVSc","HGVSp","variant_type","Feature", "clinvar_sig")]  # Získání vybraných variant
+      new_variants$sample <- selected_samples
+      
+      current_variants <- selected_variants()  # Stávající přidané varianty
+      new_unique_variants <- new_variants[!(new_variants$var_name %in% current_variants$var_name &       # Porovnání - přidáme pouze ty varianty, které ještě nejsou v tabulce
+                                              new_variants$Gene_symbol %in% current_variants$Gene_symbol), ]
+      
+      if (nrow(new_unique_variants) > 0) selected_variants(rbind(current_variants, new_unique_variants))
+      
+      # Aktualizace globální proměnné shared_data$somatic_data:
+      global_data <- shared_data$somatic_data()
+      
+      if (is.null(global_data) || nrow(global_data) == 0 || !("sample" %in% names(global_data))) {
+        global_data <- data.table(
+          sample = character(),
+          var_name = character(),
+          Gene_symbol = character(),
+          tumor_variant_freq= character(),
+          tumor_depth = character(),
+          Consequence = character(),
+          HGVSc = character(),
+          HGVSp = character(),
+          variant_type = character(),
+          Feature = character(),
+          clinvar_sig = character()
+        )
+      }
+      message("## selected_variants(): ", selected_variants())
+      message("## global_data: ", global_data)
+      # Odstraníme data, která patří právě tomuto pacientovi
+      global_data <- global_data[sample != selected_samples]
+      
+      # Přidáme nově aktualizované lokální data daného pacienta
+      updated_global_data <- rbind(global_data, selected_variants())
+      shared_data$somatic_data(updated_global_data)
+      message("## shared_data$somatic_data(): ", shared_data$somatic_data())
+    })
+    
+    
+    
+    output$selectPathogenic_tab <- renderReactable({
+      variants <- selected_variants()
+      if (nrow(variants) == 0) {
+        return(NULL)
+      }
+      
+      reactable(
+        variants,
+        columns = list(
+          var_name = colDef(name = "Variant name"),
+          Gene_symbol = colDef(name = "Gene name")),
+        selection = "multiple", onClick = "select")
+    })
+    
+    observeEvent(input$delete_button, {
+      rows <- getReactableState("selectPathogenic_tab", "selected")
+      req(rows)
+      current_variants <- selected_variants()
+      updated_variants <- current_variants[-rows, ]
+      selected_variants(updated_variants)
+      shared_data$somatic_data(updated_variants)
+      session$sendCustomMessage("resetReactableSelection",selected_variants())
+      
+      if (nrow(selected_variants()) == 0) {
+        hide("confirm_btn")
+        hide("delete_button")
+      }
+    })
+
+    # Při stisku tlačítka pro výběr
+    observeEvent(input$selectPathogenic_button, {
+      if (nrow(selected_variants()) == 0) {
+        # Pokud nejsou vybrány žádné řádky, zůstaň u původního stavu
+        # variant_selected(FALSE)
+        hide("confirm_btn")
+        hide("delete_button")
+        
+        shinyalert(
+          title = "No variant selected",
+          text = "Please select the potentially oncogenic variants from table above.",
+          type = "warning",
+          showCancelButton = FALSE,
+          confirmButtonText = "OK",
+          callbackR = function(value) {
+            # value bude TRUE pro OK, FALSE pro "Go to variant"
+            if (!value) {
+              # updateTabItems(session = session$userData$parent_session,  # použijeme parent session
+              #                inputId = "sidebar_menu",  # bez namespace
+              #                selected = "fusion_genes")
+            }})
+      } else {
+        # Pokud jsou nějaké řádky vybrány, nastav fusion_selected na TRUE
+        # variant_selected(TRUE)
+        
+        # Zobraz tlačítka pomocí shinyjs
+        show("confirm_btn")
+        show("delete_button")
+      }
+    })
+    
+    hide("confirm_btn")
+    hide("delete_button")
+    
+    
+    
+    observeEvent(filter_state$confirm(), {
+      message("🟢 Confirm button was clicked")
+      selected_tumor_depth(filter_state$tumor_depth())
+      selected_gnomAD_min(filter_state$gnomAD_min())
+      selected_gene_region(filter_state$gene_region())
+      selected_clinvar_sig(filter_state$clinvar_sig())
+    })
+    
+    # plot VAF histogram
+    output$Histogram <- renderPlot({
+      generate_vaf(filtered_data(),selected_variants())}, height = 480)
+    
+    # Rendering the Sankey network
+    p <-reactiveVal()
+    
+    sankey_data <- reactive({
+      sankey_plot(filtered_data())
+    })
+    output$sankey_plot <- renderSankeyNetwork({
+      p(sankeyNetwork(
+        Links = sankey_data()$links, Nodes = sankey_data()$nodes,
+        Source = "IDsource", Target = "IDtarget",
+        Value = "value", NodeID = "name",
+        sinksRight = FALSE, fontSize = 15,
+        height = sankey_data()$plot_height, width = "100%"))
+      p()
+    })
+    output$diagram <- renderUI({
+      sankeyNetworkOutput(ns("sankey_plot"), height = sankey_data()$plot_height)
+    })
+  })
+}
+
+filterTab_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    
+    observe({
+      if(isTruthy(is.na(input$tumor_depth))) updateNumericInput(session, "tumor_depth", value = 10)
+    })
+    observe({
+      if(isTruthy(is.na(input$gnomAD_min))) updateNumericInput(session, "gnomAD_min", value = 0.0001)
+    })
+    
+    return(list(
+      confirm = reactive(input$confirm_btn),
+      tumor_depth = reactive(input$tumor_depth),
+      gnomAD_min = reactive(input$gnomAD_min),
+      gene_regions = reactive(input$gene_regions),
+      clinvar_sig = reactive(input$clinvar_sig)
+    ))
+  })
+}
+
+filterTab_ui <- function(id,data){
+  ns <- NS(id)
+  
+  filenames <- get_inputs("per_sample_file")
+  file_paths <- filenames$var_call.somatic[1]
+  patient_names <- substr(basename(file_paths), 1, 6)
+  
+  tagList(
+    tags$head(tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"),
+      tags$style(HTML(".dropdown-toggle {border-radius: 0; padding: 0; background-color: transparent; border: none; float: right;margin-top -1px;}
+                    .checkbox label {font-weight: normal !important;}
+                    .checkbox-group .checkbox {margin-bottom: 0px !important;}
+                    .pretty-checkbox-group .shiny-options-group {column-count: 2 !important; column-gap: 20px !important;}
+                    .pretty-checkbox-group label {font-weight: normal !important;}
+                    .my-blue-btn {background-color: #007bff;color: white;border: none;}
+                    .dropdown-menu .bootstrap-select .dropdown-toggle {border: 1px solid #ced4da !important; background-color: #fff !important;
+                      color: #495057 !important; height: 38px !important; font-size: 16px !important; border-radius: 4px !important; 
+                      box-shadow: none !important;}
+                    .sw-dropdown-content {border: 1px solid #ced4da !important; border-radius: 4px !important; box-shadow: none !important;
+                      background-color: white !important;}
+                    .glyphicon-triangle-bottom {font-size: 12px !important; line-height: 12px !important; vertical-align: middle;}
+                    .glyphicon-triangle-bottom {display: none !important; width: 0 !important; margin: 0 !important; padding: 0 !important;}
+                    #app-somatic_var_call_tab-igv_dropdownButton {width: 230px !important; height: 38px !important; font-size: 16px !important;}
+                    "))
+  ),
+  br(),
+  dropdownButton(
+    label = NULL,
+    right = TRUE,
+    width = "480px",
+    icon = HTML('<i class="fa-solid fa-filter fa-2sm" style="color: #74C0FC; margin-bottom: 0; padding-bottom: 0;"></i>'),
+    div(class = "pretty-checkbox-group",
+        prettyCheckboxGroup(
+          inputId = ns("colFilter_checkBox"),
+          label = HTML("<b>Show columns:</b>"),
+          choices = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq", 
+                      "tumor_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic", 
+                      "gene_region", "Consequence", "all_full_annot_name"),
+          selected = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq", 
+                       "tumor_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic", 
+                       "gene_region", "Consequence", "all_full_annot_name"),
+          icon = icon("check"),
+          status = "primary",
+          outline = FALSE
+        )
+    ),
+    div(style = "display: flex; gap: 10px; width: 100%;",
+        actionButton(inputId = ns("show_all"), label = "Show All", style = "flex-grow: 1; width: 0;"),
+        actionButton(inputId = ns("show_default"), label = "Show Default", style = "flex-grow: 1; width: 0;")),
+    fluidRow(
+       box(width = 12,title = tags$div(style = "padding-top: 8px;","Filter data by:"),closable = FALSE,collapsible = FALSE,
+           tagList(
+             fluidRow(
+               column(6, numericInput(ns("tumor_depth"), tags$strong("Tumor coverage min"), value = 10, min = 0, max = 1000)),
+               column(6, numericInput(ns("gnomAD_min"), tags$strong("gnomAD NFE min"), value = 0.0001, min = 0, max = 1))
+             ),
+             checkboxGroupInput(ns("gene_regions"), label = tags$strong("Gene region"),choices = unique(data$gene_region),selected = c("exon","intron")),#unique(data$gene_region)
+             checkboxGroupInput(ns("clinvar_sig"),label = tags$strong("ClinVar significance"), selected = unique(data$clinvar_sig),
+                                choices = setNames(unique(data$clinvar_sig), ifelse(trimws(unique(data$clinvar_sig)) == "", "missing value",unique(data$clinvar_sig))))
+           )
+        )
+    ),
+    div(style = "display: flex; justify-content: center; margin-top: 10px;",
+      actionBttn(ns("confirm_btn"),"Apply changes",style = "stretch",color = "success",size = "sm",individual = TRUE,value = 0))
+    )
+  )
+}
+
+
+
+               # div(style = "display: flex; justify-content: space-between; align-items: center; width: 100%;",
+               #   actionButton(ns("confirm_selected"), label = "Confirm selected rows"),
+               #   div(
+               #     style = "height: 38px;font-size: 16px;",
+               #     dropdown(
+               #       inputId = ns("igv_dropdownButton"),
+               #       label = "Interactive Genome Viewer",
+               #       status = "primary", 
+               #       icon = NULL,
+               #       right = TRUE,
+               #       width = 230,
+               #       pickerInput(
+               #         inputId = ns("idpick"), 
+               #         label = "Select patients for IGV:", 
+               #         choices = patient_names, 
+               #         options = pickerOptions(actionsBox = FALSE, size = 4, maxOptions = 4, dropupAuto = FALSE, maxOptionsText = "Select max. 4 patients"), 
+               #         multiple = TRUE
+               #       ),
+               #       div(style = "display: flex; justify-content: center; margin-top: 10px;",
+               #           actionBttn(inputId = ns("go2igv_button"), label = "Go to IGV", style = "stretch", color = "primary", size = "sm", individual = TRUE)
+               #       )
+               #     )
+               #   )
+               # ),
+               # uiOutput(ns("confirm_button_ui"))
+
+    
+
+  
+
+    # observeEvent(input$go2igv_button, {
+    #   selected_empty <- is.null(shared_data$selected_variants) || (is.data.frame(shared_data$selected_variants) && nrow(shared_data$selected_variants) == 0)
+    #   bam_empty <- is.null(shared_data$bam_files) || length(shared_data$bam_files) == 0
+    #   
+    #   if (selected_empty || bam_empty) {
+    #     showModal(modalDialog(
+    #       title = "Missing input",
+    #       "You have not selected variants or patients for visualization. Please return to the Somatic variant calling tab and define them.",
+    #       easyClose = TRUE,
+    #       footer = modalButton("OK")
+    #     ))
+    #   } else {
+    #     shinyjs::runjs("document.querySelector('[data-value=\"app-hidden_igv\"]').click();")
+    #   }
+    # })
+    # 
+
+    # 
+    # # zakladni nastaveni zobrazovanych sloupcu a jejich aktualizace ____________
+    # default_columns <- default_col()
+    # observe({
+    #   updatePrettyCheckboxGroup(
+    #     inputId = "colFilter_checkBox",
+    #     choiceNames = map_column_names(all_columns),
+    #     choiceValues = all_columns,
+    #     selected = c(
+    #       "var_name", "library", "Gene_symbol", "HGVSp", "HGVSc",
+    #       "tumor_variant_freq", "tumor_depth", "gnomAD_NFE","snpDB","COSMIC","HGMD", "clinvar_sig",
+    #       "clinvar_DBN", "fOne","CGC_Somatic", "gene_region", "Consequence",
+    #       "all_full_annot_name"
+    #     ),
+    #   )
+    # })
+    # observeEvent(input$show_all,{
+    #   updatePrettyCheckboxGroup(
+    #     inputId = "colFilter_checkBox",
+    #     selected = all_columns
+    #   )
+    # })
+    # observeEvent(input$show_default,{
+    #   updatePrettyCheckboxGroup(
+    #     inputId = "colFilter_checkBox",
+    #     selected = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc",
+    #                  "tumor_variant_freq", "tumor_depth", "gnomAD_NFE","snpDB","COSMIC",
+    #                  "HGMD", "clinvar_sig", "clinvar_DBN", "fOne","CGC_Somatic", "gene_region",
+    #                  "Consequence", "all_full_annot_name"
+    #     )
+    #   )
+    # })
+    # 
+    # # aktualizace zobrazovanych sloupcu na zaklade zvolenych ___________________
+    # reactive_columns <- reactive({
+    #   req(input$colFilter_checkBox)
+    #   selected_columns <- input$colFilter_checkBox
+    #   updated_columns <- default_col()
+    #   missing_columns <- setdiff(all_columns, names(updated_columns))
+    #   for (col_name in missing_columns) {
+    #     updated_columns[[col_name]] <- colDef(show=FALSE)
+    #   }
+    #   for (col_name in names(updated_columns)) {
+    #     updated_columns[[col_name]]$show <- col_name %in% selected_columns
+    #   }
+    #   return(updated_columns)
+    # })
+    # 
+
+    # 
+    # #export dat ________________________________________________________________
+    # output$Table_download <- get_table_download_handler(
+    #   input = input,
+    #   patient_names = patient_names,
+    #   filtered_data = filtered_data,
+    #   data_list = data_list
+    # )
+    # output$Sankey_download <- get_sankey_download_handler(
+    #   input = input,
+    #   p = p  # p = reaktivní funkce vracející sankey objekt
+    # )
+    # output$Hist_download <- get_hist_download_handler(h = h)
+    # 
+    # 
+    # observe({
+    #   bam_list <- NULL
+    #   if (!is.null(input$idpick) && length(input$idpick) > 0) {
+    #     bam_list <- lapply(input$idpick, function(id_val) {
+    #       list(name = id_val, file = paste0(id_val, ".bam"))
+    #     })
+    #   }
+    #   shared_data$bam_files <- bam_list
+    # })
+    # 
+    # 
+    
+
+#runApp('sequiaViz')

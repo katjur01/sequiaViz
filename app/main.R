@@ -53,12 +53,13 @@ box::use(
   app/view/summary_table,
   app/view/fusion_genes_table,
   app/view/germline_var_call_table,
-#   # app/view/variant_calling_table,
+  app/view/somatic_var_call_table,
   app/view/expression_profile_table,
   app/view/expression_profile_plot,
   app/view/dropdown_button[igvDropdown_ui,igvDropdown_server,colFilterDropdown_ui,colFilterDropdown_server],
   app/logic/patients_list[patients_list,set_patient_to_sample],
   app/view/IGV,
+  app/logic/igv_helper[start_static_server,stop_static_server],
 #   app/logic/load_data[load_data,get_inputs],
   app/logic/prepare_table[colFilter],
   app/logic/reactable_helpers[columnName_map],
@@ -66,9 +67,6 @@ box::use(
 
 
 )
-
-# plan(multisession)#, workers = detectCores() - 1
-
 
 #####################################################
 
@@ -91,10 +89,10 @@ ui <- function(id){
   dashboardPage(
     header = dashboardHeader(
       nav = navbarMenu(
-        navbarTab("Summary 2.0 dev", tabName = ns("summary2")),
-        navbarTab("Summary", tabName = ns("summary")),
-        navbarTab("Network graph", tabName = ns("network_graph")),
         navbarTab("Variant calling", tabName = ns("variant_calling")),
+        navbarTab("Summary 2.0 dev", tabName = ns("summary2")),
+        navbarTab("Network graph", tabName = ns("network_graph")),
+
         navbarTab("Expression profile", tabName = ns("expression_profile")),
 
         navbarTab("Fusion genes", tabName = ns("fusion_genes")),
@@ -135,18 +133,23 @@ ui <- function(id){
                   )
                 )
                 
-              )
-              ,
-              tabItem(h3("SUMMARY"),tabName = ns("summary"),
-                      fluidRow(
-                          summary_table$summaryUI(ns("summaryUI"))
-                          # do.call(tagList, lapply(patients_list(), function(patient) {
-                          #   summary_table$summaryUI(paste0("summaryUI_", patient), patient)
-                          # }))
-                          )
-                      ),
+              ),
               tabItem(tabName = ns("variant_calling"),
                       tabBox(id = ns("variant_calling_tabs"), width = 12, collapsible = FALSE, title = uiOutput(ns("igv_dropdown_ui")),
+                             tabPanel("Somatic small variant calling",tabName = ns("somatic_var_call_panel"),value = "somatic",
+                                      tags$style(HTML(".btn-group > .btn.active {background-color: skyblue; color: white;}
+                                                 .btn-mygrey {background-color: lightgray; color: black;}
+                                                ")),
+                                      # 
+                                      # div(style = "width: 100%;",do.call(tabsetPanel, c(
+                                      #   lapply(seq_along(patient_names), function(i) {
+                                      #     tabPanel(patient_names[i], use_spinner(reactableOutput(ns(paste0("my_table", i)))))}),
+                                      #   id = ns("tabset")))
+                                      
+                                      do.call(tabsetPanel, c(id = ns("tabset"), lapply(names(set_patient_to_sample("somatic")), function(sample) {
+                                        tabPanel(title = sample, somatic_var_call_table$ui(ns(paste0("somatic_tab_", sample))))
+                                      })))
+                             ),
                              tabPanel("Germline small variant calling",tabName = ns("germline_var_call_panel"),value = "germline",
                                       ## this css changes color of selected buttons in IGV dropdown button
                                       tags$style(
@@ -166,11 +169,8 @@ ui <- function(id){
                                       do.call(tabsetPanel, c(id = ns("germline_patients"), lapply(names(set_patient_to_sample("germline")), function(sample) {
                                         tabPanel(title = sample, germline_var_call_table$ui(ns(paste0("germline_tab_", sample))))
                                       })))
-                              ),
-                             tabPanel("Somatic small variant calling",tabName = ns("somatic_var_call_panel"),value = "somatic",
-                                      h2("Somatic variant calling results")
-                                      # variant_calling_table$ui(ns("somatic_var_call_tab"))
                               )
+ 
                       )),
               tabItem(tabName = ns("fusion_genes"),
                       bs4Card(width = 12,headerBorder = FALSE, collapsible = FALSE,
@@ -240,14 +240,18 @@ ui <- function(id){
 server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    shared_data <- reactiveValues(germline_data = reactiveVal(NULL), fusion_data = reactiveVal(NULL), 
+    shared_data <- reactiveValues(germline_data = reactiveVal(NULL), fusion_data = reactiveVal(NULL), somatic_data = reactiveVal(NULL),
                                   germline_overview = list(), fusion_overview = list())
   
     
-    # observeEvent(input$showPlots_switch, {
-    #   toggle("plots_tabBox", condition = input$showPlots_switch)
+
+    # bam_path <- paste0(getwd(),"/input_files/bam")
+    # start_static_server(dir = bam_path)
+    # IGV$igv_server("igv", shared_data)
+    # session$onSessionEnded(function() {
+    #   stop_static_server()
     # })
-    # 
+    
 ## run summary module
     summary_table$summaryServer("summaryUI", session)
     
@@ -278,8 +282,16 @@ server <- function(id) {
       fusion_genes_table$server(paste0("geneFusion_tab_", patient), samples_fuze[[patient]], selected_columns_fusion, columnName_map("fusion"), shared_data)
     })
 ##################
-
-
+    # Run somatic varcall module
+    
+    samples_som <- set_patient_to_sample("somatic")
+    
+    lapply(names(samples_som), function(patient) {
+      somatic_var_call_table$server(paste0("somatic_tab_", patient), samples_som[[patient]], shared_data)
+      # somatic_var_call_table$server(paste0("somatic_tab_", "DZ1601"), "DZ1601", shared_data)
+    })
+    
+##################
     # filter table columns dropdown button for germline
     all_colnames_val_germline <- getColFilterValues("germline")
     output$colFilter_dropdown_ui_germline <- renderUI({

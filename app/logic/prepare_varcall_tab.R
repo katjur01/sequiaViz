@@ -20,7 +20,6 @@ load_data <- function(input_files,flag, sample = NULL){
     
 
   
-  }
 }
 
 get_inputs <- function(flag){

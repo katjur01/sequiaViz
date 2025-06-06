@@ -53,10 +53,10 @@ ui <- function(id) {
     actionButton(ns("selectPathogenic_button"), "Select variants as possibly pathogenic", status = "info"),
     tags$br(),
     fluidRow(
-      column(3,reactableOutput(ns("selectPathogenic_tab")))),
+      column(5,reactableOutput(ns("selectPathogenic_tab")))),
     tags$br(),
     fluidRow(
-      column(1,actionButton(ns("delete_button"), "Delete variants", status = "danger")))
+      column(1,actionButton(ns("delete_button"), "Delete variants", icon = icon("trash-can"))))
   )
 }
 

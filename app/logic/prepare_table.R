@@ -107,6 +107,23 @@ prepare_fusion_genes_table <- function(data,selected_samples){
 }
 
 #' @export
+prepare_somatic_table <- function(dt){
+
+  dt <- replace_dot_with_na(dt)
+  dt[,gnomAD_NFE := as.numeric(gnomAD_NFE)]
+  dt[,tumor_variant_freq := as.numeric(tumor_variant_freq)]
+  dt[is.na(clinvar_sig), clinvar_sig := " "]
+  dt <- dt[, c("SOMATIC", "PHENO","GENE_PHENO") := NULL]
+  order <- c("var_name","in_library","Gene_symbol","tumor_variant_freq","tumor_depth","gene_region",
+             "fOne","CGC_Somatic","gnomAD_NFE","clinvar_sig","clinvar_DBN","snpDB","COSMIC",
+             "HGMD","Consequence","HGVSc","HGVSp","all_full_annot_name")
+  dt <- setcolorder(dt,order)
+  
+  message(paste0("Somatic varcall, pacient ",unique(dt$sample)," (prepare_table script)"))
+  return(dt)
+}
+
+#' @export
 prepare_germline_table <- function(dt){
   
   dt <- replace_dot_with_na(dt)

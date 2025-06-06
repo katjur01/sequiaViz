@@ -26,8 +26,19 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
       input_var_all <- lapply(input_files_all,fread)
       dt_all <- rbindlist(input_var_all)
       
-      sample_list <- gsub(".*\\/(.*)\\.variants.tsv","\\1",input_files)
+      sample_list <- c()
       
+      for (path in input_files) {
+        if (grepl("somatic", path)) {
+          sample <- gsub(".*\\/(.*)\\.variants.tsv", "\\1", path)
+          sample_list <- c(sample_list, paste0(sample, "krev"))
+        } else if (grepl("germline", path)) {
+          sample <- gsub(".*\\/(.*)\\.variants.tsv", "\\1", path)
+          sample_list <- c(sample_list, paste0(sample, "krev"))
+        }
+      }
+      
+  
       dt_all[, in_library := rowSums(.SD), .SDcols = sample_list]
       dt_all[, in_library := paste0(in_library, "/", length(sample_list))]
       merged_dt <- merge(dt, unique(dt_all[, .(var_name, in_library)]), by = "var_name", all.x = TRUE)
