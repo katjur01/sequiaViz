@@ -12,23 +12,22 @@ box::use(
 
 # Export table (CSV, TSV, XLSX)
 #' @export
-get_table_download_handler <- function(input, patient_names, filtered_data, data_list) {
+get_table_download_handler <- function(input, patient, data, filtered_data) {
   downloadHandler(
     filename = function() {
       file_name <- switch(input$export_data_table,
-                          "filtered" = paste0(input$tabset,"_filtered_data"),
-                          "all" = paste0(input$tabset,"_all_data"))
+                          "filtered" = paste0(patient,"_filtered_data"),
+                          "all" = paste0(patient,"_all_data"))
       switch(input$export_format_table,
              "csv" = paste0(file_name,".csv"),
              "tsv" = paste0(file_name,".tsv"),
              "xlsx" = paste0(file_name,".xlsx"))
     },
     content = function(file) {
-      index <- which(patient_names == input$tabset)
       export_data <- if (input$export_data_table == "filtered") {
-        filtered_data[[index]]()
+        filtered_data
       } else {
-        data_list[[index]]
+        data
       }
       switch(input$export_format_table,
              "csv" = { write.csv(export_data, file, row.names = FALSE) },
@@ -39,15 +38,28 @@ get_table_download_handler <- function(input, patient_names, filtered_data, data
   )
 }
 
+
+# Export histogramu TVF
+#' @export
+get_hist_download_handler <- function(patient,h) {
+  downloadHandler(
+    filename = paste0(patient,"_TVF_histogram.png"),
+    content = function(file) {
+      ggsave(file, h, width = 12, height = 4)
+    }
+  )
+}
+
+
 # Export Sankey plot (HTML, PNG)
 #' @export
-get_sankey_download_handler <- function(input, p) {
+get_sankey_download_handler <- function(input, patient, p) {
   downloadHandler(
     filename = function() {
       if (input$export_format == "html") {
-        paste0(input$tabset,"_sankey.html")
+        paste0(patient,"_sankey.html")
       } else {
-        paste0(input$tabset,"_sankey.png")
+        paste0(patient,"_sankey.png")
       }
     },
     content = function(file) {
@@ -59,17 +71,6 @@ get_sankey_download_handler <- function(input, p) {
         webshot(temp_html, file, vwidth = 733, vheight = 317)
         unlink(temp_html)
       }
-    }
-  )
-}
-
-# Export histogramu TVF
-#' @export
-get_hist_download_handler <- function(patient,h) {
-  downloadHandler(
-    filename = paste0(patient,"_TVF_histogram.png"),
-    content = function(file) {
-      ggsave(file, h, width = 12, height = 4)
     }
   )
 }

@@ -178,7 +178,6 @@ server <- function(id, selected_samples, shared_data) {
       )
     })
     
-    
     # Sledování vybraného řádku a varianty
     selected_variant <- reactive({
       selected_row <- getReactableState("somatic_var_call_tab", "selected")
@@ -230,7 +229,6 @@ server <- function(id, selected_samples, shared_data) {
       shared_data$somatic_data(updated_global_data)
       message("## shared_data$somatic_data(): ", shared_data$somatic_data())
     })
-    
     
     
     output$selectPathogenic_tab <- renderReactable({
@@ -307,8 +305,10 @@ server <- function(id, selected_samples, shared_data) {
     })
     
     # plot VAF histogram
-    output$Histogram <- renderPlot({
-      generate_vaf(filtered_data(),selected_variants())}, height = 480)
+    hist <- reactive({
+      generate_vaf(filtered_data(),selected_variants())
+    })
+    output$Histogram <- renderPlot({ hist() },height = 480)
     
     # Rendering the Sankey network
     p <-reactiveVal()
@@ -328,6 +328,15 @@ server <- function(id, selected_samples, shared_data) {
     output$diagram <- renderUI({
       sankeyNetworkOutput(ns("sankey_plot"), height = sankey_data()$plot_height)
     })
+    
+    #################
+    ## export data ##
+    #################
+    output$Table_download <- get_table_download_handler(input,selected_samples,data(),filtered_data())
+    output$Hist_download <- get_hist_download_handler(selected_samples, hist())
+    output$Sankey_download <- get_sankey_download_handler(input, selected_samples, p())   # p = reaktive funkcion returning sankey object
+
+    
   })
 }
 
@@ -516,20 +525,6 @@ filterTab_ui <- function(id,data){
     #   return(updated_columns)
     # })
     # 
-
-    # 
-    # #export dat ________________________________________________________________
-    # output$Table_download <- get_table_download_handler(
-    #   input = input,
-    #   patient_names = patient_names,
-    #   filtered_data = filtered_data,
-    #   data_list = data_list
-    # )
-    # output$Sankey_download <- get_sankey_download_handler(
-    #   input = input,
-    #   p = p  # p = reaktivní funkce vracející sankey objekt
-    # )
-    # output$Hist_download <- get_hist_download_handler(h = h)
     # 
     # 
     # observe({
