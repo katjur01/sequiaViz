@@ -14,7 +14,7 @@ box::use(
   stats[setNames],
   shinyalert[shinyalert,useShinyalert],
   shinyjs[useShinyjs,hide,show],
-  data.table[data.table]
+  data.table[data.table,as.data.table]
 )
 
 box::use(
@@ -28,6 +28,7 @@ box::use(
   app/view/export_functions[get_table_download_handler,get_sankey_download_handler,get_hist_download_handler],
   app/logic/load_data[get_inputs,load_data],
   app/logic/prepare_table[prepare_somatic_table],
+  app/logic/patients_list[sample_list_som],
   # app/logic/reactable_helpers[selectFilter,minRangeFilter,filterMinValue,generate_columnsDef]
 )
 
@@ -46,6 +47,7 @@ ui <- function(id) {
   ns <- NS(id)
   useShinyjs()
   tagList(
+
      dropdownButton(label = NULL,right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC; margin-bottom: 0; padding-bottom: 0;"></i>'),
        selectInput(ns("export_data_table"), "Select data:", choices = c("All data" = "all", "Filtered data" = "filtered")),
        selectInput(ns("export_format_table"), "Select format:", choices = c("CSV" = "csv", "TSV" = "tsv", "Excel" = "xlsx")),
@@ -55,16 +57,30 @@ ui <- function(id) {
      br(),
      use_spinner(reactableOutput(ns("somatic_var_call_tab"))),
      tags$br(),
-     actionButton(ns("selectPathogenic_button"), "Select variants as possibly oncogenic", status = "info"),
-     tags$br(),
-     fluidRow(
-       column(5,reactableOutput(ns("selectPathogenic_tab")))),
-     tags$br(),
-     fluidRow(
-       column(1,actionButton(ns("delete_button"), "Delete variants", icon = icon("trash-can")))),
-     tags$br(),
+     # uiOutput(ns("confirm_button_ui")),
+     div(style = "display: flex; justify-content: space-between; align-items: top; width: 100%;",
+       div(
+         actionButton(ns("selectPathogenic_button"), "Select variants as possibly oncogenic", status = "info"),
+         tags$br(),
+           reactableOutput(ns("selectPathogenic_tab")),
+         tags$br(),
+           actionButton(ns("delete_button"), "Delete variants", icon = icon("trash-can")),
+         tags$br()
+         ),
+       
+       # div(
+         # style = "height: 38px;font-size: 16px;",
+         dropdown(ns("igv_dropdownButton"), label = "IGV", status = "primary", icon = icon("play"), right = TRUE, size = "md",#width = 230, 
+           pickerInput(ns("idpick"), "Select patients for IGV:", choices = sample_list_som(), options = pickerOptions(actionsBox = FALSE, size = 4, maxOptions = 4, dropupAuto = FALSE, maxOptionsText = "Select max. 4 patients"),multiple = TRUE),
+           div(style = "display: flex; justify-content: center; margin-top: 10px;",
+               actionBttn(ns("go2igv_button"), label = "Go to IGV", style = "stretch", color = "primary", size = "sm", individual = TRUE)
+           )
+         )
+       # )
+     ),
      uiOutput(ns("confirm_button_ui")),
-     box(width = 12, closable = FALSE,collapsible = TRUE, title = tags$div(style = "padding-top: 8px;","Tumor variant frequency histogram"),
+     tags$br(),
+     box(width = 12, closable = FALSE,collapsible = TRUE, collapsed = TRUE, title = tags$div(style = "padding-top: 8px;","Tumor variant frequency histogram"),
        dropdownButton(label = "Export Circos Plot",right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
          downloadButton(ns("Hist_download"),"Download as PNG")),
        br(),br(),
@@ -72,7 +88,7 @@ ui <- function(id) {
          use_spinner(plotOutput(ns("Histogram"),height = "480px"))
        )
      ),
-     box(width = 12,closable = FALSE,collapsible = TRUE,title = tags$div(style = "padding-top: 8px;","Sankey diagram"),
+     box(width = 12,closable = FALSE,collapsible = TRUE,collapsed = TRUE,title = tags$div(style = "padding-top: 8px;","Sankey diagram"),
        dropdownButton(label = "Export Sankey Plot",right = FALSE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
          selectInput(ns("export_format"), "Select format:", choices = c("HTML" = "html", "PNG" = "png")),
          downloadButton(ns("Sankey_download"),"Download")),
@@ -201,8 +217,8 @@ server <- function(id, selected_samples, shared_data) {
       
       if (nrow(new_unique_variants) > 0) selected_variants(rbind(current_variants, new_unique_variants))
       
-      # Aktualizace globální proměnné shared_data$somatic_data:
-      global_data <- shared_data$somatic_data()
+      # Aktualizace globální proměnné shared_data$somatic_var:
+      global_data <- shared_data$somatic_var()
       
       if (is.null(global_data) || nrow(global_data) == 0 || !("sample" %in% names(global_data))) {
         global_data <- data.table(
@@ -226,8 +242,8 @@ server <- function(id, selected_samples, shared_data) {
       
       # Přidáme nově aktualizované lokální data daného pacienta
       updated_global_data <- rbind(global_data, selected_variants())
-      shared_data$somatic_data(updated_global_data)
-      message("## shared_data$somatic_data(): ", shared_data$somatic_data())
+      shared_data$somatic_var(updated_global_data)
+      message("## shared_data$somatic_var(): ", shared_data$somatic_var())
     })
     
     
@@ -235,14 +251,15 @@ server <- function(id, selected_samples, shared_data) {
       variants <- selected_variants()
       if (nrow(variants) == 0) {
         return(NULL)
+      } else {
+        variants <- as.data.table(variants)[,.(var_name,Gene_symbol,Consequence,HGVSc,HGVSp,Feature)]
+        reactable(
+          as.data.frame(variants),
+          columns = list(
+            var_name = colDef(name = "Variant name"),
+            Gene_symbol = colDef(name = "Gene name")),
+          selection = "multiple", onClick = "select")
       }
-      
-      reactable(
-        variants,
-        columns = list(
-          var_name = colDef(name = "Variant name"),
-          Gene_symbol = colDef(name = "Gene name")),
-        selection = "multiple", onClick = "select")
     })
     
     observeEvent(input$delete_button, {
@@ -251,7 +268,7 @@ server <- function(id, selected_samples, shared_data) {
       current_variants <- selected_variants()
       updated_variants <- current_variants[-rows, ]
       selected_variants(updated_variants)
-      shared_data$somatic_data(updated_variants)
+      shared_data$somatic_var(updated_variants)
       session$sendCustomMessage("resetReactableSelection",selected_variants())
       
       if (nrow(selected_variants()) == 0) {
@@ -335,6 +352,53 @@ server <- function(id, selected_samples, shared_data) {
     output$Table_download <- get_table_download_handler(input,selected_samples,data(),filtered_data())
     output$Hist_download <- get_hist_download_handler(selected_samples, hist())
     output$Sankey_download <- get_sankey_download_handler(input, selected_samples, p())   # p = reaktive funkcion returning sankey object
+
+    #############
+    ## run IGV ##
+    #############
+    
+    observeEvent(input$go2igv_button, {
+      selected_empty <- is.null(selected_variants()) || nrow(selected_variants()) == 0
+      bam_empty <- is.null(shared_data$somatic_bam) || length(shared_data$somatic_bam) == 0
+      
+      if (selected_empty || bam_empty) {
+        showModal(modalDialog(
+          title = "Missing input",
+          "You have not selected variants or patients for visualization. Please return to the Somatic variant calling tab and define them.",
+          easyClose = TRUE,
+          footer = modalButton("OK")
+        ))
+        
+      } else {
+        shared_data$navigation_context("somatic")   # odkud otevíráme IGV
+        
+        bam_path  <- get_inputs("bam_file")
+        # bam_list  <- lapply(input$idpick, function(id_val) {
+        #   full_path <- grep(paste0(id_val, ".*\\.bam$"), bam_path$dna.tumor_bam, value = TRUE)
+        #   list(name = id_val, file = sub(bam_path$path_to_folder, ".", full_path, fixed = TRUE))
+        # })
+        
+        bam_list <- unlist(
+          lapply(input$idpick, function(id_val) {
+            ## 1) DNA-tumor BAM
+            tumor_path <- grep(paste0(id_val, ".*\\.bam$"), bam_path$dna.tumor_bam, value = TRUE)
+            tumor_track <- list(name = paste0(id_val, "tumor"), file = sub(bam_path$path_to_folder, ".", tumor_path, fixed = TRUE))
+            
+            ## 2) DNA-normal BAM
+            normal_path <- grep(paste0(id_val, ".*\\.bam$"), bam_path$dna.normal_bam, value = TRUE)
+            normal_track <- list(name = paste0(id_val, "normal"), file = sub(bam_path$path_to_folder, ".", normal_path, fixed = TRUE))
+            
+            list(tumor_track, normal_track)  # pořadí: tumor -> chimeric
+          }), recursive = FALSE              # nerozbalujeme úplně, zůstane list tracků
+        )
+        
+        shared_data$somatic_bam(bam_list)
+        message("✔ Assigned somatic_bam: ", paste(sapply(bam_list, `[[`, "file"), collapse = ", "))
+        
+        shinyjs::runjs("document.querySelector('[data-value=\"app-hidden_igv\"]').click();")
+      }
+    })
+    
 
     
   })
@@ -430,53 +494,6 @@ filterTab_ui <- function(id,data){
 
 
 
-               # div(style = "display: flex; justify-content: space-between; align-items: center; width: 100%;",
-               #   actionButton(ns("confirm_selected"), label = "Confirm selected rows"),
-               #   div(
-               #     style = "height: 38px;font-size: 16px;",
-               #     dropdown(
-               #       inputId = ns("igv_dropdownButton"),
-               #       label = "Interactive Genome Viewer",
-               #       status = "primary", 
-               #       icon = NULL,
-               #       right = TRUE,
-               #       width = 230,
-               #       pickerInput(
-               #         inputId = ns("idpick"), 
-               #         label = "Select patients for IGV:", 
-               #         choices = patient_names, 
-               #         options = pickerOptions(actionsBox = FALSE, size = 4, maxOptions = 4, dropupAuto = FALSE, maxOptionsText = "Select max. 4 patients"), 
-               #         multiple = TRUE
-               #       ),
-               #       div(style = "display: flex; justify-content: center; margin-top: 10px;",
-               #           actionBttn(inputId = ns("go2igv_button"), label = "Go to IGV", style = "stretch", color = "primary", size = "sm", individual = TRUE)
-               #       )
-               #     )
-               #   )
-               # ),
-               # uiOutput(ns("confirm_button_ui"))
-
-    
-
-  
-
-    # observeEvent(input$go2igv_button, {
-    #   selected_empty <- is.null(shared_data$selected_variants) || (is.data.frame(shared_data$selected_variants) && nrow(shared_data$selected_variants) == 0)
-    #   bam_empty <- is.null(shared_data$bam_files) || length(shared_data$bam_files) == 0
-    #   
-    #   if (selected_empty || bam_empty) {
-    #     showModal(modalDialog(
-    #       title = "Missing input",
-    #       "You have not selected variants or patients for visualization. Please return to the Somatic variant calling tab and define them.",
-    #       easyClose = TRUE,
-    #       footer = modalButton("OK")
-    #     ))
-    #   } else {
-    #     shinyjs::runjs("document.querySelector('[data-value=\"app-hidden_igv\"]').click();")
-    #   }
-    # })
-    # 
-
     # 
     # # zakladni nastaveni zobrazovanych sloupcu a jejich aktualizace ____________
     # default_columns <- default_col()
@@ -527,15 +544,6 @@ filterTab_ui <- function(id,data){
     # 
     # 
     # 
-    # observe({
-    #   bam_list <- NULL
-    #   if (!is.null(input$idpick) && length(input$idpick) > 0) {
-    #     bam_list <- lapply(input$idpick, function(id_val) {
-    #       list(name = id_val, file = paste0(id_val, ".bam"))
-    #     })
-    #   }
-    #   shared_data$bam_files <- bam_list
-    # })
     # 
     # 
     

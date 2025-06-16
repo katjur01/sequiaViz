@@ -347,8 +347,8 @@ server <- function(id, shared_data) {
     ### Selected variant or fusion data + buttons ###
     #################################################
     observe({
-      germ_vars <- as.data.table(shared_data$germline_data())
-      fusions <- as.data.table(shared_data$fusion_data())
+      germ_vars <- as.data.table(shared_data$germline_var())
+      fusions <- as.data.table(shared_data$fusion_var())
       tissue_table <- copy(tissue_dt())  # Výchozí tabulka
       
       # Výchozí hodnota pro selected_dt

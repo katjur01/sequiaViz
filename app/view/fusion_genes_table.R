@@ -2,7 +2,7 @@
 
 box::use(
   shiny[moduleServer,NS,h3,tagList,div,textInput,renderPrint,reactive,observe,observeEvent,icon,mainPanel,titlePanel,isolate,
-        uiOutput,renderUI,HTML,req,reactiveVal,column,fluidRow],
+        uiOutput,renderUI,HTML,req,reactiveVal,column,fluidRow,showModal,modalDialog,modalButton],
   reactable,
   reactable[reactable,colDef,reactableOutput,renderReactable,JS,getReactableState],
   htmltools[tags,p],
@@ -12,11 +12,13 @@ box::use(
   data.table[fifelse,setcolorder],
   shinyalert[shinyalert,useShinyalert],
   data.table[data.table,uniqueN],
+  shinyWidgets[pickerInput, dropdown,actionBttn,pickerOptions]
 )
 box::use(
   app/logic/load_data[get_inputs,load_data],
   app/logic/prepare_table[prepare_fusion_genes_table,prepare_arriba_images], 
   app/logic/waiters[use_spinner],
+  app/logic/patients_list[sample_list_fuze],
   app/logic/reactable_helpers[generate_columnsDef]
 )
 
@@ -39,26 +41,25 @@ ui <- function(id) {
   ns <- NS(id)
   useShinyjs()
   tagList(
-    # div(
-    #   class = "fusion-table-contant",
-      use_spinner(reactable$reactableOutput(ns("fusion_genes_tab"))),
-    # )
-    tags$br(),
-    actionButton(ns("selectFusion_button"), "Select fusion as causal", status = "info"),
-    tags$br(),
-    fluidRow(
-      column(3,reactableOutput(ns("selectFusion_tab")))
-    ),
-    tags$br(),
-    fluidRow(
-      column(1,actionButton(ns("delete_button"), "Delete fusion", status = "danger"))
+    use_spinner(reactable$reactableOutput(ns("fusion_genes_tab"))),
+    div(style = "display: flex; justify-content: space-between; align-items: top; width: 100%;",
+      div(
+        tags$br(),
+        actionButton(ns("selectFusion_button"), "Select fusion as causal", status = "info"),
+        tags$br(),
+        fluidRow(
+          column(3,reactableOutput(ns("selectFusion_tab")))),
+        tags$br(),
+        fluidRow(
+          column(1,actionButton(ns("delete_button"), "Delete fusion", status = "danger")))
+      ),
+      dropdown(ns("igv_dropdownButton"), label = "IGV", status = "primary", icon = icon("play"), right = TRUE, size = "md",#width = 230, 
+               pickerInput(ns("idpick"), "Select patients for IGV:", choices = sample_list_fuze(), options = pickerOptions(actionsBox = FALSE, size = 4, maxOptions = 4, dropupAuto = FALSE, maxOptionsText = "Select max. 4 patients"),multiple = TRUE),
+               div(style = "display: flex; justify-content: center; margin-top: 10px;",
+                   actionBttn(ns("go2igv_button"), label = "Go to IGV", style = "stretch", color = "primary", size = "sm", individual = TRUE)
+               )
+      )
     )
-
-    # actionButton(ns("delete_button"), "Delete fusion", status = "danger"),
-    # actionButton(ns("confirm_btn"), "Confirm fusion", status = "success"),
-
-
-    
   )
 
 }
@@ -177,7 +178,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       selected_rows <- getReactableState("fusion_genes_tab", "selected")
       req(selected_rows)
       
-      new_variants <- dt()[selected_rows, c("gene1","gene2","overall_support")]  # Získání vybraných fúzí
+      new_variants <- dt()[selected_rows, c("gene1","gene2","overall_support","position1","position2")]  # Získání vybraných fúzí
       new_variants$sample <- selected_samples
       current_variants <- selected_fusions()  # Stávající přidané varianty
       new_unique_variants <- new_variants[!(new_variants$gene1 %in% current_variants$gene1 &       # Porovnání - přidáme pouze ty varianty, které ještě nejsou v tabulce
@@ -185,19 +186,21 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       
       if (nrow(new_unique_variants) > 0) {      # Přidáme pouze unikátní varianty
         selected_fusions(rbind(current_variants, new_unique_variants))
-        # shared_data$fusion_data(selected_fusions())
-        # message("Updated fusion_data in shared_data:", shared_data$fusion_data())
+        # shared_data$fusion_var(selected_fusions())
+        # message("Updated fusion_var in shared_data:", shared_data$fusion_var())
       }
       
       # Aktualizace globální proměnné shared_data$germline_data:
-      global_data <- shared_data$fusion_data()
+      global_data <- shared_data$fusion_var()
       
       if (is.null(global_data) || nrow(global_data) == 0 || !("sample" %in% names(global_data))) {
         global_data <- data.table(
           sample = character(),
           gene1 = character(),
           gene2 = character(),
-          overall_support = integer()
+          overall_support = integer(),
+          position1 = character(),
+          position2 = character()
         )
       }
       message("## selected_fusions(): ", selected_fusions())
@@ -207,8 +210,8 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       
       # Přidáme nově aktualizované lokální data daného pacienta
       updated_global_data <- rbind(global_data, selected_fusions())
-      shared_data$fusion_data(updated_global_data)
-      message("## shared_data$fusion_data(): ", shared_data$fusion_data())
+      shared_data$fusion_var(updated_global_data)
+      message("## shared_data$fusion_var(): ", shared_data$fusion_var())
     })
     
     output$selectFusion_tab <- renderReactable({
@@ -240,7 +243,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       updated_variants <- current_variants[-rows, ]
       
       selected_fusions(updated_variants)
-      shared_data$fusion_data(updated_variants)
+      shared_data$fusion_var(updated_variants)
       
       session$sendCustomMessage("resetReactableSelection",selected_fusions())
       
@@ -289,27 +292,46 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
 
     
     
-    # observeEvent(input$igvButton_click, {
-    #   runjs("
-    #     var newWindow = window.open(window.location.href.split('#')[0] + '#shiny-tab-hidden_igv', '_blank');
-    #     newWindow.onload = function() {
-    #       newWindow.Shiny.setInputValue('go_to_hidden_igv', true);
-    #     }
-    #   ")
-    # })
-
+    #############
+    ## run IGV ##
+    #############
     
-    # observeEvent(input$openIGVButton, {
-    #     IGV$server("igv")
-    # 
-    # })
-#     
-#     # observeEvent(input$igvButton_click, {
-#     #   IGV$server("igv")
-#     #   # system("open -a /Users/katerinajuraskova/Desktop/IGV.app -b /Users/katerinajuraskova/Desktop/sequiaViz/batch_file_2.txt")
-#     #   # system("npx http-server -a localhost ./ -p 8080", wait = FALSE) # -p 8080
-#     #   # runjs("window.open('http://localhost:8080/www/igv_web_app/', '_blank');")
-#     # })
+    observeEvent(input$go2igv_button, {
+      selected_empty <- is.null(selected_fusions()) || nrow(selected_fusions()) == 0
+      bam_empty <- is.null(shared_data$fusion_bam) || length(shared_data$fusion_bam) == 0
+      
+      if (selected_empty || bam_empty) {
+        showModal(modalDialog(
+          title = "Missing input",
+          "You have not selected fusions or patients for visualization. Please return to the Fusion gene detection tab and define them.",
+          easyClose = TRUE,
+          footer = modalButton("OK")
+        ))
+        
+      } else {
+        shared_data$navigation_context("fusion")   # odkud otevíráme IGV
+        bam_path  <- get_inputs("bam_file")
+        
+        bam_list <- unlist(
+          lapply(input$idpick, function(id_val) {
+            ## 1) RNA-tumor BAM
+            tumor_path <- grep(paste0(id_val, ".*\\.bam$"), bam_path$rna.tumor_bam, value = TRUE)
+            tumor_track <- list(name = paste0(id_val, " RNA"), file = sub(bam_path$path_to_folder, ".", tumor_path, fixed = TRUE))
+            
+            ## 2) Chimeric BAM
+            chim_path <- grep(paste0(id_val, ".*Chimeric\\.out\\.bam$"), bam_path$rna.chimeric_bam, value = TRUE)
+            chim_track <- list(name = paste0(id_val, " Chimeric"), file = sub(bam_path$path_to_folder, ".", chim_path, fixed = TRUE))
+            
+            list(tumor_track, chim_track)    # pořadí: tumor -> chimeric
+          }), recursive = FALSE              # nerozbalujeme úplně, zůstane list tracků
+        )
+      
+        shared_data$fusion_bam(bam_list)
+        message("✔ Assigned fusion_bam: ", paste(sapply(bam_list, `[[`, "file"), collapse = ", "))
+        
+        shinyjs::runjs("document.querySelector('[data-value=\"app-hidden_igv\"]').click();")
+      }
+    })
 
   })
 }

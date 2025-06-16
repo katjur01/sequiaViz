@@ -1,6 +1,6 @@
 box::use(
   shiny[br, NS,h3, tagList, div, observe, observeEvent, mainPanel, titlePanel, uiOutput, renderUI, HTML, fluidPage,fluidRow, moduleServer,
-        reactiveValues, column],
+        reactiveValues, column, req, reactive, reactiveVal,showModal,modalDialog],
   htmltools[tags],
   bs4Dash[actionButton,box],
   shinyjs[useShinyjs, runjs],
@@ -71,9 +71,69 @@ igv_server <- function(id,shared_data) {
     #   position1 = c("17:45597764", "11:118482495", "1:171814013"),
     #   position2 = c("17:45545676", "11:20365744", "1:171987759")
     # )
+    #################################################
+    ### Selected variant or fusion data + buttons ###
+    #################################################
+    # observe({
+    #   # Výchozí hodnota pro selected_dt
+    #   selected_dt(NULL)
+    #   
+    #   if (is.null(selected_variants) || nrow(selected_variants) == 0) {
+    #     message("No variants selected.")
+    #     # result_dt(tissue_table)
+    #   } else {
+    #     var_tab <- selected_variants[, .(Gene_symbol, variant = var_name)]
+    #     var_tab <- unique(var_tab, by = "Gene_symbol")
+    #   }
+    # 
+    # })
+
+    selected_variants <- reactive({
+      req(shared_data$navigation_context())
+      from <- shared_data$navigation_context()
+      if(!is.null(from)){
+        message("🔍 Opened IGV from tab: ", from)
+        if (from == "somatic") {
+          return(data.frame(
+            gene1 = shared_data$somatic_var()$Gene_symbol,
+            position1 = gsub("_(\\d+)_.*$", ":\\1", shared_data$somatic_var()$var_name),
+            sample = shared_data$somatic_var()$sample
+          ))
+        } else if (from == "germline") {
+          return(data.frame(
+            gene1 = shared_data$germline_var()$Gene_symbol,
+            position1 = gsub("_(\\d+)_.*$", ":\\1", shared_data$germline_var()$var_name),
+            sample = shared_data$germline_var()$sample
+          ))
+        } else if (from == "fusion") {
+          return(data.frame(
+            gene1 = shared_data$fusion_var()$gene1,
+            gene2 = shared_data$fusion_var()$gene2,
+            position1 = gsub("_(\\d+)_.*$", ":\\1", shared_data$fusion_var()$position1),
+            position2 = gsub("_(\\d+)_.*$", ":\\1", shared_data$fusion_var()$position2),
+            sample = shared_data$fusion_var()$sample
+          ))
+        }
+      }
+    })
+    
+    selected_bams <- reactive({
+      req(shared_data$navigation_context())
+      from <- shared_data$navigation_context()
+      if(!is.null(from)){
+        if (from == "somatic") {
+          return(shared_data$somatic_bam())
+        } else if (from == "germline") {
+          return(shared_data$germline_bam())
+        } else if (from == "fusion") {
+          return(shared_data$fusion_bam())
+        }
+      }
+    })
     
     output$bookmarks <- renderReactable({
-      reactable(values$bookmark_df,
+      req(selected_variants())
+      reactable(selected_variants(),
                 pagination = FALSE,
                 striped = TRUE,
                 wrap = FALSE,
@@ -86,9 +146,11 @@ igv_server <- function(id,shared_data) {
     })
     
     observeEvent(input$loadIGVButton, {
-      selected_empty <- is.null(shared_data$selected_variants) || 
-        (is.data.frame(shared_data$selected_variants) && nrow(shared_data$selected_variants) == 0)
-      bam_empty <- is.null(shared_data$bam_files) || length(shared_data$bam_files) == 0
+      message("Current selected_bams files: ", paste(selected_bams(), collapse = ", "))
+      message("Current selected_variants files: ", paste(selected_variants(), collapse = ", "))
+      selected_empty <- is.null(selected_variants()) || 
+        (is.data.frame(selected_variants()) && nrow(selected_variants()) == 0)
+      bam_empty <- is.null(selected_bams()) || length(selected_bams()) == 0
       
       if (selected_empty || bam_empty) {
         showModal(modalDialog(
@@ -101,8 +163,10 @@ igv_server <- function(id,shared_data) {
         output$igvDivOutput <- renderUI({
           div(id = session$ns("igv-igvDiv"))
         })
-      track_block <- build_igv_tracks(samples)
+      message("###### build_igv_tracks selected_bams ######: ",selected_bams())
+      track_block <- build_igv_tracks(selected_bams())
       
+      message("##### track_block ##### : ",track_block)
       # Krok 2: Po vykreslení spustíme JavaScript pro IGV s mírným zpožděním
       runjs(sprintf("
         setTimeout(function() {
@@ -139,11 +203,22 @@ igv_server <- function(id,shared_data) {
       selected <- input$bookmarks_click
       message("Clicked row info: ", selected$index)
       if (!is.null(selected)) {
-        position1 <- values$bookmark_df$position1[selected$index]
-        position2 <- values$bookmark_df$position2[selected$index]
-        positions <- paste0(position1, " ", position2)
+        from <- shared_data$navigation_context()
+        message("🔍 Opened IGV from tab: ", from)
         
-        message("Navigating to positions: ", positions)
+        if (from == "somatic") {
+          position <- selected_variants()$position1[selected$index]
+        } else if (from == "germline") {
+          position <- selected_variants()$position1[selected$index]
+        } else if (from == "fusion") {
+          position1 <- selected_variants()$position1[selected$index]
+          position2 <- selected_variants()$position2[selected$index]
+          position <- paste0(position1, " ", position2)
+        } else {
+          position <- NULL
+        }
+        
+        message("Navigating to positions: ", position)
         
         runjs(sprintf("
           console.log('Navigating to positions: %s');
@@ -156,7 +231,7 @@ igv_server <- function(id,shared_data) {
             });
           } else {
             console.log('IGV browser does not exist');
-          }", positions, positions))
+          }", position, position))
       }
     })
   })

@@ -119,9 +119,10 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
 get_inputs <- function(flag){
   
   library <- "MOII_e117"
-  path = paste0("./input_files/", library)
   
   if (flag == "per_sample_file"){
+
+    path = paste0("./input_files/", library)
     
     ## somatic var call path
     somatic_variant_calling_project <- "117_WES_somatic"
@@ -159,6 +160,8 @@ get_inputs <- function(flag){
     ))
     
   } else if (flag == "all_sample_file"){
+
+    path = paste0("./input_files/", library)
     
     ## somatic var call path
     somatic_variant_calling_project <- "117_WES_somatic"
@@ -174,9 +177,31 @@ get_inputs <- function(flag){
     
     
     return(list(var_call.somatic = somatic_variant_calling_filenames,
-                var_call.germline = germline_variant_calling_filenames,
-                var_call.structural = structural_variant_calling_filenames
+                var_call.germline = germline_variant_calling_filenames
     ))
+    
+  } else if (flag == "bam_file"){
+
+    path = paste0("input_files/", library, "/primary_analysis/")
+    
+    
+    somatic_variant_calling_project <- "230426_MOII_e117_tkane"
+    DNA_tumor_bam <- list.files(paste(path, somatic_variant_calling_project,"mapped",sep = "/"), pattern = "*.bam", full.names = TRUE)
+    
+    germline_variant_calling_project <- "230426_MOII_e117_krve"
+    DNA_normal_bam <- list.files(paste(path, germline_variant_calling_project,"mapped",sep = "/"), pattern = "*.bam", full.names = TRUE)
+    
+    fusion_genes_project <- "230426_MOII_e117_fuze"
+    RNA_tumor_bam <- list.files(paste(path, fusion_genes_project,"mapped",sep = "/"), pattern = "*.bam", full.names = TRUE)
+    RNA_chimeric_bam <- list.files(file.path(path, fusion_genes_project), pattern   = "Chimeric\\.out\\.bam$", recursive = TRUE, full.names = TRUE)
+
+    return(list(dna.tumor_bam = DNA_tumor_bam,
+                dna.normal_bam = DNA_normal_bam,
+                rna.tumor_bam = RNA_tumor_bam,
+                rna.chimeric_bam = RNA_chimeric_bam,
+                path_to_folder = path
+    ))
+    
     
   } else {
     stop("Invalid tag. Use 'per_sample_file' or 'all_sample_file'.")

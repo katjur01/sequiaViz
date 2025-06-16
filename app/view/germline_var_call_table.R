@@ -10,7 +10,7 @@
 
 box::use(
   shiny[moduleServer,NS,h2,h3,tagList,div,tabsetPanel,tabPanel,observeEvent,fluidPage,fluidRow, reactive,icon,textInput,isTruthy,verbatimTextOutput,
-        sliderInput,showModal,modalDialog,column,uiOutput,renderUI,textOutput,renderText,reactiveVal,req,observe,outputOptions,checkboxInput,
+        sliderInput,showModal,modalDialog,modalButton,column,uiOutput,renderUI,textOutput,renderText,reactiveVal,req,observe,outputOptions,checkboxInput,
         renderPrint,getDefaultReactiveDomain],
   bs4Dash[actionButton, box,popover,addPopover],
   reactable,
@@ -18,7 +18,7 @@ box::use(
   # reactable.extras[reactable_extras_ui,reactable_extras_server],
   htmltools[tags,HTML],
   app/logic/patients_list[set_patient_to_sample],
-  shinyWidgets[prettyCheckbox,searchInput],
+  shinyWidgets[prettyCheckbox,searchInput,pickerInput, dropdown,actionBttn,pickerOptions],
   shinyalert[shinyalert,useShinyalert],
   shinyjs[useShinyjs,hide,show],
   data.table[data.table,uniqueN],
@@ -28,6 +28,7 @@ box::use(
 box::use(
   app/logic/load_data[get_inputs,load_data],
   app/logic/prepare_table[prepare_germline_table],
+  app/logic/patients_list[sample_list_germ],
   app/logic/waiters[use_spinner],
   app/logic/reactable_helpers[selectFilter,minRangeFilter,filterMinValue,generate_columnsDef]
 )
@@ -50,13 +51,23 @@ ui <- function(id) {
     tags$div(id = ns("checkbox_popover"), style = "width:245px; position: absolute; right: 10;", #margin-top: 13.5px;
              checkboxInput(ns("fullTable_checkbox"),label = "Keep pre-filtered variant table",value = TRUE)),
     tags$br(),
-    actionButton(ns("selectPathogenic_button"), "Select variants as possibly pathogenic", status = "info"),
-    tags$br(),
-    fluidRow(
-      column(5,reactableOutput(ns("selectPathogenic_tab")))),
-    tags$br(),
-    fluidRow(
-      column(1,actionButton(ns("delete_button"), "Delete variants", icon = icon("trash-can"))))
+    div(style = "display: flex; justify-content: space-between; align-items: top; width: 100%;",
+      div(
+        actionButton(ns("selectPathogenic_button"), "Select variants as possibly pathogenic", status = "info"),
+        tags$br(),
+        fluidRow(
+          column(5,reactableOutput(ns("selectPathogenic_tab")))),
+        tags$br(),
+        fluidRow(
+          column(1,actionButton(ns("delete_button"), "Delete variants", icon = icon("trash-can"))))
+      ),
+      dropdown(ns("igv_dropdownButton"), label = "IGV", status = "primary", icon = icon("play"), right = TRUE, size = "md",#width = 230, 
+               pickerInput(ns("idpick"), "Select patients for IGV:", choices = sample_list_germ(), options = pickerOptions(actionsBox = FALSE, size = 4, maxOptions = 4, dropupAuto = FALSE, maxOptionsText = "Select max. 4 patients"),multiple = TRUE),
+               div(style = "display: flex; justify-content: center; margin-top: 10px;",
+                   actionBttn(ns("go2igv_button"), label = "Go to IGV", style = "stretch", color = "primary", size = "sm", individual = TRUE)
+               )
+      )
+    )
   )
 }
 
@@ -179,8 +190,8 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
 
       if (nrow(new_unique_variants) > 0) selected_variants(rbind(current_variants, new_unique_variants))
       
-      # Aktualizace globální proměnné shared_data$germline_data:
-      global_data <- shared_data$germline_data()
+      # Aktualizace globální proměnné shared_data$germline_var:
+      global_data <- shared_data$germline_var()
       
       if (is.null(global_data) || nrow(global_data) == 0 || !("sample" %in% names(global_data))) {
         global_data <- data.table(
@@ -204,8 +215,8 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
       
       # Přidáme nově aktualizované lokální data daného pacienta
       updated_global_data <- rbind(global_data, selected_variants())
-      shared_data$germline_data(updated_global_data)
-      message("## shared_data$germline_data(): ", shared_data$germline_data())
+      shared_data$germline_var(updated_global_data)
+      message("## shared_data$germline_var(): ", shared_data$germline_var())
     })
     
 
@@ -238,7 +249,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
       current_variants <- selected_variants()
       updated_variants <- current_variants[-rows, ]
       selected_variants(updated_variants)
-      shared_data$germline_data(updated_variants)
+      shared_data$germline_var(updated_variants)
       session$sendCustomMessage("resetReactableSelection",selected_variants())
       
       if (nrow(selected_variants()) == 0) {
@@ -290,6 +301,42 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
                  content = "gnomAD NFE <= 0.01, Coverage > 10, Consequence w/o synonymous_variant, Gene region is exon or splice",
                  placement = "bottom",
                  trigger = "hover"))
+    
+    
+    
+    #############
+    ## run IGV ##
+    #############
+    
+    observeEvent(input$go2igv_button, {
+      selected_empty <- is.null(selected_variants()) || nrow(selected_variants()) == 0
+      bam_empty <- is.null(shared_data$germline_bam) || length(shared_data$germline_bam) == 0
+      
+      if (selected_empty || bam_empty) {
+        showModal(modalDialog(
+          title = "Missing input",
+          "You have not selected variants or patients for visualization. Please return to the Germline variant calling tab and define them.",
+          easyClose = TRUE,
+          footer = modalButton("OK")
+        ))
+        
+      } else {
+        shared_data$navigation_context("germline")   # odkud otevíráme IGV
+        
+        bam_path <- get_inputs("bam_file")
+        bam_list <- lapply(input$idpick, function(id_val) {
+            full_path <- grep(paste0(id_val, ".*\\.bam$"), bam_path$dna.normal_bam, value = TRUE)
+            list(name = id_val, file = sub(bam_path$path_to_folder, ".", full_path, fixed = TRUE))  # relativní cesta)
+        })
+        
+        shared_data$germline_bam(bam_list)
+        message("✔ Assigned germline_bam: ",paste(sapply(bam_list, `[[`, "file"), collapse = ", "))
+        
+        shinyjs::runjs("document.querySelector('[data-value=\"app-hidden_igv\"]').click();")
+      }
+    })
+    
+    
     
   })
 }

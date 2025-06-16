@@ -38,7 +38,7 @@ box::use(
   htmltools[tags,p,span],
   shinyWidgets[pickerInput,prettySwitch,dropdown],
   shinyjs[useShinyjs, runjs,toggle],
-  utils[str],
+  utils[str]
   # fresh[create_theme,bs4dash_vars,bs4dash_yiq,bs4dash_layout,bs4dash_sidebar_light,bs4dash_status,bs4dash_color]
   # promises[future_promise,`%...!%`,`%...>%`,catch],
   # future[plan,multisession],
@@ -64,7 +64,7 @@ box::use(
   app/logic/prepare_table[colFilter],
   app/logic/reactable_helpers[columnName_map],
   app/view/networkGraph_cytoscape,
-
+  app/logic/load_data[get_inputs],
 
 )
 
@@ -89,30 +89,19 @@ ui <- function(id){
   dashboardPage(
     header = dashboardHeader(
       nav = navbarMenu(
+        navbarTab("Fusion genes", tabName = ns("fusion_genes")),
         navbarTab("Variant calling", tabName = ns("variant_calling")),
         navbarTab("Summary 2.0 dev", tabName = ns("summary2")),
         navbarTab("Network graph", tabName = ns("network_graph")),
 
         navbarTab("Expression profile", tabName = ns("expression_profile")),
 
-        navbarTab("Fusion genes", tabName = ns("fusion_genes")),
+
         navbarTab("Hidden IGV Item", tabName = ns("hidden_igv"))
 
       )
     ),
     sidebar = dashboardSidebar(disable = TRUE),
-          # header = dashboardHeader(),
-          # sidebar = dashboardSidebar( id = ns("sidebar"), collapsed = TRUE,
-          #   h3( "MOII_e_117krve", style = "font-size: 20px; padding: 10px; color: #FFFFFF; "),
-          #   sidebarMenu(id = ns("sidebar_menu"),
-          #               menuItem("Expression profile", tabName = ns("expression_profile"), icon = icon("chart-line")),
-          #               menuItem("Network graph", tabName = ns("network_graph"), icon = icon("diagram-project")),
-          #               menuItem("Fusion genes", tabName = ns("fusion_genes"), icon = icon("atom")),
-          #               menuItem("Variant calling", tabName = ns("variant_calling"), icon = icon("dna")),
-          #               menuItem("Hidden IGV Item", tabName = ns("hidden_igv"), icon = icon("eye-slash")),
-          #               menuItem("Summary",tabName = ns("summary"),icon = icon("id-card-clip"))
-          #         
-          #         )),
           body = dashboardBody(#style = "background-color: white;",
             tabItems(
               tabItem(tabName = ns("summary2"),
@@ -135,7 +124,8 @@ ui <- function(id){
                 
               ),
               tabItem(tabName = ns("variant_calling"),
-                      tabBox(id = ns("variant_calling_tabs"), width = 12, collapsible = FALSE, title = uiOutput(ns("igv_dropdown_ui")),
+                      tabBox(id = ns("variant_calling_tabs"), width = 12, collapsible = FALSE, # title = uiOutput(ns("igv_dropdown_ui"))
+                             
                              tabPanel("Somatic small variant calling",tabName = ns("somatic_var_call_panel"),value = "somatic",
                                       tags$style(HTML(".btn-group > .btn.active {background-color: skyblue; color: white;}
                                                  .btn-mygrey {background-color: lightgray; color: black;}
@@ -151,25 +141,25 @@ ui <- function(id){
                                       })))
                              ),
                              tabPanel("Germline small variant calling",tabName = ns("germline_var_call_panel"),value = "germline",
-                                      ## this css changes color of selected buttons in IGV dropdown button
-                                      tags$style(
-                                        HTML(".btn-group > .btn.active {
-                                                 background-color: skyblue;
-                                                 color: white;
-                                               }
-                                               .btn-mygrey {
-                                                 background-color: lightgray;
-                                                 color: black;
-                                                 }
-                                              ")
-                                      ),
+                                      # ## this css changes color of selected buttons in IGV dropdown button
+                                      # tags$style(
+                                      #   HTML(".btn-group > .btn.active {
+                                      #            background-color: skyblue;
+                                      #            color: white;
+                                      #          }
+                                      #          .btn-mygrey {
+                                      #            background-color: lightgray;
+                                      #            color: black;
+                                      #            }
+                                      #         ")
+                                      # ),
                                       fluidPage(
-                                          div(style = "width: 2.8%; position: absolute; right: 0; margin-top: 13.5px;",
-                                              uiOutput(ns("colFilter_dropdown_ui_germline")))),
+                                        div(style = "width: 2.8%; position: absolute; right: 0; margin-top: 13.5px;",
+                                            uiOutput(ns("colFilter_dropdown_ui_germline")))),
                                       do.call(tabsetPanel, c(id = ns("germline_patients"), lapply(names(set_patient_to_sample("germline")), function(sample) {
                                         tabPanel(title = sample, germline_var_call_table$ui(ns(paste0("germline_tab_", sample))))
                                       })))
-                              )
+                             )
  
                       )),
               tabItem(tabName = ns("fusion_genes"),
@@ -240,9 +230,17 @@ ui <- function(id){
 server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-    shared_data <- reactiveValues(germline_data = reactiveVal(NULL), fusion_data = reactiveVal(NULL), somatic_data = reactiveVal(NULL),
-                                  germline_overview = list(), fusion_overview = list())
-  
+    shared_data <- reactiveValues(germline_var = reactiveVal(NULL), 
+                                  fusion_var = reactiveVal(NULL), 
+                                  somatic_var = reactiveVal(NULL),
+                                  germline_bam = reactiveVal(NULL), 
+                                  fusion_bam = reactiveVal(NULL), 
+                                  somatic_bam = reactiveVal(NULL),
+                                  germline_overview = list(), 
+                                  fusion_overview = list(),
+                                  navigation_context = reactiveVal(NULL))     # somatic or germline or fusion     # from where are we opening IGV
+
+    
     
 
     # bam_path <- paste0(getwd(),"/input_files/bam")
@@ -301,14 +299,14 @@ server <- function(id) {
 
     ## igv dropdown button for germline
     selection_enabled <- reactiveVal(FALSE)
-
-    # IGV dropdown button for germline
-    output$igv_dropdown_ui <- renderUI({
-      igvDropdown_ui(ns("igv_dropdown"), names(set_patient_to_sample("germline")))
-    })
-
-    # IGV Dropdown server call, pass the reactive value
-    igvDropdown_server("igv_dropdown", session, selection_enabled)
+# 
+#     # IGV dropdown button for germline
+#     output$igv_dropdown_ui <- renderUI({
+#       igvDropdown_ui(ns("igv_dropdown"), names(set_patient_to_sample("germline")))
+#     })
+# 
+#     # IGV Dropdown server call, pass the reactive value
+#     igvDropdown_server("igv_dropdown", session, selection_enabled)
 
     # Run germline varcall module
     samples_germ <- set_patient_to_sample("germline")
@@ -365,15 +363,6 @@ server <- function(id) {
     })
       
 
-    
-   
-      
-      
-      
-      
-    
-
-
 ##################    
     ## run network graph module    
     
@@ -384,32 +373,23 @@ server <- function(id) {
 
 
     # # Spustíme statický server při startu celé aplikace
-    # start_static_server(dir = "/Users/katerinajuraskova/Desktop/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_fuze/mapped")
-    # 
-    # IGV$igv_server("igv")
-    # 
-    # # Ukončení serveru při zavření celé session
-    # session$onSessionEnded(function() {
-    #   stop_static_server()
-    # })
+    # start_static_server(dir = "/Users/katerinajuraskova/Desktop/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_tkane/mapped")
+    # Spustíme statický server při startu celé aplikace
+    path <- get_inputs("bam_file")
+    
+    path_combined <- file.path(getwd(), path$path_to_folder)
+    path_clean <- sub("/+$", "", path_combined)
+    
+    start_static_server(dir = path_clean)   # paste0(getwd(),"/input_files/MOII_e117/primary_analysis/230426_MOII_e117_tkane/mapped"))
+
+    IGV$igv_server("igv",shared_data)
+
+    # Ukončení serveru při zavření celé session
+    session$onSessionEnded(function() {
+      stop_static_server()
+    })
 
 
-
-
-
-
-  
-  
-  # piechart_server("pieChart")
-  # fusion_genes_table$piechart_server("pieChart")
-  
-
-
-  ##### filtering table for all patients together #####
-  ##
-  # selected_samples <- dropdown_button$server("select_samples")
-  # fusion_genes_table$table_server("geneFusion_tab",selected_samples)
-  #####################################################
   })
 }
 
