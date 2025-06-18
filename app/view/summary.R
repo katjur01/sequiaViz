@@ -48,15 +48,13 @@ ui <- function(id){
           # tags$div(textOutput(ns("clinvar_N_som"))),
     fluidRow(
       # Levý sloupec – boxy (všechny boxy se zobrazí jeden vedle druhého, případně můžete je obalit do vlastního fluidRow, pokud je chcete mít vertikálně)
-      column(8,
-        fluidRow(
+      # column(8,
+        # fluidRow(
           div(class = "summary-box somatic-infobox",
               box(
                 title = span("Somatic var call", class = "category"),
                 tags$div(textOutput(ns("mutationNormal"))),
-                tags$div(textOutput(ns("mutationFoundation"))),
                 tags$div(textOutput(ns("for_review_som"))),
-                tags$div(textOutput(ns("clinvar_N_som"))),
                 icon = HTML('<span class="icon icon-green" title="Analysis available"><i class="fa-solid fa-circle-check"></i></span>'),
                 elevation = 2,
                 collapsible = FALSE,
@@ -95,7 +93,7 @@ ui <- function(id){
             box(
               title = span("Expression profile", class = "category"),
               tags$div(textOutput(ns("tissues"))),
-              tags$div(class = "item", "Over-expressed genes: 41"),
+              tags$div(class = "item", "Tissue comparison: 2"),
               tags$div(class = "item", "Under-expressed genes: 21"),
               tags$div(class = "item", "Altered pathways: 5"),
               icon = HTML('<span class="icon icon-green" title="Analysis available"><i class="fa-solid fa-circle-check"></i></span>'),
@@ -107,20 +105,14 @@ ui <- function(id){
               width = 12
             )
           )
-        )
-      ),
-      # Pravý sloupec – obrázek
-      column(4
-        # div(
-        #   # class = "image-content",
-        #   tags$img(src = "potential_circos1.png",
-        #            style = "width:70%; height:auto; display:inline-block; vertical-align:middle;")
         # )
-      )
+      # )
     ),
     
     fluidRow(
       column(7,
+        hr(),
+        uiOutput(ns("somatic_boxes")),
         hr(),
         uiOutput(ns("germline_boxes")),
         hr(),
@@ -201,7 +193,6 @@ server <- function(id, patient, shared_data){
     mutation_load <- reactive({
       dt <- as.data.table(read.xlsx("input_files/MOII_e117/117_WES_somatic/mutation_loads.xlsx"))
       dt[,normal:= as.numeric(gsub(",", ".", normal))]
-      dt[,foundation_one:= as.numeric(gsub(",", ".", foundation_one))]
       dt
     })
     
@@ -210,9 +201,7 @@ server <- function(id, patient, shared_data){
     output$for_review_som <- renderText({
       paste("Variants for review: ")#, variantsCount())
     })
-    output$clinvar_N_som <- renderText({
-      paste0("Pathogenic and likely-pathogenic variants: ")
-    })
+
     # 3) Zobrazení mutation load pro 'normal'
     output$mutationNormal <- renderText({
       row <- mutation_load()[sample == patient, ]
@@ -224,17 +213,6 @@ server <- function(id, patient, shared_data){
       }
     })
     
-    # 4) Zobrazení mutation load pro 'foundationOne'
-    output$mutationFoundation <- renderText({
-      row <- mutation_load()[sample == patient, ]
-      
-      if (nrow(row) == 1) {
-        paste("Mutation load foundationOne:", row$foundation_one)
-      } else {
-        "Mutation load foundationOne: N/A"
-      }
-    })
-    
     
     
     #################################################
@@ -242,7 +220,7 @@ server <- function(id, patient, shared_data){
     #################################################
 
     output$somatic_boxes <- renderUI({
-      som_vars <- as.data.table(shared_data$somatic_data())
+      som_vars <- as.data.table(shared_data$somatic_var())
       
       if (is.null(som_vars) || nrow(som_vars) == 0) {
         tags$div("No somatic variants selected")
@@ -255,12 +233,45 @@ server <- function(id, patient, shared_data){
 
         boxes <- lapply(1:nrow(som_vars), function(i) {
           variant <- som_vars[i, ]
-          div(class = "summary-box somatic-infobox",
+          
+          div(class = "somatic-box",
               box(
-                title = paste0(variant$Gene_symbol),
+                title = HTML(paste0(variant$Gene_symbol,
+                      '<span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>',
+                      '<span style="font-size:14px; font-weight:normal; ">missence variant</span>',
+                      '<span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>',
+                      # '<span class="clinvar-tag clinvar-pathogenic">Pathogenic</span>'
+                      '<span style="font-size:14px; font-weight:normal; >Pathogenic</span>')),
                 solidHeader = TRUE, collapsed = TRUE, width = 12,
-                tags$p(strong("Detail:"), variant$var_name),
-                tags$p(strong("Detail:"), variant$additional_info)
+                fluidRow(
+                  column(3,
+                         tags$p(strong("Variant info: ")),
+                         tags$p("Location: chr19:45352801"),
+                         fluidRow(
+                           column(2,
+                                  tags$p("Ref: C")
+                           ),
+                           column(2,
+                                  tags$p("Alt: G")
+                           )
+                         )
+                  ),
+                  column(3,
+                         fluidRow(
+                           column(6,
+                                  tags$p("HGVSc: c.1847G>C"),
+                                  tags$p("HGVSp: p.R616P"),
+                                  tags$p("Variant type: SNV")
+                           )
+                         )
+                  ),
+                  column(3,
+                         tags$p(strong("Frequency: ")),
+                         tags$p("Alelic: 0.28"),
+                         tags$p("GnomAD: 0.0000027")
+                  ),
+                  column(3)
+                )
               )
           )
         })
@@ -272,7 +283,7 @@ server <- function(id, patient, shared_data){
     
     # Dynamicky generované karty pro germline varianty
     output$germline_boxes <- renderUI({
-      germ_vars <- as.data.table(shared_data$germline_data())
+      germ_vars <- as.data.table(shared_data$germline_var())
       
       if (is.null(germ_vars) || nrow(germ_vars) == 0) {
         # return(NULL)
@@ -314,7 +325,6 @@ server <- function(id, patient, shared_data){
                      )
               ),
               column(3,
-
                      fluidRow(
                        column(6,
                               tags$p("HGVSc: c.1847G>C"),
@@ -330,8 +340,6 @@ server <- function(id, patient, shared_data){
                 ),
               column(3)
             )
-            
-            
           )
         )
       })
@@ -343,11 +351,11 @@ server <- function(id, patient, shared_data){
     
     output$fusion_boxes <- renderUI({
               
-      fusion_vars <- as.data.table(shared_data$fusion_data())
+      fusion_vars <- as.data.table(shared_data$fusion_var())
       
       if (is.null(fusion_vars) || nrow(fusion_vars) == 0) {
         # return(NULL)
-        tags$div("No germline variants selected")
+        tags$div("No fusion genes selected")
       } else {
         
       
@@ -382,15 +390,11 @@ server <- function(id, patient, shared_data){
               ),
               column(3)
             )
-
           )
         )
       })
-      
       tagList(boxes) # Vrátíme seznam boxů jako tagList
-      
       }
-      
     })
     
 
