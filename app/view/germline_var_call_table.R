@@ -181,7 +181,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
       req(selected_rows)
       
       new_variants <- filtered_data()[selected_rows, c("var_name", "Gene_symbol","variant_freq","coverage_depth", "Consequence",
-                                                       "HGVSc","HGVSp","variant_type","Feature", "clinvar_sig")]  # Získání vybraných variant
+                                                       "HGVSc","HGVSp","variant_type","Feature", "clinvar_sig","gnomAD_NFE")]  # Získání vybraných variant
       new_variants$sample <- selected_samples
 
       current_variants <- selected_variants()  # Stávající přidané varianty
@@ -205,7 +205,8 @@ server <- function(id, selected_samples, selected_columns, column_mapping, selec
           HGVSp = character(),
           variant_type = character(),
           Feature = character(),
-          clinvar_sig = character()#(round(variant_freq * coverage_depth))/coverage_depth
+          clinvar_sig = character(), #(round(variant_freq * coverage_depth))/coverage_depth
+          gnomAD_NFE = character()
         )
       }
       message("## selected_variants(): ", selected_variants())

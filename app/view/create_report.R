@@ -4,11 +4,11 @@
 # library(rmarkdown)
 
 box::use(
-  shiny[tagList,fileInput,conditionalPanel,reactive,reactiveValues,reactiveVal,radioButtons,downloadButton,icon,moduleServer,NS,downloadHandler],
+  shiny[tagList,fileInput,conditionalPanel,reactive,reactiveValues,reactiveVal,downloadButton,icon,moduleServer,NS,downloadHandler,div],
   flextable[theme_vanilla,bg,fontsize,border_remove,set_header_labels,set_table_properties],
   officer[cursor_reach,body_add_par,body_remove,fp_border,fp_text,read_docx],
-  htmltools[tags],
-  shinyWidgets[dropdown],
+  htmltools[tags,HTML],
+  shinyWidgets[dropdown,prettyRadioButtons],
   data.table[data.table],
   bs4Dash[box]
 )
@@ -29,48 +29,25 @@ myReport_theme <- function(ft) {
 
 ui <- function(id) {
   ns <- NS(id)
-  
   tagList(
-    dropdown(right = TRUE, size = "md", icon = icon("download"), style = "material-flat", width = "240px",
-       box(width = 12,title = tags$div(style = "padding-top: 8px;","Choose template:"),closable = FALSE,collapsible = FALSE,
-        radioButtons(
-          inputId = ns("template_choice"),
-          label = NULL,
-          choices = c("Use default template" = "default", "Upload custom template" = "custom"),
-          selected = "default"
-        ),
+    div(style = "font-size: 16px !important; font-weight: normal !important;",
+    dropdown(right = TRUE, size = "sm", icon = icon("download"), style = "material-flat", width = "300px",
+       prettyRadioButtons(
+            inputId = ns("template_choice"),
+            label = "Choose template:",
+            choices = c("Use default template" = "default", "Upload custom template" = "custom"),
+            selected = "default"
+          ),
         conditionalPanel(
           condition = sprintf("input['%s'] == 'custom'", ns("template_choice")),
           fileInput(ns("custom_template"), "Upload your template (.docx)", accept = ".docx")
-        )
        ),
       downloadButton(ns("download_report"), "Generate Report")
+    )
     )
   )
 }
 
-
-# ui <- fluidPage(
-#   titlePanel("Report Generator"),
-#   sidebarLayout(
-#     sidebarPanel(
-#       # Přepínač mezi výchozí a vlastní šablonou
-#       radioButtons("template_choice", "Choose template:",
-#                    choices = c("Use default template" = "default",
-#                                "Upload custom template" = "custom"),
-#                    selected = "default"),
-#       conditionalPanel(
-#         condition = "input.template_choice == 'custom'",
-#         fileInput("custom_template", "Upload your template (.docx)",
-#                   accept = c(".docx"))
-#       ),
-# 
-#       downloadButton("download_report", "Generate Report")
-#     ),
-#     mainPanel(
-#     )
-#   )
-# )
 
 server <- function(id,shared_data) {
   moduleServer(id, function(input, output, session) {

@@ -1,13 +1,11 @@
+.container-of-summary-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
 .summary-box {
-  width: 350px;
-  
-  .card-header {
-    padding: 5px 10px;  /* Sníží padding */
-  }
-  .card-header .card-title {
-    font-size: 16px;    /* Menší velikost písma */
-    margin: 0;          /* Odstraní nepřebytečné mezery */
-  }
+  flex: 1 1 355px;  // Klíčová část
 }
 
 .no_data {
@@ -49,7 +47,15 @@
     border: 2px solid #7ac143; 
   }
   .card-header {
-    background-color: #f8fcf6ff; 
+    background-color: #f8fcf6ff;
+  }
+  .card-header .card-tools {
+    margin-top: -25px;
+  }
+  .card-body {
+    font-size: 16px; 
+    line-height: 0.8; 
+    padding: 20px 30px;
   }
 }
 .germline-box {
@@ -59,6 +65,14 @@
   .card-header {
     background-color: #f1f8f9ff; 
   }
+  .card-header .card-tools {
+    margin-top: -25px;
+  }
+  .card-body {
+    font-size: 16px; 
+    line-height: 0.8; 
+    padding: 20px 30px;
+  }
 }
 .fusion-box {
   .card {
@@ -66,6 +80,14 @@
   }
   .card-header {
     background-color: #fffdf7ff; 
+  }
+  .card-header .card-tools {
+    margin-top: -25px;
+  }
+  .card-body {
+    font-size: 16px; 
+    line-height: 0.8; 
+    padding: 20px 30px;
   }
 }
 

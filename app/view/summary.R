@@ -27,90 +27,49 @@ ui <- function(id){
   ns <- NS(id)
   hasData <- TRUE
   tagList(
-
-      # descriptionBlock(
-      #   number = "17%", 
-      #   numberColor = "pink", 
-      #   numberIcon = icon("caret-up"),
-      #   header = "$35,210.43", 
-      #   text = "TOTAL REVENUE", 
-      #   rightBorder = TRUE,
-      #   marginBottom = FALSE
-      # )
-    
-    # column(4,
-       # div(class = "text-content",
-          # HTML('<span class="icon icon-green"><i class="fas fa-square-check"></i></span>'),
-          # span("Somatic var call", class = "category"),
-          # tags$div(textOutput(ns("mutationNormal"))),
-          # tags$div(textOutput(ns("mutationFoundation"))),
-          # tags$div(textOutput(ns("for_review_som"))),
-          # tags$div(textOutput(ns("clinvar_N_som"))),
-    fluidRow(
-      # Levý sloupec – boxy (všechny boxy se zobrazí jeden vedle druhého, případně můžete je obalit do vlastního fluidRow, pokud je chcete mít vertikálně)
-      # column(8,
-        # fluidRow(
+  fluidRow(
+    column(12,
+      div(class = "container-of-summary-boxes",
           div(class = "summary-box somatic-infobox",
-              box(
+              box(elevation = 2, collapsible = FALSE, headerBorder = FALSE, width = 12,
                 title = span("Somatic var call", class = "category"),
                 tags$div(textOutput(ns("mutationNormal"))),
                 tags$div(textOutput(ns("for_review_som"))),
                 icon = HTML('<span class="icon icon-green" title="Analysis available"><i class="fa-solid fa-circle-check"></i></span>'),
-                elevation = 2,
-                collapsible = FALSE,
-                headerBorder = FALSE,
-                style = "height:136px; overflow:auto;",
-                width = 12  # box zabere celou šířku levého sloupce
-              )
+                style = "height:136px; overflow:auto;")
           ),
           div(class = "summary-box germline-infobox", #class = paste("summary-box germline-infobox", if(!hasData) "no_data" else ""),
-            box(
+            box(elevation = 2, collapsible = FALSE, headerBorder = FALSE, width = 12,
               title = span("Germline var call", class = "category"),
               tags$div(textOutput(ns("for_review_germ"))),
               tags$div(textOutput(ns("clinvar_N_germ"))),
               icon = HTML('<span class="icon icon-gray" title="Analysis not available"><i class="fa-solid fa-circle-check"></i></span>'), #fa-circle-xmark
-              elevation = 2,
-              collapsible = FALSE,
-              headerBorder = FALSE,
-              style = "height:140px; overflow:auto;",
-              width = 12  # box zabere celou šířku levého sloupce
-            )
-          ),
+              style = "height:140px; overflow:auto;")
+            ),
           div(class = "summary-box fusion-infobox",
-            box(
+            box(elevation = 2, collapsible = FALSE, headerBorder = FALSE, width = 12,
               title = span("Fusion genes", class = "category"),
               tags$div(textOutput(ns("high_confidence"))),
               tags$div(textOutput(ns("potencially_fused"))),
               icon = HTML('<span class="icon icon-green" title="Analysis available"><i class="fa-solid fa-circle-check"></i></span>'),
-              elevation = 2,
-              collapsible = FALSE,
-              headerBorder = FALSE,
-              style = "height:136px; overflow:auto;",
-              width = 12
-            )
+              style = "height:136px; overflow:auto;")
           ),
           div(class = "summary-box expression-infobox",
-            box(
+            box(elevation = 2, collapsible = FALSE, headerBorder = FALSE, width = 12, color = "teal",
               title = span("Expression profile", class = "category"),
               tags$div(textOutput(ns("tissues"))),
               tags$div(class = "item", "Tissue comparison: 2"),
               tags$div(class = "item", "Under-expressed genes: 21"),
               tags$div(class = "item", "Altered pathways: 5"),
               icon = HTML('<span class="icon icon-green" title="Analysis available"><i class="fa-solid fa-circle-check"></i></span>'),
-              color = "teal",
-              elevation = 2,
-              collapsible = FALSE,
-              headerBorder = FALSE,
-              style = "height:136px; overflow:auto;",
-              width = 12
-            )
+              style = "height:136px; overflow:auto;")
           )
-        # )
-      # )
+        )
+      )
     ),
     
     fluidRow(
-      column(7,
+      column(12,
         hr(),
         uiOutput(ns("somatic_boxes")),
         hr(),
@@ -219,6 +178,9 @@ server <- function(id, patient, shared_data){
     ### Selected variant or fusion data + buttons ###
     #################################################
 
+    noNA_text <- function(x) ifelse(is.na(x) | x == "", "-", x)
+    
+    
     output$somatic_boxes <- renderUI({
       som_vars <- as.data.table(shared_data$somatic_var())
       
@@ -233,51 +195,38 @@ server <- function(id, patient, shared_data){
 
         boxes <- lapply(1:nrow(som_vars), function(i) {
           variant <- som_vars[i, ]
-          
+          var_name_split <- unlist(strsplit(variant$var_name, "_"))
+          allele_change <- unlist(strsplit(var_name_split[3],"/"))
+
           div(class = "somatic-box",
-              box(
-                title = HTML(paste0(variant$Gene_symbol,
-                      '<span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>',
-                      '<span style="font-size:14px; font-weight:normal; ">missence variant</span>',
-                      '<span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>',
-                      # '<span class="clinvar-tag clinvar-pathogenic">Pathogenic</span>'
-                      '<span style="font-size:14px; font-weight:normal; >Pathogenic</span>')),
-                solidHeader = TRUE, collapsed = TRUE, width = 12,
+              box(solidHeader = TRUE, collapsed = TRUE, width = 12,
+                  title = HTML(sprintf(
+                      '<span style="font-size:16px; font-weight:bold;">%s</span> 
+                       <span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>
+                       <span style="font-size:14px; font-weight:normal;">%s</span>',
+                      noNA_text(variant$Gene_symbol),
+                      noNA_text(variant$Consequence))),
                 fluidRow(
                   column(3,
                          tags$p(strong("Variant info: ")),
-                         tags$p("Location: chr19:45352801"),
+                         tags$p(sprintf("Position: %s", sprintf("chr%s:%s", var_name_split[1], var_name_split[2]))),
                          fluidRow(
-                           column(2,
-                                  tags$p("Ref: C")
-                           ),
-                           column(2,
-                                  tags$p("Alt: G")
-                           )
-                         )
-                  ),
+                           column(2, tags$p(sprintf("Ref: %s", allele_change[1]))),
+                           column(2, tags$p(sprintf("Alt: %s", allele_change[2]))))),
                   column(3,
                          fluidRow(
                            column(6,
-                                  tags$p("HGVSc: c.1847G>C"),
-                                  tags$p("HGVSp: p.R616P"),
-                                  tags$p("Variant type: SNV")
-                           )
-                         )
-                  ),
+                                  tags$p(""),
+                                  tags$p(sprintf("HGVSc: %s", variant$HGVSc)),
+                                  tags$p(sprintf("HGVSp: %s", variant$HGVSp)),
+                                  tags$p(sprintf("Variant type: %s", variant$variant_type))))),
                   column(3,
                          tags$p(strong("Frequency: ")),
-                         tags$p("Alelic: 0.28"),
-                         tags$p("GnomAD: 0.0000027")
-                  ),
+                         tags$p(sprintf("Allelic: %s", variant$tumor_variant_freq)),
+                         tags$p(sprintf("GnomAD: %s", variant$gnomAD_NFE))),
                   column(3)
-                )
-              )
-          )
-        })
-        
+                  )))})
         tagList(boxes)
-        
       }
     })
     
@@ -297,55 +246,41 @@ server <- function(id, patient, shared_data){
       
       boxes <- lapply(1:nrow(germ_vars), function(i) {
         variant <- germ_vars[i, ]
-        
+        var_name_split <- unlist(strsplit(variant$var_name, "_"))
+        allele_change <- unlist(strsplit(var_name_split[3],"/"))
         div(class = "germline-box",
-          box(
-            title = HTML(
-              paste0(
-                variant$Gene_symbol,
-                '<span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>',
-                '<span style="font-size:14px; font-weight:normal; ">missence variant</span>',
-                '<span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>',
-                # '<span class="clinvar-tag clinvar-pathogenic">Pathogenic</span>'
-                '<span style="font-size:14px; font-weight:normal; >Pathogenic</span>'
-              )
-            ),
-            solidHeader = TRUE, collapsed = TRUE, width = 12,
-            fluidRow(
-              column(3,
-                     tags$p(strong("Variant info: ")),
-                     tags$p("Location: chr19:45352801"),
-                     fluidRow(
-                       column(2,
-                              tags$p("Ref: C")
-                       ),
-                       column(2,
-                              tags$p("Alt: G")
-                       )
-                     )
-              ),
-              column(3,
-                     fluidRow(
-                       column(6,
-                              tags$p("HGVSc: c.1847G>C"),
-                              tags$p("HGVSp: p.R616P"),
-                              tags$p("Variant type: SNV")
-                       )
-                     )
-                   ),
-              column(3,
-                    tags$p(strong("Frequency: ")),
-                    tags$p("Alelic: 0.28"),
-                    tags$p("GnomAD: 0.0000027")
-                ),
-              column(3)
-            )
-          )
-        )
-      })
-      
+            box(solidHeader = TRUE, collapsed = TRUE, width = 12,
+                title = HTML(sprintf(
+                  '<span style="font-size:16px; font-weight:bold;"> %s </span> 
+                   <span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>
+                   <span style="font-size:14px; font-weight:normal;"> %s </span>
+                   <span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>
+                   <span style="font-size:14px; font-weight:normal;"> %s </span>',
+                  noNA_text(variant$Gene_symbol),
+                  noNA_text(variant$Consequence),
+                  noNA_text(variant$clinvar_sig)
+                )),
+                fluidRow(
+                  column(3,
+                         tags$p(strong("Variant info: ")),
+                         tags$p(sprintf("Position: %s", sprintf("chr%s:%s", var_name_split[1], var_name_split[2]))),
+                         fluidRow(
+                           column(2, tags$p(sprintf("Ref: %s", allele_change[1]))),
+                           column(2, tags$p(sprintf("Alt: %s", allele_change[2]))))),
+                  column(3,
+                         fluidRow(
+                           column(6,
+                                  tags$p(),
+                                  tags$p(sprintf("HGVSc: %s", variant$HGVSc)),
+                                  tags$p(sprintf("HGVSp: %s", variant$HGVSp)),
+                                  tags$p(sprintf("Variant type: %s", variant$variant_type))))),
+                  column(3,
+                         tags$p(strong("Frequency: ")),
+                         tags$p(sprintf("Allelic: %s", variant$variant_freq)),
+                         tags$p(sprintf("GnomAD: %s", variant$gnomAD_NFE))),
+                  column(3)
+            )))})
       tagList(boxes) # Vrátíme seznam boxů jako tagList
-      
       }
     })
     
@@ -357,7 +292,6 @@ server <- function(id, patient, shared_data){
         # return(NULL)
         tags$div("No fusion genes selected")
       } else {
-        
       
       fusion_vars <- fusion_vars[grepl(patient, sample)]
       message("## fusion_vars after filtering: ", fusion_vars)
@@ -368,38 +302,33 @@ server <- function(id, patient, shared_data){
       boxes <- lapply(1:nrow(fusion_vars), function(i) {
         fusion <- fusion_vars[i, ]
         div(class = "fusion-box",
-          box(
-            title = paste0(fusion$gene1," - ", fusion$gene2),
-            solidHeader = TRUE, collapsed = TRUE, width = 12, boxToolSize = "xs",
-            fluidRow(
-              column(3,
-                     tags$p(strong("Frame: "), "inframe"),
-                     tags$p(strong("Coverage: "), "35"),
-                     ),
-              column(3,
-                     tags$p(strong("Gene1: "), fusion$gene1),
-                     tags$p("Gene id: ENS000000003"),
-                     tags$p("Position: chr11:118482495"),
-                     tags$p("Site: CDS/splice-site")
-              ),
-              column(3,
-                     tags$p(strong("Gene1: "), fusion$gene2),
-                     tags$p("Gene id: ENS00001115680"),
-                     tags$p("Position: chr9:20365744"),
-                     tags$p("Site: intron")
-              ),
-              column(3)
-            )
-          )
-        )
-      })
-      tagList(boxes) # Vrátíme seznam boxů jako tagList
+            box(solidHeader = TRUE, collapsed = TRUE, width = 12,
+                title = HTML(sprintf(
+                    '<span style="font-size:16px; font-weight:bold;">%s</span> 
+                     <span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>
+                     <span style="font-size:14px; font-weight:normal;">%s</span>',
+                    paste0(fusion$gene1," - ", fusion$gene2),
+                    noNA_text(fusion$arriba.confidence))),
+                fluidRow(
+                  column(3,
+                         tags$p(strong(sprintf("%s: ", fusion$gene1))),
+                         tags$p(sprintf("ID: %s", "ENS")),
+                         tags$p(sprintf("Position: %s", fusion$position1)),
+                         tags$p(sprintf("Arriba site: %s", fusion$arriba.site1))),
+                  column(3,
+                         tags$p(strong(sprintf("%s: ", fusion$gene2))),
+                         tags$p(sprintf("ID: %s", "ENS")),
+                         tags$p(sprintf("Position: %s", fusion$position2)),
+                         tags$p(sprintf("Arriba site: %s", fusion$arriba.site2))),
+                  column(3,
+                         tags$p(),
+                         tags$p(sprintf("Frame: %s", "inframe or out-of-frame")),
+                         tags$p(sprintf("Coverage: %s", fusion$overall_support))),
+                  column(3)
+                )))})
+      tagList(boxes)
       }
     })
-    
-
-    
-    
   })
 }
 
