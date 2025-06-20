@@ -235,15 +235,12 @@ server <- function(id, selected_samples, shared_data) {
           gnomAD_NFE = character()
         )
       }
-      message("## selected_variants(): ", selected_variants())
-      message("## global_data: ", global_data)
       # Odstraníme data, která patří právě tomuto pacientovi
       global_data <- global_data[sample != selected_samples]
       
       # Přidáme nově aktualizované lokální data daného pacienta
       updated_global_data <- rbind(global_data, selected_variants())
       shared_data$somatic_var(updated_global_data)
-      message("## shared_data$somatic_var(): ", shared_data$somatic_var())
     })
     
     

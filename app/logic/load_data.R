@@ -12,15 +12,15 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
     input_var <- input_files[grepl(sample, input_files)]
     dt <- fread(input_var)
     dt[,sample := sample]
-
+    
     if("in_library" %in% colnames(dt)){
       return(dt)
-
+      
     } else {
       ## adding information about how unique variants are in samples
       ## this will run only first time when in_library column is not present 
       message("Creating in_library column.")
-
+      
       filenames_all <- get_inputs("all_sample_file")
       input_files_all <- filenames_all$var_call.germline
       input_var_all <- lapply(input_files_all,fread)
@@ -38,7 +38,7 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
         }
       }
       
-  
+      
       dt_all[, in_library := rowSums(.SD), .SDcols = sample_list]
       dt_all[, in_library := paste0(in_library, "/", length(sample_list))]
       merged_dt <- merge(dt, unique(dt_all[, .(var_name, in_library)]), by = "var_name", all.x = TRUE)
@@ -47,7 +47,7 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
       
       return(merged_dt)
     }
-
+    
   } else if (flag == "fusion") {
     input_var <- input_files[grepl(sample, input_files)]
     dt <- as.data.table(read.xlsx(input_var))
@@ -69,7 +69,7 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
         return(dt)
       })
       combined_dt <- rbindlist(dt_list, use.names = TRUE, fill = TRUE)
-
+      
     } else if (expr_flag == "all_genes"){
       patient_files <- patient_files[grep(expr_flag, patient_files)] # sample = "DZ1601"
       patient_files <- patient_files[grep("multiRow", patient_files)]
@@ -85,7 +85,7 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
     } else{
       stop("Your data table has wrong name. Must contain string gene_of_interest or all_genes.")
     }
-
+    
     return(combined_dt)
     
     
@@ -104,10 +104,10 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
     # 
     #   return(dt)
     # })
-# 
-#     combined_data <- merge(patient_data[[1]], patient_data[[2]], by = c("Sample", "Gene", "Pathway"), all = TRUE)
-#     return(combined_data)
-
+    # 
+    #     combined_data <- merge(patient_data[[1]], patient_data[[2]], by = c("Sample", "Gene", "Pathway"), all = TRUE)
+    #     return(combined_data)
+    
   } else {
     return(print("not varcall nor fusion nor expression"))
   }
@@ -121,7 +121,7 @@ get_inputs <- function(flag){
   library <- "MOII_e117"
   
   if (flag == "per_sample_file"){
-
+    
     path = paste0("./input_files/", library)
     
     ## somatic var call path
@@ -160,7 +160,7 @@ get_inputs <- function(flag){
     ))
     
   } else if (flag == "all_sample_file"){
-
+    
     path = paste0("./input_files/", library)
     
     ## somatic var call path
@@ -181,7 +181,7 @@ get_inputs <- function(flag){
     ))
     
   } else if (flag == "bam_file"){
-
+    
     path = paste0("input_files/", library, "/primary_analysis/")
     
     
@@ -194,7 +194,7 @@ get_inputs <- function(flag){
     fusion_genes_project <- "230426_MOII_e117_fuze"
     RNA_tumor_bam <- list.files(paste(path, fusion_genes_project,"mapped",sep = "/"), pattern = "*.bam", full.names = TRUE)
     RNA_chimeric_bam <- list.files(file.path(path, fusion_genes_project), pattern   = "Chimeric\\.out\\.bam$", recursive = TRUE, full.names = TRUE)
-
+    
     return(list(dna.tumor_bam = DNA_tumor_bam,
                 dna.normal_bam = DNA_normal_bam,
                 rna.tumor_bam = RNA_tumor_bam,
@@ -279,7 +279,7 @@ get_inputs <- function(flag){
 
 
 
-  
+
 
 
 # test app

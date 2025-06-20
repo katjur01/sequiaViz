@@ -332,9 +332,20 @@ Shiny.addCustomMessageHandler('cy-init', function(data) {
     if (!cy) {
         cy = initializeCytoscape(cyContainerId, data.elements);
     } else {
+            /*
         cy.elements().remove();
         cy.add(data.elements);
-        cy.layout({ name: 'cola' }).run(); // Default layout for run
+        cy.layout({ name: 'cola' }).run();
+        */
+        
+        cy.batch(() => {
+            cy.elements().remove();     // smaže starý pathway
+            cy.add(data.elements);      // přidá nový
+        });
+
+        cy.style().update();            // vynutí překreslení (řeší „neviditelné“ hrany)
+        cy.resize();                    // totéž, navíc přepočte viewport
+        cy.layout({ name: 'cola', animate: true }).run();   // layout až PO přidání
     }
 
     // Znovu označ uzly, které byly vybrány před překreslením
@@ -355,9 +366,20 @@ Shiny.addCustomMessageHandler('cy-subset', function(data) {
     if (!cySubset) {
         cySubset = initializeCytoscape(cySubsetContainerId, data.elements, true);
     } else {
+      /*
         cySubset.elements().remove();
         cySubset.add(data.elements);
         cySubset.layout({ name: 'cola' }).run();
+        */
+        cySubset.batch(() => {
+            cySubset.elements().remove();   // smaže starý subset
+            cySubset.add(data.elements);    // přidá nový
+        });
+
+        cySubset.style().update();          // vynutí redraw (canvas-bug)
+        cySubset.resize();                  // přepočítá viewport
+
+        cySubset.layout({ name: 'cola', animate: false }).run(); 
     }
 });
 

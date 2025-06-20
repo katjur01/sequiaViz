@@ -205,7 +205,8 @@ ui <- function(id){
               tabItem(h1("Gene Interactions Network"),tabName = ns("network_graph"),
                       bs4Card(width = 12,headerBorder = FALSE, collapsible = FALSE,
                         fluidPage(
-                          networkGraph_cytoscape$ui(ns("network_graph"))))
+                          networkGraph_cytoscape$ui(ns("network_graph"))
+                          ))
               ),
               tabItem(tabName = ns("hidden_igv"),
                       tags$style(HTML("
@@ -367,7 +368,7 @@ server <- function(id) {
 ##################    
     ## run network graph module    
     
-    # networkGraph_cytoscape$server("network_graph", shared_data)
+    networkGraph_cytoscape$server("network_graph", shared_data)
     
     
 

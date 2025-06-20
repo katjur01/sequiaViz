@@ -33,7 +33,7 @@ ui <- function(id){
           div(class = "summary-box somatic-infobox",
               box(elevation = 2, collapsible = FALSE, headerBorder = FALSE, width = 12,
                 title = span("Somatic var call", class = "category"),
-                tags$div(textOutput(ns("mutationNormal"))),
+                tags$div(textOutput(ns("TMB"))),
                 tags$div(textOutput(ns("for_review_som"))),
                 icon = HTML('<span class="icon icon-green" title="Analysis available"><i class="fa-solid fa-circle-check"></i></span>'),
                 style = "height:136px; overflow:auto;")
@@ -41,8 +41,8 @@ ui <- function(id){
           div(class = "summary-box germline-infobox", #class = paste("summary-box germline-infobox", if(!hasData) "no_data" else ""),
             box(elevation = 2, collapsible = FALSE, headerBorder = FALSE, width = 12,
               title = span("Germline var call", class = "category"),
-              tags$div(textOutput(ns("for_review_germ"))),
               tags$div(textOutput(ns("clinvar_N_germ"))),
+              tags$div(textOutput(ns("for_review_germ"))),
               icon = HTML('<span class="icon icon-gray" title="Analysis not available"><i class="fa-solid fa-circle-check"></i></span>'), #fa-circle-xmark
               style = "height:140px; overflow:auto;")
             ),
@@ -162,13 +162,13 @@ server <- function(id, patient, shared_data){
     })
 
     # 3) Zobrazení mutation load pro 'normal'
-    output$mutationNormal <- renderText({
+    output$TMB <- renderText({
       row <- mutation_load()[sample == patient, ]
       
       if (nrow(row) == 1) {
-        paste("Mutation load normal:", row$normal)
+        paste("Tumor mutation burden (load):", row$normal)
       } else {
-        "Mutation load normal: N/A"
+        "Tumor mutation burden: N/A"
       }
     })
     

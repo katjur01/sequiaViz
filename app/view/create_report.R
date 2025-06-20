@@ -1,10 +1,5 @@
-
-# library(ggplot2)
-# library(dplyr)
-# library(rmarkdown)
-
 box::use(
-  shiny[tagList,fileInput,conditionalPanel,reactive,reactiveValues,reactiveVal,downloadButton,icon,moduleServer,NS,downloadHandler,div],
+  shiny[tagList,fileInput,conditionalPanel,reactive,reactiveValues,reactiveVal,downloadButton,icon,moduleServer,NS,downloadHandler,div,observe,observeEvent],
   flextable[theme_vanilla,bg,fontsize,border_remove,set_header_labels,set_table_properties],
   officer[cursor_reach,body_add_par,body_remove,fp_border,fp_text,read_docx],
   htmltools[tags,HTML],
@@ -31,19 +26,19 @@ ui <- function(id) {
   ns <- NS(id)
   tagList(
     div(style = "font-size: 16px !important; font-weight: normal !important;",
-    dropdown(right = TRUE, size = "sm", icon = icon("download"), style = "material-flat", width = "300px",
-       prettyRadioButtons(
-            inputId = ns("template_choice"),
-            label = "Choose template:",
-            choices = c("Use default template" = "default", "Upload custom template" = "custom"),
-            selected = "default"
-          ),
-        conditionalPanel(
-          condition = sprintf("input['%s'] == 'custom'", ns("template_choice")),
-          fileInput(ns("custom_template"), "Upload your template (.docx)", accept = ".docx")
-       ),
-      downloadButton(ns("download_report"), "Generate Report")
-    )
+      dropdown(right = TRUE, size = "sm", icon = icon("download"), style = "material-flat", width = "300px",
+         prettyRadioButtons(
+              inputId = ns("template_choice"),
+              label = "Choose template:",
+              choices = c("Use default template" = "default", "Upload custom template" = "custom"),
+              selected = "default"
+            ),
+          conditionalPanel(
+            condition = sprintf("input['%s'] == 'custom'", ns("template_choice")),
+            fileInput(ns("custom_template"), "Upload your template (.docx)", accept = ".docx")
+         ),
+        downloadButton(ns("download_report"), "Generate Report")
+      )
     )
   )
 }
@@ -52,70 +47,52 @@ ui <- function(id) {
 server <- function(id,shared_data) {
   moduleServer(id, function(input, output, session) {
 
-    shared_data <- reactiveValues(germline_data = reactiveVal(NULL))
-    
-    
-    # global_data <- data.table(
-    #   sample = character(),
-    #   var_name = character(),
-    #   Gene_symbol = character(),
-    #   tumor_variant_freq= character(),
-    #   tumor_depth = character(),
-    #   Consequence = character(),
-    #   HGVSc = character(),
-    #   HGVSp = character(),
-    #   variant_type = character(),
-    #   Feature = character(),
-    #   clinvar_sig = character()
-    # )
     somatic_dt <- reactive({
-      message("shared_data$somatic_var()",colnames(shared_data$somatic_var()))
-      message("shared_data$somatic_var()",shared_data$somatic_var())
-      shared_data$somatic_var()
-      # dt <- data.table(
-      #   sample = character(),
-      #   var_name = character(),
-      #   Gene_symbol = character(),
-      #   tumor_variant_freq = character(),
-      #   coverage_depth = character(),
-      #   Consequence = character(),
-      #   HGVSc = character(),
-      #   HGVSp = character(),
-      #   variant_type = character(),
-      #   Feature = character(),
-      #   clinvar_sig = character(),
-      #   reads = character(),
-      #   variant_classification = character(),
-      #   therapeutic_option = character()
-      # )
-      # # dt[,reads := paste0(round(variant_freq * coverage_depth),"/",coverage_depth)]
-      # # dt[,var_name := sub("^([0-9XY]+_[0-9]+)_.*", "\\1", var_name)]
-      # # dt[,var_name := gsub("_", ":", var_name)]
-      # # dt[,variant := ifelse(is.na(HGVSp), HGVSc, paste0(HGVSc, "\n(", HGVSp, ")"))]
-      # # dt[,VAF :=  paste0(round(variant_freq,2) * 100," %")]
-      # dt
+      req(shared_data$somatic_var())
+      message(" ###########################  shared_data$somatic_var()",shared_data$somatic_var())
+      var_dt <- as.data.table(shared_data$somatic_var())
+      
+      if (is.na(shared_data$somatic_var())){
+        message(" ###########################  shared_data$somatic_var() IS NA")
+        dt <- data.table(
+          # sample = character(),
+          Gene = character(),
+          Transcript = character(),
+          variant = character(),
+          VAF = character(),
+          Consequence = character(),
+          Class = character()
+        )
+      } else {
+        message(" ###########################  shared_data$somatic_var() IS NOT NA")
+        dt <- data.table(
+          # sample = character(),
+          Gene = var_dt$Gene_symbol,
+          Transcript = var_dt$Feature,
+          variant = paste0(var_dt$HGVSc, "\n(", var_dt$HGVSp, ")"),
+          VAF = paste0(round(var_dt$tumor_variant_freq,2) * 100," %"),
+          Consequence = var_dt$Consequence,
+          Class = ""
+        )
+        message(" ###########################  dt : ",dt)
+      }
+      dt
     })
     
     preprare_somatic_dt <- function(somatic_dt) {
-      ft <- flextable(somatic_dt, col_keys = c("Gene_symbol","Feature","var_name","variant","variant_type","Consequence","reads","VAF","clinvar_sig","therapeutic_option"))
+      ft <- flextable(somatic_dt, col_keys = c("Gene","Feature","variant","VAF","Consequence","Class"))
       ft <- set_header_labels(ft,
-                              Gene_symbol = "Gene",
+                              Gene = "Gene",
                               Feature = "Transcript",
-                              var_name = "Position",
                               variant = "Variant",
-                              variant_type = "Type",
                               VAF = "VAF",
-                              Consequence = "Consequence",
-                              reads = "Reads",
-                              therapeutic_option = "Therapeutic option",
-                              clinvar_sig = "Class")
+                              Consequence = "Variant effect",
+                              Class = "Class")
       ft <- myReport_theme(ft)
       ft <- set_table_properties(ft, width = 1, layout = "autofit")
-      for (col in c("variant_type", "reads", "VAF")) {
-        ft <- width(ft, j = col, width = 0.6)
-      }
-      ft <- width(ft, j =  ~ clinvar_sig, width = 0.8)
-      ft <- width(ft, j =  ~ therapeutic_option, width = 1.5)
+      ft <- width(ft, j = ~ VAF, width = 0.6)
+      ft <- width(ft, j =  ~ variant, width = 0.8)
+      ft <- width(ft, j =  ~ Class, width = 1.5)
       ft <- bold(ft, j = ~ Gene_symbol, bold = TRUE)
       ft
     }
@@ -204,25 +181,14 @@ server <- function(id,shared_data) {
       ft <- bold(ft, j = ~ gene1 + gene2, bold = TRUE)
       ft
     }
-    
-    mut_sign_dt <- reactive({
-      dt <- data.table(
-        signature = c("Tumour mutation burden (TMB)","Mutation load normal","Microsatelite (in)stability (MSI)","Homologous recombinantion deficiency (HRD)"),
-        score = c(2.4, 1.06, 0.1, 0.95),
-        treshold = c("10 [0-100+]","","4 [0-100+]","0.5 [0-1]"),
-        result = c("Low","Low","MSS (stable)","Deficient")
-      )
-      dt
-    })
-    
-    preprare_mut_sign_dt <- function(mut_sign_dt) {
-      ft <- flextable(mut_sign_dt)
-      ft <- myReport_theme(ft)
-      ft <- set_table_properties(ft, width = 1, layout = "autofit")
-      ft <- width(ft, j = "signature", width = 3)
-      ft <- bold(ft, j = ~ signature, bold = TRUE)
-      ft
-    }
+# 
+#     mut_sign_dt <- sprintf("Tumor mutation burden (load): %s mutations/Mb", )
+#     
+#     preprare_mut_sign_dt <- function(mut_sign_dt) {
+#       ft <- width(ft, j = ~ mut_sign_dt, width = 3)
+#       ft <- bold(ft, j = ~ mut_sign_dt, bold = TRUE)
+#       ft
+#     }
     
     expression_dt <- reactive({
       dt <- data.table(
@@ -361,7 +327,9 @@ server <- function(id,shared_data) {
     })
   
     summary_somatic <- reactive({
-      sprintf("%s (%s)", somatic_dt()$Gene_symbol, paste0(somatic_dt()$HGVSc,"/",somatic_dt()$HGVSp))
+      req(somatic_dt())
+      message(" ######################### somatic_dt is active: ",somatic_dt())
+      sprintf("%s (%s)", somatic_dt()$Gene, somatic_dt()$variant)
     })
   
     summary_fusion <- reactive({
@@ -376,15 +344,16 @@ server <- function(id,shared_data) {
     })
     
     somatic_interpretation <- reactive({
-      variants <- sprintf("%s variant was found in the %s gene.", paste0(somatic_dt()$HGVSc,"/",somatic_dt()$HGVSp), somatic_dt()$Gene_symbol)
-      links <- paste0("(https://www.oncokb.org/gene/", somatic_dt()$Gene_symbol, ")")
+      req(somatic_dt())
+      variants <- sprintf("%s variant was found in the %s gene.", somatic_dt()$variant, somatic_dt()$Gene)
+      links <- paste0("(https://www.oncokb.org/gene/", somatic_dt()$Gene, ")")
       full_text <- paste(variants, links)
       return(full_text)
     })
     
-  
+  observe({
+    
     output$download_report <- downloadHandler(
-      
       filename = function() {
         paste0("report_", Sys.Date(), ".docx")
       },
@@ -518,21 +487,21 @@ server <- function(id,shared_data) {
         }, error = function(e) {
           message("Placeholder <<fusion_table>> was not found. Fusion table will not be added.")
         })
-        
-        
-        tryCatch({
-          doc <- cursor_reach(doc, "<<mutational_sign_table>>")
-  
-          if (is.null(mut_sign_dt()) || nrow(mut_sign_dt()) == 0) {
-            doc <- body_add_par(doc, "No data about mutational signatures were found.")
-          } else {
-            doc <- body_add_flextable(doc, preprare_mut_sign_dt(mut_sign_dt()), pos = "before")
-          }
-          doc <- cursor_reach(doc, "<<mutational_sign_table>>")
-          doc <- body_remove(doc)
-        }, error = function(e) {
-          message("Placeholder <<mutational_sign_table>> was not found. Mutational signatures table will not be added.")
-        })
+        # 
+        # 
+        # tryCatch({
+        #   doc <- cursor_reach(doc, "<<mutational_sign_table>>")
+        # 
+        #   if (is.null(mut_sign_dt()) || nrow(mut_sign_dt()) == 0) {
+        #     doc <- body_add_par(doc, "No data about mutational signatures were found.")
+        #   } else {
+        #     doc <- body_add_flextable(doc, preprare_mut_sign_dt(mut_sign_dt()), pos = "before")
+        #   }
+        #   doc <- cursor_reach(doc, "<<mutational_sign_table>>")
+        #   doc <- body_remove(doc)
+        # }, error = function(e) {
+        #   message("Placeholder <<mutational_sign_table>> was not found. Mutational signatures table will not be added.")
+        # })
   
         tryCatch({
           doc <- cursor_reach(doc, "<<expression_table>>")
@@ -587,6 +556,7 @@ server <- function(id,shared_data) {
         print(doc, target = file)
       }
     )
+  })
   })
 }
 
