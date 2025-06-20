@@ -50,6 +50,7 @@ tab_server <- function(id, tissue_dt, subTissue_dt, selected_nodes,selected_dt) 
     ##### reactable calling #####
     output$network_tab <- renderReactable({
       message("Rendering Reactable for network")
+      message("#########   tissue_dt    ######šš   ",colnames(tissue_dt()))
       reactable(as.data.frame(tissue_dt()),
                 columns = list(
                   feature_name = colDef(name = "Gene name", maxWidth = 100, filterable = TRUE),

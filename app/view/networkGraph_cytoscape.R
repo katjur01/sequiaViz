@@ -129,7 +129,7 @@ server <- function(id, shared_data) {
     new_genes_var <- reactiveVal(NULL)
     remove_genes_var <- reactiveVal(NULL)
     clear_all <- reactiveVal(FALSE)
-    result_dt <- reactiveVal(NULL)
+    # result_dt <- reactiveVal(NULL)
     selected_dt <- reactiveVal(NULL)
     
     dt <- input_data("MR1507","all_genes")
@@ -354,37 +354,37 @@ server <- function(id, shared_data) {
       
       # Výchozí hodnota pro selected_dt
       selected_dt(NULL)
-      
-      if ((is.null(som_vars)  || nrow(som_vars) == 0) &&
-          (is.null(germ_vars) || nrow(germ_vars) == 0) &&
-          (is.null(fusions)   || nrow(fusions) == 0)) {
-        message("No somatic, germline or fusion variant selected.")
-        result_dt(tissue_table)
-      } else {
-        # Přidání somatic variant
-        if (!is.null(som_vars) && nrow(som_vars) > 0) {
-          selected_som_variants <- som_vars[, .(Gene_symbol, variant = var_name)]
-          selected_som_variants <- unique(selected_som_variants, by = "Gene_symbol")
-          tissue_table <- merge(tissue_table, selected_som_variants, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
-        }
-        
-        # Přidání germline variant
-        if (!is.null(germ_vars) && nrow(germ_vars) > 0) {
-          selected_germ_variants <- germ_vars[, .(Gene_symbol, variant = var_name)]
-          selected_germ_variants <- unique(selected_germ_variants, by = "Gene_symbol")
-          tissue_table <- merge(tissue_table, selected_germ_variants, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
-        }
-        
-        # Přidání fúzí
-        if (!is.null(fusions) && nrow(fusions) > 0) {
-          fusions <- fusions[, .(Gene_symbol = c(gene1, gene2), fusion = paste(paste(gene1, gene2, sep = "-"), collapse = ", "))]
-          fusions <- unique(fusions, by = "Gene_symbol")
-          tissue_table <- merge(tissue_table, fusions, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
-        }
-        
-        result_dt(tissue_table)
-        message("Updated result_dt with somatic, germline and/or fusion variants.")
-      }
+      # 
+      # if ((is.null(som_vars)  || nrow(som_vars) == 0) &&
+      #     (is.null(germ_vars) || nrow(germ_vars) == 0) &&
+      #     (is.null(fusions)   || nrow(fusions) == 0)) {
+      #   message("No somatic, germline or fusion variant selected.")
+      #   result_dt(tissue_table)
+      # } else {
+      #   # Přidání somatic variant
+      #   if (!is.null(som_vars) && nrow(som_vars) > 0) {
+      #     selected_som_variants <- som_vars[, .(Gene_symbol, variant = var_name)]
+      #     selected_som_variants <- unique(selected_som_variants, by = "Gene_symbol")
+      #     tissue_table <- merge(tissue_table, selected_som_variants, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
+      #   }
+      #   
+      #   # Přidání germline variant
+      #   if (!is.null(germ_vars) && nrow(germ_vars) > 0) {
+      #     selected_germ_variants <- germ_vars[, .(Gene_symbol, variant = var_name)]
+      #     selected_germ_variants <- unique(selected_germ_variants, by = "Gene_symbol")
+      #     tissue_table <- merge(tissue_table, selected_germ_variants, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
+      #   }
+      #   
+      #   # Přidání fúzí
+      #   if (!is.null(fusions) && nrow(fusions) > 0) {
+      #     fusions <- fusions[, .(Gene_symbol = c(gene1, gene2), fusion = paste(paste(gene1, gene2, sep = "-"), collapse = ", "))]
+      #     fusions <- unique(fusions, by = "Gene_symbol")
+      #     tissue_table <- merge(tissue_table, fusions, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
+      #   }
+      #   
+      #   result_dt(tissue_table)
+      #   message("Updated result_dt with somatic, germline and/or fusion variants.")
+      # }
       
       # Vytvoření selected_dt
       if ((!is.null(som_vars) && nrow(som_vars) > 0) || (!is.null(germ_vars) && nrow(germ_vars) > 0) || (!is.null(fusions) && nrow(fusions) > 0)) {
@@ -401,11 +401,11 @@ server <- function(id, shared_data) {
         }
         
         selected_fusions <- if (!is.null(fusions) && nrow(fusions) > 0) {
-          unique(fusions[, fusion := "yes"])
+          fusions <- unique(fusions[, .(Gene_symbol = c(gene1, gene2), fusion = "yes")])
+          # unique(fusions[, fusion := "yes"])
         } else {
           data.frame(Gene_symbol = character(0))
         }
-
         combined_variants <- unique(rbindlist(list(as.data.table(selected_som_variants)[, .(Gene_symbol, var_name = "somatic")],as.data.table(selected_germ_variants)[, .(Gene_symbol, var_name = "germline")])))
         combined_selected <- merge(combined_variants, selected_fusions, by = "Gene_symbol", all = TRUE)
         pathways_info <- subTissue_dt()[feature_name %in% combined_selected$Gene_symbol, .(Gene_symbol = feature_name, all_kegg_paths_name)]
@@ -416,6 +416,8 @@ server <- function(id, shared_data) {
       } else {
         selected_dt(data.frame(Gene_symbol = character(0), variant = character(0), fusion = character(0), all_kegg_paths_name = character(0)))
       }
+      message("###########   colanmes(selected_dt)  #################",colnames(selected_dt()))
+      message("###########   selected_dt  #################",selected_dt())
     })
     
     
@@ -566,7 +568,7 @@ server <- function(id, shared_data) {
     ### others ###
     ##############
 
-    networkGraph_tables$tab_server("tab", tissue_dt = reactive(result_dt()), subTissue_dt, selected_nodes = synchronized_nodes, selected_dt)
+    networkGraph_tables$tab_server("tab", tissue_dt, subTissue_dt, selected_nodes = synchronized_nodes, selected_dt) # tissue_dt = reactive(result_dt())
 
     addPopover(id = "helpPopover_addGene",options = list(title = "Write comma-separated text:",content = "example: BRCA1, TP53, FOXO3",placement = "right",trigger = "hover"))
     addPopover(id = "helpPopover_layout",options = list(title = "Layout options:",placement = "right",trigger = "hover",
