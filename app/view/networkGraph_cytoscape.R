@@ -347,6 +347,7 @@ server <- function(id, shared_data) {
     ### Selected variant or fusion data + buttons ###
     #################################################
     observe({
+      som_vars <- as.data.table(shared_data$somatic_var())
       germ_vars <- as.data.table(shared_data$germline_var())
       fusions <- as.data.table(shared_data$fusion_var())
       tissue_table <- copy(tissue_dt())  # Výchozí tabulka
@@ -354,16 +355,24 @@ server <- function(id, shared_data) {
       # Výchozí hodnota pro selected_dt
       selected_dt(NULL)
       
-      if ((is.null(germ_vars) || nrow(germ_vars) == 0) &&
-          (is.null(fusions) || nrow(fusions) == 0)) {
-        message("No germline variants or fusions selected.")
+      if ((is.null(som_vars)  || nrow(som_vars) == 0) &&
+          (is.null(germ_vars) || nrow(germ_vars) == 0) &&
+          (is.null(fusions)   || nrow(fusions) == 0)) {
+        message("No somatic, germline or fusion variant selected.")
         result_dt(tissue_table)
       } else {
+        # Přidání somatic variant
+        if (!is.null(som_vars) && nrow(som_vars) > 0) {
+          selected_som_variants <- som_vars[, .(Gene_symbol, variant = var_name)]
+          selected_som_variants <- unique(selected_som_variants, by = "Gene_symbol")
+          tissue_table <- merge(tissue_table, selected_som_variants, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
+        }
+        
         # Přidání germline variant
         if (!is.null(germ_vars) && nrow(germ_vars) > 0) {
-          selected_variants <- germ_vars[, .(Gene_symbol, variant = var_name)]
-          selected_variants <- unique(selected_variants, by = "Gene_symbol")
-          tissue_table <- merge(tissue_table, selected_variants, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
+          selected_germ_variants <- germ_vars[, .(Gene_symbol, variant = var_name)]
+          selected_germ_variants <- unique(selected_germ_variants, by = "Gene_symbol")
+          tissue_table <- merge(tissue_table, selected_germ_variants, by.x = "feature_name", by.y = "Gene_symbol", all.x = TRUE)
         }
         
         # Přidání fúzí
@@ -374,13 +383,19 @@ server <- function(id, shared_data) {
         }
         
         result_dt(tissue_table)
-        message("Updated result_dt with germline variants and/or fusions.")
+        message("Updated result_dt with somatic, germline and/or fusion variants.")
       }
       
       # Vytvoření selected_dt
-      if ((!is.null(germ_vars) && nrow(germ_vars) > 0) || (!is.null(fusions) && nrow(fusions) > 0)) {
-        selected_variants <- if (!is.null(germ_vars) && nrow(germ_vars) > 0) {
-          unique(germ_vars[, var_name := "yes"])
+      if ((!is.null(som_vars) && nrow(som_vars) > 0) || (!is.null(germ_vars) && nrow(germ_vars) > 0) || (!is.null(fusions) && nrow(fusions) > 0)) {
+        selected_som_variants <- if (!is.null(som_vars) && nrow(som_vars) > 0) {
+          unique(som_vars[, var_name := "somatic"])
+        } else {
+          data.frame(Gene_symbol = character(0))
+        }
+        
+        selected_germ_variants <- if (!is.null(germ_vars) && nrow(germ_vars) > 0) {
+          unique(germ_vars[, var_name := "germline"])
         } else {
           data.frame(Gene_symbol = character(0))
         }
@@ -390,8 +405,9 @@ server <- function(id, shared_data) {
         } else {
           data.frame(Gene_symbol = character(0))
         }
-        
-        combined_selected <- merge(selected_variants, selected_fusions, by = "Gene_symbol", all = TRUE)
+
+        combined_variants <- unique(rbindlist(list(as.data.table(selected_som_variants)[, .(Gene_symbol, var_name = "somatic")],as.data.table(selected_germ_variants)[, .(Gene_symbol, var_name = "germline")])))
+        combined_selected <- merge(combined_variants, selected_fusions, by = "Gene_symbol", all = TRUE)
         pathways_info <- subTissue_dt()[feature_name %in% combined_selected$Gene_symbol, .(Gene_symbol = feature_name, all_kegg_paths_name)]
         combined_selected <- merge(combined_selected, pathways_info, by = "Gene_symbol", all.x = TRUE)
         setDF(combined_selected)
@@ -404,12 +420,61 @@ server <- function(id, shared_data) {
     
     
     
-    observeEvent(list(input$selectedGermVariants, input$selectedFusions, input$selected_pathway, input$selected_tissue), {
+    observeEvent(list(input$selectedSomVariants, input$selectedGermVariants, input$selectedFusions, input$selected_pathway, input$selected_tissue), {
+      
+      if (input$selectedSomVariants) {
+        if ("var_name" %in% names(selected_dt())) {
+          selected_dt <- as.data.table(selected_dt())
+          somatic_nodes <- as.character(unique(selected_dt[var_name == "somatic", Gene_symbol]))
+          
+          print(somatic_nodes)
+          if (length(somatic_nodes) == 0) {
+            updatePrettySwitch(session, "selectedSomVariants", value = FALSE) # Reset prettySwitch na FALSE
+            
+            shinyalert(
+              title = "No variants selected",
+              text = "You don't have any somatic variants selected.",
+              type = "warning",
+              showCancelButton = TRUE,
+              confirmButtonText = "OK",
+              cancelButtonText = "Go to variant",
+              callbackR = function(value) {
+                # value bude TRUE pro OK, FALSE pro "Go to variant"
+                if (!value) {
+                  # updateTabItems(session = session$userData$parent_session,  # použijeme parent session
+                  #                inputId = "sidebar_menu",  # bez namespace
+                  #                selected = "fusion_genes")
+                }})
+          } else {
+            message("Adding border for somatic variant nodes:", paste(somatic_nodes, collapse = ", "))
+            session$sendCustomMessage("variant-border", list(type = "somatic", nodes = as.list(somatic_nodes)))
+          }
+        } else {
+          # Reset prettySwitch na FALSE
+          updatePrettySwitch(session, "selectedSomVariants", value = FALSE)
+          
+          shinyalert(
+            title = "No variants selected",
+            text = "No somatic variants are currently selected as possibly oncogenic.",
+            type = "warning",
+            showCancelButton = TRUE,
+            confirmButtonText = "OK",
+            cancelButtonText = "Go to variant",
+            callbackR = function(value) {
+              if (!value) {}})
+        }
+        
+      } else {
+        message("Removing border for somatic variant nodes.")
+        session$sendCustomMessage("variant-border", list(type = "somatic", nodes = character(0)))
+      }
+      
+      
       # Aktualizace pro germline varianty
       if (input$selectedGermVariants) {
         if ("var_name" %in% names(selected_dt())) {
           selected_dt <- as.data.table(selected_dt())
-          germline_nodes <- as.character(unique(selected_dt[!is.na(var_name), Gene_symbol]))
+          germline_nodes <- as.character(unique(selected_dt[var_name == "germline", Gene_symbol]))
           
           print(germline_nodes)
           if (length(germline_nodes) == 0) {

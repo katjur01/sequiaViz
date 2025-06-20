@@ -62,6 +62,15 @@ function initializeCytoscape(containerId, elementsData, isSubset = false) {
                 }
             },
             {
+                selector: 'node.somVariantBorder',
+                style: {
+                    // Vnitřní hrana
+                    'border-width': 16,                // Šířka vnitřní hrany
+                    'border-color': 'green',         // Barva vnitřní hrany
+                    'border-style': 'solid',          // Styl vnitřní hrany
+                }
+            },
+            {
                 selector: 'node.germVariantBorder',
                 style: {
                     // Vnitřní hrana
@@ -187,6 +196,8 @@ Shiny.addCustomMessageHandler('variant-border', function(data) {
     // Nastavení třídy na základě typu
     if (type === 'germline') {
         className = 'germVariantBorder';
+    } else if (type === 'somatic') {
+        className = 'somVariantBorder';
     } else if (type === 'fusion') {
         className = 'fusionBorder';
     } else {
