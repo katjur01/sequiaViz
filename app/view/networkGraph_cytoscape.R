@@ -416,8 +416,6 @@ server <- function(id, shared_data) {
       } else {
         selected_dt(data.frame(Gene_symbol = character(0), variant = character(0), fusion = character(0), all_kegg_paths_name = character(0)))
       }
-      message("###########   colanmes(selected_dt)  #################",colnames(selected_dt()))
-      message("###########   selected_dt  #################",selected_dt())
     })
     
     

@@ -256,8 +256,8 @@ server <- function(id) {
     
     lapply(patients_list(), function(patient) {
       
-      summary$server(paste0("summary_table_", patient),patient, shared_data)
-      create_report$server(paste0("create_report_", patient),shared_data)
+      summary$server(paste0("summary_table_", patient), patient, shared_data)
+      create_report$server(paste0("create_report_", patient), patient, shared_data)
     })
 
 
@@ -368,7 +368,7 @@ server <- function(id) {
 ##################    
     ## run network graph module    
     
-    networkGraph_cytoscape$server("network_graph", shared_data)
+    # networkGraph_cytoscape$server("network_graph", shared_data)
     
     
 
