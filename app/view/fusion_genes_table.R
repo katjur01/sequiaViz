@@ -325,6 +325,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
             chim_path <- grep(paste0(id_val, ".*Chimeric\\.out\\.bam$"), bam_path$rna.chimeric_bam, value = TRUE)
             chim_track <- list(name = paste0(id_val, " Chimeric"), file = sub(bam_path$path_to_folder, ".", chim_path, fixed = TRUE))
             
+            message("#####.  list(tumor_track, chim_track) ###### : ",list(tumor_track, chim_track))
             list(tumor_track, chim_track)    # pořadí: tumor -> chimeric
           }), recursive = FALSE              # nerozbalujeme úplně, zůstane list tracků
         )
@@ -340,6 +341,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
 }
 
 
+###### build_igv_tracks selected_bams ######: list(name = "DZ1601tumor", file = character(0))list(name = "DZ1601normal", file = "./230426_MOII_e117_krve/mapped/DZ1601krev.bam")list(name = "MR1507tumor", file = character(0))list(name = "MR1507normal", file = "./230426_MOII_e117_krve/mapped/MR1507krev.bam")
 #
 # fusionGenes_Ui <- fluidPage(
 #   piechart_input("plots")

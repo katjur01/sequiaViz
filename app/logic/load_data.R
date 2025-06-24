@@ -195,7 +195,6 @@ get_inputs <- function(flag){
     fusion_genes_project <- "230426_MOII_e117_fuze"
     RNA_tumor_bam <- list.files(paste(path, fusion_genes_project,"mapped",sep = "/"), pattern = "*.bam", full.names = TRUE)
     RNA_chimeric_bam <- list.files(file.path(path, fusion_genes_project), pattern   = "Chimeric\\.out\\.bam$", recursive = TRUE, full.names = TRUE)
-    
     return(list(dna.tumor_bam = DNA_tumor_bam,
                 dna.normal_bam = DNA_normal_bam,
                 rna.tumor_bam = RNA_tumor_bam,

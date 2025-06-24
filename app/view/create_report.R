@@ -52,6 +52,7 @@ ui <- function(id) {
 server <- function(id, patient, shared_data) {
   moduleServer(id, function(input, output, session) {
 
+    noNA_text <- function(x) ifelse(is.na(x) | x == "", "-", x)
     
     somatic_dt <- reactive({
       som_vars <- as.data.table(shared_data$somatic_var())
@@ -73,7 +74,9 @@ server <- function(id, patient, shared_data) {
           dt <- data.table(
             Gene        = som_vars$Gene_symbol,
             Transcript  = som_vars$Feature,
-            variant     = sprintf("%s\n(%s)", som_vars$HGVSc, som_vars$HGVSp),
+            HGVSc       = noNA_text(som_vars$HGVSc),
+            HGVSp       = noNA_text(som_vars$HGVSp),
+            variant     = sprintf("%s\n(%s)", noNA_text(som_vars$HGVSc), noNA_text(som_vars$HGVSp)),
             VAF         = as.numeric(som_vars$tumor_variant_freq) * 100,
             Consequence = som_vars$Consequence,
             Class       = ""
@@ -123,7 +126,9 @@ server <- function(id, patient, shared_data) {
           dt <- data.table(
             Gene        = germ_vars$Gene_symbol,
             Transcript  = germ_vars$Feature,
-            variant     = sprintf("%s\n(%s)", germ_vars$HGVSc, germ_vars$HGVSp),
+            HGVSc       = noNA_text(germ_vars$HGVSc),
+            HGVSp       = noNA_text(germ_vars$HGVSp),
+            variant     = sprintf("%s\n(%s)", noNA_text(germ_vars$HGVSc), noNA_text(germ_vars$HGVSp)),
             MAF         = germ_vars$gnomAD_NFE,
             Consequence = germ_vars$Consequence,
             Phenotype   = "",
@@ -352,38 +357,57 @@ server <- function(id, patient, shared_data) {
         return(input$custom_template$datapath)
       }
     })
+
+    summary_somatic <- reactive({
+      if (is.null(somatic_dt()) || nrow(somatic_dt()) == 0) {
+        sum_som <- NA
+      } else {
+        sum_som <- sprintf("%s (%s/%s)", somatic_dt()$Gene, somatic_dt()$HGVSc, somatic_dt()$HGVSp)
+      }
+      return(sum_som)
+    })
     
-    # summary_germline <- reactive({
-    #   message(" ######################### somatic_dt is active: ",germline_dt())
-    #   sprintf("%s (%s)", germline_dt()$Gene, paste0(germline_dt()$HGVSc,"/",germline_dt()$HGVSp))
-    # })
+    summary_germline <- reactive({
+      if (is.null(germline_dt()) || nrow(germline_dt()) == 0) {
+        sum_germ <- NA
+      } else {
+        sum_germ <- sprintf("%s (%s/%s)", germline_dt()$Gene, germline_dt()$HGVSc, germline_dt()$HGVSp)
+      }
+      return(sum_germ)
+    })
 
-    # summary_somatic <- reactive({
-    #   req(somatic_dt())
-    #   message(" ######################### somatic_dt is active 1: ")
-    #   sprintf("%s (%s)", somatic_dt()$Gene, paste0(somatic_dt()$HGVSc,"/",somatic_dt()$HGVSp))
-    #   message(" ######################### somatic_dt is active 2: ")
-    # })
+    summary_fusion <- reactive({
+      if (is.null(fusion_dt()) || nrow(fusion_dt()) == 0) {
+        sum_fus <- NA
+      } else {
+        sum_fus <- sprintf("%s::%s gene fusion", fusion_dt()$gene1, fusion_dt()$gene2)
+      }
+      return(sum_fus)
+    })
 
-    # summary_fusion <- reactive({
-    #   sprintf("%s::%s gene fusion", fusion_dt()$gene1, fusion_dt()$gene2)
-    # })
-    # 
-    # germline_interpretation <- reactive({
-    #   variants <- sprintf("%s variant was found in the %s gene.", paste0(germline_dt()$HGVSc,"/",germline_dt()$HGVSp), germline_dt()$Gene_symbol)
-    #   links <- paste0("(https://www.oncokb.org/gene/", germline_dt()$Gene_symbol, ")")
-    #   full_text <- paste(variants, links)
-    #   return(full_text)
-    # })
-  #   
-  #   somatic_interpretation <- reactive({
-  #     req(somatic_dt())
-  #     variants <- sprintf("%s variant was found in the %s gene.", somatic_dt()$variant, somatic_dt()$Gene)
-  #     links <- paste0("(https://www.oncokb.org/gene/", somatic_dt()$Gene, ")")
-  #     full_text <- paste(variants, links)
-  #     return(full_text)
-  #   })
-  #   
+
+    somatic_interpretation <- reactive({
+      if (is.null(somatic_dt()) || nrow(somatic_dt()) == 0) {
+        full_text <- NA
+      } else {
+        variants <- sprintf("%s/%s variant was found in the %s gene.", somatic_dt()$HGVSc, somatic_dt()$HGVSp, somatic_dt()$Gene)
+        links <- paste0("(https://www.oncokb.org/gene/", somatic_dt()$Gene, ")")
+        full_text <- paste(variants, links)
+      }
+      return(full_text)
+    })
+    
+    germline_interpretation <- reactive({
+      if (is.null(germline_dt()) || nrow(germline_dt()) == 0) {
+        full_text <- NA
+      } else {
+        variants <- sprintf("%s/%s variant was found in the %s gene.", germline_dt()$HGVSc, germline_dt()$HGVSp, germline_dt()$Gene)
+        links <- paste0("(https://www.oncokb.org/gene/", germline_dt()$Gene, ")")
+        full_text <- paste(variants, links)
+      }
+      return(full_text)
+    })
+
   observe({
 
     output$download_report <- downloadHandler(
@@ -416,49 +440,45 @@ server <- function(id, patient, shared_data) {
           message("Placeholder <<patient_info>> was not found.")
         })
 
-# 
-#         tryCatch({
-#           doc <- cursor_reach(doc, "<<summary_germline>>")
-# 
-#           if (!is.null(germline_dt()) || nrow(germline_dt()) > 0) {
-#             for (variant_text in summary_germline()) {
-#               doc <- body_add_par(doc, variant_text, pos = "before")
-#             }
-#           }
-#           doc <- cursor_reach(doc, "<<summary_germline>>")
-#           doc <- body_remove(doc)
-#         }, error = function(e) {
-#           message("Placeholder <<summary_germline>> was not found. No pathogenic varints will not be added.")
-#         })
+        tryCatch({
+          doc <- cursor_reach(doc, "<<summary_somatic>>")
+          if (!is.null(somatic_dt()) && nrow(somatic_dt()) != 0) {
+            for (variant_text in summary_somatic()) {
+              doc <- body_add_par(doc, variant_text, pos = "before")
+            }
+          }
+          doc <- cursor_reach(doc, "<<summary_somatic>>")
+          doc <- body_remove(doc)
+        }, error = function(e) {
+          message("Placeholder <<summary_somatic>> was not found. No pathogenic varints will not be added.")
+        })
 
-        # tryCatch({
-        #   doc <- cursor_reach(doc, "<<summary_somatic>>")
-        #   if (!is.null(somatic_dt()) || nrow(somatic_dt()) > 0) {
-        #     message("##################### somatic_dt() ################### ", somatic_dt())
-        #     for (variant_text in summary_somatic()) {
-        #       message("##################### variant_text ################### ", variant_text)
-        #       doc <- body_add_par(doc, variant_text, pos = "before")
-        #     }
-        #   }
-        #   doc <- cursor_reach(doc, "<<summary_somatic>>")
-        #   doc <- body_remove(doc)
-        # }, error = function(e) {
-        #   message("Placeholder <<summary_somatic>> was not found. No pathogenic varints will not be added.")
-        # })
+        tryCatch({
+          doc <- cursor_reach(doc, "<<summary_germline>>")
+          if (!is.null(germline_dt()) && nrow(germline_dt()) != 0) {
+            for (variant_text in summary_germline()) {
+              doc <- body_add_par(doc, variant_text, pos = "before")
+            }
+          }
+          doc <- cursor_reach(doc, "<<summary_germline>>")
+          doc <- body_remove(doc)
+        }, error = function(e) {
+          message("Placeholder <<<summary_germline>> was not found. No pathogenic varints will not be added.")
+        })
+
+        tryCatch({
+          doc <- cursor_reach(doc, "<<summary_fusion>>")
+          if (!is.null(fusion_dt()) && nrow(fusion_dt()) != 0) {
+            for (variant_text in summary_fusion()) {
+              doc <- body_add_par(doc, variant_text, pos = "before")
+            }
+          }
+          doc <- cursor_reach(doc, "<<summary_fusion>>")
+          doc <- body_remove(doc)
+        }, error = function(e) {
+          message("Placeholder <<summary_fusion>> was not found. No gene fusion will not be added.")
+        })
         
-        # tryCatch({
-        #   doc <- cursor_reach(doc, "<<summary_fusion>>")
-        # 
-        #   if (!is.null(fusion_dt()) || nrow(fusion_dt()) > 0) {
-        #     for (variant_text in summary_fusion()) {
-        #       doc <- body_add_par(doc, variant_text, pos = "before")
-        #     }
-        #   }
-        #   doc <- cursor_reach(doc, "<<summary_fusion>>")
-        #   doc <- body_remove(doc)
-        # }, error = function(e) {
-        #   message("Placeholder <<summary_fusion>> was not found. No gene fusion will not be added.")
-        # })
   #       # 
   #       # tryCatch({
   #       #   doc <- cursor_reach(doc, "<<details_table>>")
@@ -481,7 +501,7 @@ server <- function(id, patient, shared_data) {
           if (is.null(somatic_dt()) || nrow(somatic_dt()) == 0) {
             doc <- body_add_par(doc, "No variants with known or potential clinical significance were found.")
           } else {
-            doc <- body_add_flextable(doc, preprare_somatic_dt(somatic_dt()), pos = "before")
+            doc <- body_add_flextable(doc, preprare_somatic_dt(somatic_dt()[,-c("HGVSc","HGVSp")]), pos = "before")
           }
           doc <- cursor_reach(doc, "<<somatic_table>>")
           doc <- body_remove(doc)
@@ -495,14 +515,12 @@ server <- function(id, patient, shared_data) {
           if (is.null(germline_dt()) || nrow(germline_dt()) == 0) {
             doc <- body_add_par(doc, "No variants with known or potential clinical significance in genes associated with hereditary cancer-predisposing syndromes were found.")
           } else {
-            print("I am in")
-            doc <- body_add_flextable(doc, preprare_germline_dt(germline_dt()), pos = "before")
+            doc <- body_add_flextable(doc, preprare_germline_dt(germline_dt()[,-c("HGVSc","HGVSp")]), pos = "before")
             # Vysvětlivka pod tabulkou
             doc <- body_add_fpar(doc, fpar(ftext("MAF – minor allele frequency – Non-Finnish European population (gnomAD database)", prop = note_style)), pos = "after")
             doc <- body_add_fpar(doc, fpar(ftext("AD – autosomal dominant inheritance", prop = note_style)), pos = "after")
             doc <- body_add_fpar(doc, fpar(ftext("AR – autosomal recessive inheritance", prop = note_style)), pos = "after")
             doc <- body_add_fpar(doc, fpar(ftext("XLR – X-linked recessive", prop = note_style)), pos = "after")
-            print("I am in the end")
           }
           doc <- cursor_reach(doc, "<<germline_table>>")
           doc <- body_remove(doc)
@@ -566,36 +584,38 @@ server <- function(id, patient, shared_data) {
   #       #   message("Placeholder <<expression_table>> was not found. Expression profile table will not be added.")
   #       # })
   #       # 
-  #       # tryCatch({
-  #       #   doc <- cursor_reach(doc, "<<germline_interpretation>>")
-  #       #   
-  #       #   if (!is.null(germline_dt()) && nrow(germline_dt()) > 0) {
-  #       #     for (variant_text in germline_interpretation()) {
-  #       #       doc <- body_add_par(doc, variant_text, pos = "before")
-  #       #     }
-  #       #   }
-  #       #   doc <- cursor_reach(doc, "<<germline_interpretation>>")
-  #       #   doc <- body_remove(doc)
-  #       # }, error = function(e) {
-  #       #   message("Placeholder <<germline_interpretation>> was not found. No pathogenic variants will be added.")
-  #       # })
-  #       # 
-  #       # 
-  #       
-  #       # tryCatch({
-  #       #   doc <- cursor_reach(doc, "<<somatic_interpretation>>")
-  #       #   
-  #       #   if (!is.null(somatic_dt()) && nrow(somatic_dt()) > 0) {
-  #       #     for (variant_text in somatic_interpretation()) {
-  #       #       doc <- body_add_par(doc, variant_text, pos = "before")
-  #       #     }
-  #       #   }
-  #       #   doc <- cursor_reach(doc, "<<somatic_interpretation>>")
-  #       #   doc <- body_remove(doc)
-  #       # }, error = function(e) {
-  #       #   message("Placeholder <<somatic_interpretation>> was not found. No pathogenic varints will not be added.")
-  #       # })
-  #       
+         
+        tryCatch({
+          doc <- cursor_reach(doc, "<<somatic_interpretation>>")
+
+          if (!is.null(somatic_dt()) && nrow(somatic_dt()) != 0) {
+            for (variant_text in somatic_interpretation()) {
+              doc <- body_add_par(doc, variant_text, pos = "before")
+            }
+          }
+          doc <- cursor_reach(doc, "<<somatic_interpretation>>")
+          doc <- body_remove(doc)
+        }, error = function(e) {
+          message("Placeholder <<somatic_interpretation>> was not found. No pathogenic varints will not be added.")
+        })
+        
+        tryCatch({
+          doc <- cursor_reach(doc, "<<germline_interpretation>>")
+
+          if (!is.null(germline_dt()) && nrow(germline_dt()) != 0) {
+            for (variant_text in germline_interpretation()) {
+              doc <- body_add_par(doc, variant_text, pos = "before")
+            }
+          }
+          doc <- cursor_reach(doc, "<<germline_interpretation>>")
+          doc <- body_remove(doc)
+        }, error = function(e) {
+          message("Placeholder <<germline_interpretation>> was not found. No pathogenic variants will be added.")
+        })
+
+
+        
+        
         print(doc, target = file)
       }
     )

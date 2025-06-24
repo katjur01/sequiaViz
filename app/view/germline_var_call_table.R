@@ -71,10 +71,8 @@ ui <- function(id) {
   )
 }
 
-server <- function(id, selected_samples, selected_columns, column_mapping, selection_enabled, shared_data) {
+server <- function(id, selected_samples, selected_columns, column_mapping, shared_data) {
   moduleServer(id, function(input, output, session) {
-    
-
     
     # Call loading function to load data
     data <- reactive({

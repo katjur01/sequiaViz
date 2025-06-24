@@ -241,16 +241,6 @@ server <- function(id) {
                                   germline_overview = list(), 
                                   fusion_overview = list(),
                                   navigation_context = reactiveVal(NULL))     # somatic or germline or fusion     # from where are we opening IGV
-
-    
-    
-
-    # bam_path <- paste0(getwd(),"/input_files/bam")
-    # start_static_server(dir = bam_path)
-    # IGV$igv_server("igv", shared_data)
-    # session$onSessionEnded(function() {
-    #   stop_static_server()
-    # })
     
 ## run summary module
     
@@ -282,7 +272,7 @@ server <- function(id) {
     lapply(names(samples_fuze), function(patient) {
       fusion_genes_table$server(paste0("geneFusion_tab_", patient), samples_fuze[[patient]], selected_columns_fusion, columnName_map("fusion"), shared_data)
     })
-# ##################
+##################
     # Run somatic varcall module
 
     samples_som <- set_patient_to_sample("somatic")
@@ -299,26 +289,15 @@ server <- function(id) {
       colFilterDropdown_ui(ns("colFilter_dropdown_germ"), all_colnames_val_germline()$all_columns, all_colnames_val_germline()$default_setting, columnName_map("germline"))
     })
 
-    ## igv dropdown button for germline
-    selection_enabled <- reactiveVal(FALSE)
-#
-#     # IGV dropdown button for germline
-#     output$igv_dropdown_ui <- renderUI({
-#       igvDropdown_ui(ns("igv_dropdown"), names(set_patient_to_sample("germline")))
-#     })
-#
-#     # IGV Dropdown server call, pass the reactive value
-#     igvDropdown_server("igv_dropdown", session, selection_enabled)
-
     # Run germline varcall module
     samples_germ <- set_patient_to_sample("germline")
     selected_columns_germ <- colFilterDropdown_server("colFilter_dropdown_germ", all_colnames_val_germline()$all_columns, all_colnames_val_germline()$default_setting)
 
     lapply(names(samples_germ), function(patient) {
-      germline_var_call_table$server(paste0("germline_tab_", patient), samples_germ[[patient]], selected_columns_germ, columnName_map("germline"), selection_enabled, shared_data)
+      germline_var_call_table$server(paste0("germline_tab_", patient), samples_germ[[patient]], selected_columns_germ, columnName_map("germline"), shared_data)
     })
 
-# ##################
+##################
 # 
 #     samples_expr <- set_patient_to_sample("expression")
 # 
@@ -358,12 +337,11 @@ server <- function(id) {
 #         })
 #     })
 # 
-# 
 #     lapply(names(samples_expr), function(patient) {
 #       expression_profile_plot$server(paste0("allGenes_plots_", patient), patient,"all_genes")
 #       expression_profile_plot$server(paste0("genesOfinterest_plots_", patient), patient,"genes_of_interest")
 #     })
-#       
+
 
 ##################    
     ## run network graph module    
@@ -374,11 +352,11 @@ server <- function(id) {
 
 
 
+    # # # Spustíme statický server při startu celé aplikace
+    # # start_static_server(dir = "/Users/katerinajuraskova/Desktop/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_tkane/mapped")
     # # Spustíme statický server při startu celé aplikace
-    # start_static_server(dir = "/Users/katerinajuraskova/Desktop/sequiaViz/input_files/MOII_e117/primary_analysis/230426_MOII_e117_tkane/mapped")
-    # Spustíme statický server při startu celé aplikace
-    
-    
+    # 
+    # 
     # path <- get_inputs("bam_file")
     # path_combined <- file.path(getwd(), path$path_to_folder)
     # path_clean <- sub("/+$", "", path_combined)
@@ -391,7 +369,7 @@ server <- function(id) {
     # session$onSessionEnded(function() {
     #   stop_static_server()
     # })
-
+    # 
 
   })
 }
