@@ -1,11 +1,13 @@
-.container-of-summary-boxes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-
 .summary-box {
-  flex: 1 1 355px;  // Klíčová část
+  width: 355px;
+  
+  .card-header {
+    padding: 5px 10px;  /* Sníží padding */
+  }
+  .card-header .card-title {
+    font-size: 16px;    /* Menší velikost písma */
+    margin: 0;          /* Odstraní nepřebytečné mezery */
+  }
 }
 
 .no_data {
@@ -21,6 +23,7 @@
     border-radius: 10px;
   }
 }
+
 .germline-infobox {
   .elevation-2{
     border: 2px solid #45818e; 
@@ -28,6 +31,7 @@
     border-radius: 10px;
   }
 }
+
 .fusion-infobox {
   .elevation-2{
     border: 2px solid #f1c232; 
@@ -35,6 +39,7 @@
     border-radius: 10px;
   }
 }
+
 .expression-infobox {
   .elevation-2{
     border: 2px solid #3c78d8ff; 
@@ -42,6 +47,7 @@
     border-radius: 10px; 
   }
 }
+
 .somatic-box {
   .card {
     border: 2px solid #7ac143; 

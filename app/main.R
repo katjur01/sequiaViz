@@ -318,52 +318,52 @@ server <- function(id) {
       germline_var_call_table$server(paste0("germline_tab_", patient), samples_germ[[patient]], selected_columns_germ, columnName_map("germline"), selection_enabled, shared_data)
     })
 
-##################
-
-    samples_expr <- set_patient_to_sample("expression")
-
-    # Reaktivní value for watching which panel is active
-    expr_flag <- reactive({
-      patients <- names(samples_expr)
-
-      for (patient in patients) {
-        panel_id <- paste0("expression_profile_tabs_", patient)
-
-        if (!is.null(input[[panel_id]])) {
-          if (input[[panel_id]] == "allGenes") {
-            return("all_genes")
-          } else if (input[[panel_id]] == "genesOfinterest") {
-            return("genes_of_interest")}}
-      }
-      return(NULL)
-    })
-
-    all_colnames_val_expression <- reactive({
-      req(expr_flag())
-      return(getColFilterValues("expression", expr_flag())())
-    })
-
-    output$colFilter_dropdown_ui_expression <- renderUI({
-      req(all_colnames_val_expression())
-      colFilterDropdown_ui(ns("colFilter_dropdown_expression"), all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting,columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$dropdown_btn)
-      })
-
-    observe({
-      req(all_colnames_val_expression())
-      selected_columns_expression <- colFilterDropdown_server("colFilter_dropdown_expression", all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting)
-
-      lapply(names(samples_expr), function(patient) {
-        expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns),all_colnames_val_expression())
-        expression_profile_table$server_genesOfInterest(paste0("genesOfinterest_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns),all_colnames_val_expression())
-        })
-    })
-
-
-    lapply(names(samples_expr), function(patient) {
-      expression_profile_plot$server(paste0("allGenes_plots_", patient), patient,"all_genes")
-      expression_profile_plot$server(paste0("genesOfinterest_plots_", patient), patient,"genes_of_interest")
-    })
-      
+# ##################
+# 
+#     samples_expr <- set_patient_to_sample("expression")
+# 
+#     # Reaktivní value for watching which panel is active
+#     expr_flag <- reactive({
+#       patients <- names(samples_expr)
+# 
+#       for (patient in patients) {
+#         panel_id <- paste0("expression_profile_tabs_", patient)
+# 
+#         if (!is.null(input[[panel_id]])) {
+#           if (input[[panel_id]] == "allGenes") {
+#             return("all_genes")
+#           } else if (input[[panel_id]] == "genesOfinterest") {
+#             return("genes_of_interest")}}
+#       }
+#       return(NULL)
+#     })
+# 
+#     all_colnames_val_expression <- reactive({
+#       req(expr_flag())
+#       return(getColFilterValues("expression", expr_flag())())
+#     })
+# 
+#     output$colFilter_dropdown_ui_expression <- renderUI({
+#       req(all_colnames_val_expression())
+#       colFilterDropdown_ui(ns("colFilter_dropdown_expression"), all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting,columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$dropdown_btn)
+#       })
+# 
+#     observe({
+#       req(all_colnames_val_expression())
+#       selected_columns_expression <- colFilterDropdown_server("colFilter_dropdown_expression", all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting)
+# 
+#       lapply(names(samples_expr), function(patient) {
+#         expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns),all_colnames_val_expression())
+#         expression_profile_table$server_genesOfInterest(paste0("genesOfinterest_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns),all_colnames_val_expression())
+#         })
+#     })
+# 
+# 
+#     lapply(names(samples_expr), function(patient) {
+#       expression_profile_plot$server(paste0("allGenes_plots_", patient), patient,"all_genes")
+#       expression_profile_plot$server(paste0("genesOfinterest_plots_", patient), patient,"genes_of_interest")
+#     })
+#       
 
 ##################    
     ## run network graph module    

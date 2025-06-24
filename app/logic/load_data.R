@@ -127,7 +127,7 @@ get_inputs <- function(flag){
     ## somatic var call path
     somatic_variant_calling_project <- "117_WES_somatic"
     somatic_variant_calling_filenames <- list.files(paste(path, somatic_variant_calling_project,"per_sample_final_var_tabs/tsv_formated",sep = "/"), pattern = "*.tsv", full.names = TRUE)
-    
+    somatic_varcall_mutation_load <- list.files(paste(path, somatic_variant_calling_project,sep = "/"), pattern = "*_loads.xlsx", full.names = TRUE)
     ## gemline var call path
     germline_variant_calling_project <- "117_WES_germline"
     germline_variant_calling_filenames <- list.files(paste(path, germline_variant_calling_project,"per_sample_final_var_tabs/tsv_formated", sep = "/"), pattern = "*.tsv", full.names = TRUE)
@@ -151,6 +151,7 @@ get_inputs <- function(flag){
     # expression_profile_filenames <- list.files(paste(path, expression_profile_project, sep = "/"), pattern = "*_report.xlsx", full.names = TRUE)
     #
     return(list(var_call.somatic = somatic_variant_calling_filenames,
+                var_call.somatic.mut_load = somatic_varcall_mutation_load,
                 var_call.germline = germline_variant_calling_filenames,
                 var_call.structural = structural_variant_calling_filenames,
                 fusions = fusion_genes_filenames,
@@ -201,8 +202,7 @@ get_inputs <- function(flag){
                 rna.chimeric_bam = RNA_chimeric_bam,
                 path_to_folder = path
     ))
-    
-    
+
   } else {
     stop("Invalid tag. Use 'per_sample_file' or 'all_sample_file'.")
   }

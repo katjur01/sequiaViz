@@ -1,12 +1,16 @@
 box::use(
   shiny[tagList,fileInput,conditionalPanel,reactive,reactiveValues,reactiveVal,downloadButton,icon,moduleServer,NS,downloadHandler,div,observe,observeEvent,reactiveValuesToList],
-  flextable[theme_vanilla,bg,fontsize,border_remove,set_header_labels,set_table_properties],
-  officer[cursor_reach,body_add_par,body_remove,fp_border,fp_text,read_docx],
+  flextable[flextable,theme_vanilla,bg,fontsize,border_remove,set_header_labels,set_table_properties,body_add_flextable,color,align,width,bold,nrow_part],
+  officer[cursor_reach,body_add_par,body_add_fpar,body_remove,fp_border,fp_text,fpar,ftext,read_docx],
   htmltools[tags,HTML],
   shinyWidgets[dropdown,prettyRadioButtons],
   data.table[data.table,as.data.table],
   bs4Dash[box],
-  utils[str]
+  utils[str],
+  openxlsx[read.xlsx]
+)
+box::use(
+  app/logic/load_data[get_inputs]
 )
 
 myReport_theme <- function(ft) {
@@ -51,155 +55,171 @@ server <- function(id, patient, shared_data) {
     
     somatic_dt <- reactive({
       som_vars <- as.data.table(shared_data$somatic_var())
-      som_vars <- som_vars[grepl(patient, sample)]
-      message("##################### som_vars: ", som_vars)
-      if (is.null(som_vars) || nrow(som_vars) == 0) {
-        message("### som_var je NULL nebo má 0 řádků → prázdný výstup")
-        dt <- data.table(
-          Gene        = character(),
-          Transcript  = character(),
-          variant     = character(),
-          VAF         = character(),
-          Consequence = character(),
-          Class       = character()
-        )
-      } else {
-        ## 3) bezpečně pře-typujte na data.table
 
-        ## 4) složte finální výstup
-        dt <- data.table(
-          Gene        = som_vars$Gene_symbol,
-          Transcript  = som_vars$Feature,
-          variant     = sprintf("%s\n(%s)", som_vars$HGVSc, som_vars$HGVSp),
-          VAF         = sprintf("%.1f %%", som_vars$tumor_variant_freq * 100),
-          Consequence = som_vars$Consequence,
-          Class       = ""
-        )
-        message("### var_dt OK, řádků: ", nrow(som_vars))
-        message("### var_dt OK, řádků: ", colnames(som_vars))
+      if (is.null(som_vars) || nrow(som_vars) == 0) {
+      } else {
+        som_vars <- som_vars[grepl(patient, sample)]
+
+        if (nrow(som_vars) == 0) {
+          dt <- data.table(
+            Gene        = character(),
+            Transcript  = character(),
+            variant     = character(),
+            VAF         = character(),
+            Consequence = character(),
+            Class       = character()
+          )
+        } else {
+          dt <- data.table(
+            Gene        = som_vars$Gene_symbol,
+            Transcript  = som_vars$Feature,
+            variant     = sprintf("%s\n(%s)", som_vars$HGVSc, som_vars$HGVSp),
+            VAF         = as.numeric(som_vars$tumor_variant_freq) * 100,
+            Consequence = som_vars$Consequence,
+            Class       = ""
+          )
+        }
+       return(dt)
       }
-      message("##################### somatic_dt() ###########š ",dt)
-    dt
     })
-    
-    # observe({
-    #   message("##################### somatic_dt() ###########š ",somatic_dt())
-    # })
-    
-    
-    
-    
-    # 
-    # preprare_somatic_dt <- function(somatic_dt) {
-    #   ft <- flextable(somatic_dt, col_keys = c("Gene","Feature","variant","VAF","Consequence","Class"))
-    #   ft <- set_header_labels(ft,
-    #                           Gene = "Gene",
-    #                           Feature = "Transcript",
-    #                           variant = "Variant",
-    #                           VAF = "VAF",
-    #                           Consequence = "Variant effect",
-    #                           Class = "Class")
-    #   ft <- myReport_theme(ft)
-    #   ft <- set_table_properties(ft, width = 1, layout = "autofit")
-    #   ft <- width(ft, j = ~ VAF, width = 0.6)
-    #   ft <- width(ft, j =  ~ variant, width = 0.8)
-    #   ft <- width(ft, j =  ~ Class, width = 1.5)
-    #   ft <- bold(ft, j = ~ Gene_symbol, bold = TRUE)
-    #   ft
-    # }
-#     
-#     
-#     germline_dt <- reactive({
-#       dt <- data.table(
-#         var_name = c("19_45352801_C/G","19_45352801_C/G"),
-#         Gene_symbol = c("ERCC2","ERCC2"),
-#         gnomAD_NFE = c(0.000000123,0.00026245),
-#         variant_freq = c(0.286,0.286),
-#         coverage_depth = c(28, 28),
-#         Consequence = c("missense_variant","missense_variant"),
-#         HGVSc = c("c.1847G>C","c.1847G>C"),
-#         HGVSp = c("p.R616P","p.R616P"),
-#         variant_type = c("SNV","SNV"),
-#         Feature = c("NM_000400.4","NM_000400.4"),
-#         clinvar_sig = c("Pathogenic","Likely pathogenic")
-#       )
-#       dt[,reads := paste0(round(variant_freq * coverage_depth),"/",coverage_depth)]
-#       dt[,var_name := sub("^([0-9XY]+_[0-9]+)_.*", "\\1", var_name)]
-#       dt[,var_name := gsub("_", ":", var_name)]
-#       dt[,variant := ifelse(is.na(HGVSp), HGVSc, paste0(HGVSc, "\n(", HGVSp, ")"))]
+    preprare_somatic_dt <- function(somatic_dt) {
+      ft <- flextable(somatic_dt, col_keys = c("Gene","Transcript","variant","VAF","Consequence","Class"))
+      ft <- set_header_labels(ft,
+                              Gene = "Gene",
+                              Transcript = "Transcript",
+                              variant = "Variant",
+                              VAF = "VAF",
+                              Consequence = "Variant effect",
+                              Class = "Class")
+      ft <- myReport_theme(ft)
+      ft <- set_table_properties(ft, width = 1, layout = "autofit")
+      ft <- width(ft, j = ~ VAF, width = 0.6)
+      ft <- width(ft, j =  ~ variant, width = 0.8)
+      ft <- width(ft, j =  ~ Class, width = 1.5)
+      ft <- bold(ft, j = ~ Gene, bold = TRUE)
+      ft
+    }
+
+    germline_dt <- reactive({
+      germ_vars <- as.data.table(shared_data$germline_var())
+      
+      if (is.null(germ_vars) || nrow(germ_vars) == 0) {
+      } else {
+        germ_vars <- germ_vars[grepl(patient, sample)]
+        
+        if (nrow(germ_vars) == 0) {
+          dt <- data.table(
+            Gene        = character(),
+            Transcript  = character(),
+            variant     = character(),
+            MAF         = numeric(),
+            Consequence = character(),
+            Phenotype   = character(),
+            Zygozity    = character(),
+            Inheritance = character(),
+            Class       = character()
+          )
+        } else {
+          dt <- data.table(
+            Gene        = germ_vars$Gene_symbol,
+            Transcript  = germ_vars$Feature,
+            variant     = sprintf("%s\n(%s)", germ_vars$HGVSc, germ_vars$HGVSp),
+            MAF         = germ_vars$gnomAD_NFE,
+            Consequence = germ_vars$Consequence,
+            Phenotype   = "",
+            Zygozity    = "",
+            Inheritance = "",
+            Class       = germ_vars$clinvar_sig
+          )
+        }
+        return(dt)
+      }
+    })
+    preprare_germline_dt <- function(germline_dt) {
+      ft <- flextable(germline_dt, col_keys = c("Gene","Transcript","variant","MAF","Consequence","Phenotype","Zygozity","Inheritance","Class"))
+      ft <- set_header_labels(ft,
+                              variant = "Variant",
+                              Consequence = "Variant effect")
+      ft <- myReport_theme(ft)
+      ft <- set_table_properties(ft, width = 1, layout = "autofit")
+      ft <- width(ft, j = ~ MAF, width = 0.6)
+      ft <- width(ft, j =  ~ Class, width = 0.8)
+      ft <- width(ft, j =  ~ Phenotype, width = 1.5)
+      ft <- bold(ft, j = ~ Gene, bold = TRUE)
+      ft
+    }
 #       dt[,MAF := sprintf("%.5f%%", gnomAD_NFE * 100)]
 #       # dt[,phenotype := c("Xeroderma pigmentosum, group D (AR), Trichothiodystrophy type 1, photosensitive (AR)",
 #       #                   "Cerebrooculofacioskeletal syndrome type 2 (AR)")]
-#       dt[,phenotype := c("","")]
-#       dt
-#     })
-#   
-#     preprare_germline_dt <- function(germline_dt) {
-#       ft <- flextable(germline_dt, col_keys = c("Gene_symbol","Feature","var_name","variant","variant_type","Consequence","reads","MAF","clinvar_sig","phenotype"))
-#       ft <- set_header_labels(ft,
-#                               Gene_symbol = "Gene",
-#                               Feature = "Transcript",
-#                               var_name = "Position",
-#                               variant = "Variant",
-#                               variant_type = "Type",
-#                               MAF = "MAF",
-#                               Consequence = "Consequence",
-#                               reads = "Reads",
-#                               clinvar_sig = "Class",
-#                               phenotype = "Associated phenotype")
-#       
-#       ft <- myReport_theme(ft)
-#       ft <- set_table_properties(ft, width = 1, layout = "autofit")
-#       for (col in c("variant_type", "reads", "MAF")) {
-#         ft <- width(ft, j = col, width = 0.6)
-#       }
-#       ft <- width(ft, j =  ~ clinvar_sig, width = 0.8)
-#       ft <- width(ft, j =  ~ phenotype, width = 1.5)
-#       ft <- bold(ft, j = ~ Gene_symbol, bold = TRUE)
-#       ft
-#     }
-# 
-#     
-#     fusion_dt <- reactive({
-#       dt <- data.table(
-#         gene1 = "KMT2A",
-#         transcript5 = "NM_",
-#         gene2 = "MLLT3",
-#         transcript3 = "NM_",
-#         overall_support = 35,
-#         phasing = "in-frame",
-#         reads = "x/y"
-#       )
-#       dt
-#     })
-#   
-#     preprare_fusion_dt <- function(fusion_dt) {
-#       ft <- flextable(fusion_dt, col_keys = c("gene1","transcript5","gene2","transcript3","overall_support","phasing","reads"))
-#       ft <- set_header_labels(ft,
-#                               gene1 = "Gene 5'",
-#                               transcript5 = "Transcript 5'",
-#                               gene2 ="Gene 3'",
-#                               transcript3 = "Transcript 3'",
-#                               overall_support = "Overall support",
-#                               phasing = "Phasing",
-#                               reads = "Reads")
-#       
-#       ft <- myReport_theme(ft)
-#       ft <- set_table_properties(ft, width = 1, layout = "autofit")
-#       # ft <- width(ft, j = c("gene1", "gene2"), width = 1)
-#       # ft <- width(ft, j = c("transcript5", "transcript3"), width = 1)
-#       ft <- width(ft, j = c("overall_support", "phasing", "reads"), width = 0.9)
-#       ft <- bold(ft, j = ~ gene1 + gene2, bold = TRUE)
-#       ft
-#     }
-# # 
-# #     mut_sign_dt <- sprintf("Tumor mutation burden (load): %s mutations/Mb", )
-# #     
-# #     preprare_mut_sign_dt <- function(mut_sign_dt) {
-# #       ft <- width(ft, j = ~ mut_sign_dt, width = 3)
-# #       ft <- bold(ft, j = ~ mut_sign_dt, bold = TRUE)
-# #       ft
-# #     }
+
+    
+    
+    fusion_dt <- reactive({
+      fusion <- as.data.table(shared_data$fusion_var())
+      
+      if (is.null(fusion) || nrow(fusion) == 0) {
+      } else {
+        fusion <- fusion[grepl(patient, sample)]
+        
+        if (nrow(fusion) == 0) {
+          message("### fusion je NULL nebo má 0 řádků → prázdný výstup")
+          dt <- data.table(
+            gene1           = character(),
+            transcript5     = character(),
+            gene2           = character(),
+            transcript3     = character(),
+            overall_support = numeric(),
+            phasing         = character()
+          )
+        } else {
+          dt <- data.table(
+            gene1           = fusion$gene1,
+            transcript5     = "",
+            gene2           = fusion$gene2,
+            transcript3     = "",
+            overall_support = fusion$overall_support,
+            phasing         = "in-frame/ out-of-frame"
+          )
+        }
+        return(dt)
+      }
+    })
+
+    preprare_fusion_dt <- function(fusion_dt) {
+      ft <- flextable(fusion_dt, col_keys = c("gene1","transcript5","gene2","transcript3","overall_support","phasing"))
+      ft <- set_header_labels(ft,
+                              gene1 = "Gene 5'",
+                              transcript5 = "Transcript 5'",
+                              gene2 ="Gene 3'",
+                              transcript3 = "Transcript 3'",
+                              overall_support = "Overall support",
+                              phasing = "Phasing")
+
+      ft <- myReport_theme(ft)
+      ft <- set_table_properties(ft, width = 1, layout = "autofit")
+      # ft <- width(ft, j = c("gene1", "gene2"), width = 1)
+      # ft <- width(ft, j = c("transcript5", "transcript3"), width = 1)
+      ft <- width(ft, j = c("overall_support", "phasing"), width = 0.9)
+      ft <- bold(ft, j = ~ gene1 + gene2, bold = TRUE)
+      ft
+    }
+    
+    mutation_load <- reactive({
+      filenames <- get_inputs("per_sample_file")
+      if (file.exists(filenames$var_call.somatic.mut_load)) {
+        dt <- as.data.table(read.xlsx(filenames$var_call.somatic.mut_load))
+        dt[, normal:= as.numeric(gsub(",", ".", normal))]
+        mut_load_str <- dt[sample == patient, normal]
+        if (length(mut_load_str) == 0 || is.na(mut_load_str)) {
+          mut_load_str <- NA
+        }
+      } else {
+        mut_load_str <- NA
+        print("its NA")
+      }
+      return(mut_load_str)
+    })
+    
 #     
 #     expression_dt <- reactive({
 #       dt <- data.table(
@@ -332,17 +352,19 @@ server <- function(id, patient, shared_data) {
         return(input$custom_template$datapath)
       }
     })
-    # 
-    # # summary_germline <- reactive({
-    # #   sprintf("%s (%s)", germline_dt()$Gene_symbol, paste0(germline_dt()$HGVSc,"/",germline_dt()$HGVSp))
-    # # })
-    # 
+    
+    # summary_germline <- reactive({
+    #   message(" ######################### somatic_dt is active: ",germline_dt())
+    #   sprintf("%s (%s)", germline_dt()$Gene, paste0(germline_dt()$HGVSc,"/",germline_dt()$HGVSp))
+    # })
+
     # summary_somatic <- reactive({
     #   req(somatic_dt())
-    #   message(" ######################### somatic_dt is active: ",somatic_dt())
-    #   sprintf("%s (%s)", somatic_dt()$Gene, somatic_dt()$variant)
+    #   message(" ######################### somatic_dt is active 1: ")
+    #   sprintf("%s (%s)", somatic_dt()$Gene, paste0(somatic_dt()$HGVSc,"/",somatic_dt()$HGVSp))
+    #   message(" ######################### somatic_dt is active 2: ")
     # })
-    # 
+
     # summary_fusion <- reactive({
     #   sprintf("%s::%s gene fusion", fusion_dt()$gene1, fusion_dt()$gene2)
     # })
@@ -375,68 +397,68 @@ server <- function(id, patient, shared_data) {
         doc <- read_docx(path = template_path())   # Load template
         note_style <- fp_text(font.size = 7, font.family = "Helvetica") # font for comments
 
-  #       tryCatch({
-  #         doc <- cursor_reach(doc, "<<patient_info>>")
-  #         # Normaly here would be body_remove(doc), but also it would add empty row between titul in template 
-  #         # and text/table from placeholder which I dont want to. Solution is to add text before and after placeholder
-  #         # and remove placeholder at last.
-  #         #
-  #         # Move the cursor to the placeholder <<patient_info>> in the document.
-  #         # After all content (headings and text) has been inserted before this placeholder,
-  #         # the placeholder itself is now removed to finalize the layout.
-  #         doc <- body_add_par(doc, paste0("Patient ID: ", "MR1507"), pos = "before")
-  #         doc <- body_add_par(doc, paste0("Diagnosis: ", "Diffuse midline glioma, H3 K27-altered"), pos = "after")
-  #         doc <- body_add_par(doc, paste0("Report date: ", format(Sys.Date(), "%B %d, %Y")), pos = "after")
-  # 
-  #         doc <- cursor_reach(doc, "<<patient_info>>")
-  #         doc <- body_remove(doc)
-  #       }, error = function(e) {
-  #         message("Placeholder <<patient_info>> was not found.")
-  #       })
-  #       
-  #       
-  #       # tryCatch({
-  #       #   doc <- cursor_reach(doc, "<<summary_germline>>")
-  #       #   
-  #       #   if (!is.null(germline_dt()) || nrow(germline_dt()) > 0) {
-  #       #     for (variant_text in summary_germline()) {
-  #       #       doc <- body_add_par(doc, variant_text, pos = "before")
-  #       #     }
-  #       #   }
-  #       #   doc <- cursor_reach(doc, "<<summary_germline>>")
-  #       #   doc <- body_remove(doc)
-  #       # }, error = function(e) {
-  #       #   message("Placeholder <<summary_germline>> was not found. No pathogenic varints will not be added.")
-  #       # })
-  #       # 
-  #       tryCatch({
-  #         doc <- cursor_reach(doc, "<<summary_somatic>>")
-  #         if (!is.null(somatic_dt()) || nrow(somatic_dt()) > 0) {
-  #           message("##################### somatic_dt() ################### ", somatic_dt())
-  #           for (variant_text in summary_somatic()) {
-  #             message("##################### variant_text ################### ", variant_text)
-  #             doc <- body_add_par(doc, variant_text, pos = "before")
-  #           }
-  #         }
-  #         doc <- cursor_reach(doc, "<<summary_somatic>>")
-  #         doc <- body_remove(doc)
-  #       }, error = function(e) {
-  #         message("Placeholder <<summary_somatic>> was not found. No pathogenic varints will not be added.")
-  #       })
-  #       
-  #       # tryCatch({
-  #       #   doc <- cursor_reach(doc, "<<summary_fusion>>")
-  #       #   
-  #       #   if (!is.null(fusion_dt()) || nrow(fusion_dt()) > 0) {
-  #       #     for (variant_text in summary_fusion()) {
-  #       #       doc <- body_add_par(doc, variant_text, pos = "before")
-  #       #     }
-  #       #   }
-  #       #   doc <- cursor_reach(doc, "<<summary_fusion>>")
-  #       #   doc <- body_remove(doc)
-  #       # }, error = function(e) {
-  #       #   message("Placeholder <<summary_fusion>> was not found. No gene fusion will not be added.")
-  #       # })
+        tryCatch({
+          doc <- cursor_reach(doc, "<<patient_info>>")
+          # Normaly here would be body_remove(doc), but also it would add empty row between titul in template
+          # and text/table from placeholder which I dont want to. Solution is to add text before and after placeholder
+          # and remove placeholder at last.
+          #
+          # Move the cursor to the placeholder <<patient_info>> in the document.
+          # After all content (headings and text) has been inserted before this placeholder,
+          # the placeholder itself is now removed to finalize the layout.
+          doc <- body_add_par(doc, paste0("Patient ID: ", patient), pos = "before")
+          doc <- body_add_par(doc, paste0("Diagnosis: ", ""), pos = "after")
+          doc <- body_add_par(doc, paste0("Report date: ", format(Sys.Date(), "%B %d, %Y")), pos = "after")
+
+          doc <- cursor_reach(doc, "<<patient_info>>")
+          doc <- body_remove(doc)
+        }, error = function(e) {
+          message("Placeholder <<patient_info>> was not found.")
+        })
+
+# 
+#         tryCatch({
+#           doc <- cursor_reach(doc, "<<summary_germline>>")
+# 
+#           if (!is.null(germline_dt()) || nrow(germline_dt()) > 0) {
+#             for (variant_text in summary_germline()) {
+#               doc <- body_add_par(doc, variant_text, pos = "before")
+#             }
+#           }
+#           doc <- cursor_reach(doc, "<<summary_germline>>")
+#           doc <- body_remove(doc)
+#         }, error = function(e) {
+#           message("Placeholder <<summary_germline>> was not found. No pathogenic varints will not be added.")
+#         })
+
+        # tryCatch({
+        #   doc <- cursor_reach(doc, "<<summary_somatic>>")
+        #   if (!is.null(somatic_dt()) || nrow(somatic_dt()) > 0) {
+        #     message("##################### somatic_dt() ################### ", somatic_dt())
+        #     for (variant_text in summary_somatic()) {
+        #       message("##################### variant_text ################### ", variant_text)
+        #       doc <- body_add_par(doc, variant_text, pos = "before")
+        #     }
+        #   }
+        #   doc <- cursor_reach(doc, "<<summary_somatic>>")
+        #   doc <- body_remove(doc)
+        # }, error = function(e) {
+        #   message("Placeholder <<summary_somatic>> was not found. No pathogenic varints will not be added.")
+        # })
+        
+        # tryCatch({
+        #   doc <- cursor_reach(doc, "<<summary_fusion>>")
+        # 
+        #   if (!is.null(fusion_dt()) || nrow(fusion_dt()) > 0) {
+        #     for (variant_text in summary_fusion()) {
+        #       doc <- body_add_par(doc, variant_text, pos = "before")
+        #     }
+        #   }
+        #   doc <- cursor_reach(doc, "<<summary_fusion>>")
+        #   doc <- body_remove(doc)
+        # }, error = function(e) {
+        #   message("Placeholder <<summary_fusion>> was not found. No gene fusion will not be added.")
+        # })
   #       # 
   #       # tryCatch({
   #       #   doc <- cursor_reach(doc, "<<details_table>>")
@@ -453,28 +475,9 @@ server <- function(id, patient, shared_data) {
   #       #   message("Placeholder <<details_table>> was not found. Details table will not be added.")
   #       # })
   #       # 
-  #       # tryCatch({
-  #       #   doc <- cursor_reach(doc, "<<germline_table>>")
-  #       #   
-  #       #   if (is.null(germline_dt()) || nrow(germline_dt()) == 0) {
-  #       #     doc <- body_add_par(doc, "No variants with known or potential clinical significance in genes associated with hereditary cancer-predisposing syndromes were found.")
-  #       #   } else {
-  #       #     doc <- body_add_flextable(doc, preprare_germline_dt(germline_dt()), pos = "before")
-  #       #     # Vysvětlivka pod tabulkou
-  #       #     doc <- body_add_fpar(doc, fpar(ftext("MAF – minor allele frequency – Non-Finnish European population (gnomAD database)", prop = note_style)), pos = "after")
-  #       #     doc <- body_add_fpar(doc, fpar(ftext("AD – autosomal dominant inheritance", prop = note_style)), pos = "after")
-  #       #     doc <- body_add_fpar(doc, fpar(ftext("AR – autosomal recessive inheritance", prop = note_style)), pos = "after")
-  #       #     doc <- body_add_fpar(doc, fpar(ftext("XLR – X-linked recessive", prop = note_style)), pos = "after")
-  #       #   }
-  #       #   doc <- cursor_reach(doc, "<<germline_table>>")
-  #       #   doc <- body_remove(doc)
-  #       # }, error = function(e) {   # No placeholder in template
-  #       #     message("Placeholder <<germline_table>> was not found. Germline table will not be added.")
-  #       # })
-  #       # 
+        
         tryCatch({
           doc <- cursor_reach(doc, "<<somatic_table>>")
-
           if (is.null(somatic_dt()) || nrow(somatic_dt()) == 0) {
             doc <- body_add_par(doc, "No variants with known or potential clinical significance were found.")
           } else {
@@ -483,37 +486,65 @@ server <- function(id, patient, shared_data) {
           doc <- cursor_reach(doc, "<<somatic_table>>")
           doc <- body_remove(doc)
         }, error = function(e) {   # No placeholder in template
-             message("Placeholder <<somatic_table>> was not found. Somatic table will not be added.")
+          message("Placeholder <<somatic_table>> was not found. Somatic table will not be added.")
         })
-  #       # 
-  #       # tryCatch({
-  #       #   doc <- cursor_reach(doc, "<<fusion_table>>")
-  #       #   
-  #       #   if (is.null(fusion_dt()) || nrow(fusion_dt()) == 0) {
-  #       #     doc <- body_add_par(doc, "No clinically relevant fusion genes were found.")
-  #       #   } else {
-  #       #     doc <- body_add_flextable(doc, preprare_fusion_dt(fusion_dt()), pos = "before")
-  #       #   }
-  #       #   doc <- cursor_reach(doc, "<<fusion_table>>")
-  #       #   doc <- body_remove(doc)
-  #       # }, error = function(e) {
-  #       #   message("Placeholder <<fusion_table>> was not found. Fusion table will not be added.")
-  #       # })
-  #       # 
-  #       # 
-  #       # tryCatch({
-  #       #   doc <- cursor_reach(doc, "<<mutational_sign_table>>")
-  #       # 
-  #       #   if (is.null(mut_sign_dt()) || nrow(mut_sign_dt()) == 0) {
-  #       #     doc <- body_add_par(doc, "No data about mutational signatures were found.")
-  #       #   } else {
-  #       #     doc <- body_add_flextable(doc, preprare_mut_sign_dt(mut_sign_dt()), pos = "before")
-  #       #   }
-  #       #   doc <- cursor_reach(doc, "<<mutational_sign_table>>")
-  #       #   doc <- body_remove(doc)
-  #       # }, error = function(e) {
-  #       #   message("Placeholder <<mutational_sign_table>> was not found. Mutational signatures table will not be added.")
-  #       # })
+        
+        tryCatch({
+          doc <- cursor_reach(doc, "<<germline_table>>")
+
+          if (is.null(germline_dt()) || nrow(germline_dt()) == 0) {
+            doc <- body_add_par(doc, "No variants with known or potential clinical significance in genes associated with hereditary cancer-predisposing syndromes were found.")
+          } else {
+            print("I am in")
+            doc <- body_add_flextable(doc, preprare_germline_dt(germline_dt()), pos = "before")
+            # Vysvětlivka pod tabulkou
+            doc <- body_add_fpar(doc, fpar(ftext("MAF – minor allele frequency – Non-Finnish European population (gnomAD database)", prop = note_style)), pos = "after")
+            doc <- body_add_fpar(doc, fpar(ftext("AD – autosomal dominant inheritance", prop = note_style)), pos = "after")
+            doc <- body_add_fpar(doc, fpar(ftext("AR – autosomal recessive inheritance", prop = note_style)), pos = "after")
+            doc <- body_add_fpar(doc, fpar(ftext("XLR – X-linked recessive", prop = note_style)), pos = "after")
+            print("I am in the end")
+          }
+          doc <- cursor_reach(doc, "<<germline_table>>")
+          doc <- body_remove(doc)
+        }, error = function(e) {   # No placeholder in template
+            message("Placeholder <<germline_table>> was not found. Germline table will not be added.")
+        })
+
+
+        tryCatch({
+          doc <- cursor_reach(doc, "<<fusion_table>>")
+
+          if (is.null(fusion_dt()) || nrow(fusion_dt()) == 0) {
+            doc <- body_add_par(doc, "No clinically relevant fusion genes were found.")
+          } else {
+            doc <- body_add_flextable(doc, preprare_fusion_dt(fusion_dt()), pos = "before")
+          }
+          doc <- cursor_reach(doc, "<<fusion_table>>")
+          doc <- body_remove(doc)
+        }, error = function(e) {
+          message("Placeholder <<fusion_table>> was not found. Fusion table will not be added.")
+        })
+
+
+        tryCatch({
+          doc <- cursor_reach(doc, "<<mutation_burden>>")
+          if (is.null(mutation_load()) || is.na(mutation_load())) {
+            doc <- body_add_par(doc, "No data about mutational load were found.")
+          } else {
+            formatted_text <- fpar(
+              ftext("Tumor mutation burden (load): ", prop = fp_text(bold = TRUE)),
+              ftext(mutation_load(), prop = fp_text()),
+              ftext(" mutations/Mb", prop = fp_text())
+            )
+            doc <- body_add_fpar(doc, formatted_text)
+          }
+          doc <- cursor_reach(doc, "<<mutation_burden>>")
+          doc <- body_remove(doc)
+        }, error = function(e) {
+          message("Placeholder <<mutation_burden>> was not found. Mutational signatures table will not be added.")
+        })
+
+        
   #       # 
   #       # tryCatch({
   #       #   doc <- cursor_reach(doc, "<<expression_table>>")
