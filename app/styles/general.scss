@@ -1,0 +1,31 @@
+
+.main-header {
+  padding-bottom: 1rem !important;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.main-header.navbar {
+  font-size: 23px;
+}
+
+.collapsible-box {
+  .card-header .card-tools {
+    margin-top: -25px;
+  }
+  .card-body {
+    font-size: 16px; 
+    line-height: 0.8; 
+    padding: 20px 30px;
+  }
+}
+
+.report-btn {
+  float: right; 
+  margin-left: auto;
+
+  .h3 {
+      .card-title {
+        float: right !important;
+      }
+  }
+}

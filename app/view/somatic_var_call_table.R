@@ -80,24 +80,28 @@ ui <- function(id) {
      ),
      uiOutput(ns("confirm_button_ui")),
      tags$br(),
-     box(width = 12, closable = FALSE,collapsible = TRUE, collapsed = TRUE, title = tags$div(style = "padding-top: 8px;","Tumor variant frequency histogram"),
-       dropdownButton(label = "Export Circos Plot",right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
-         downloadButton(ns("Hist_download"),"Download as PNG")),
-       br(),br(),
-       div(style = "width: 100%; margin: auto;",
-         use_spinner(plotOutput(ns("Histogram"),height = "480px"))
+     div(class = "collapsible-box",
+       box(width = 12, closable = FALSE,collapsible = TRUE, collapsed = TRUE, title = tags$div(style = "padding-top: 8px;","Tumor variant frequency histogram"),
+         dropdownButton(label = "Export Circos Plot",right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
+           downloadButton(ns("Hist_download"),"Download as PNG")),
+         br(),br(),
+         div(style = "width: 100%; margin: auto;",
+           use_spinner(plotOutput(ns("Histogram"),height = "480px"))
+         )
        )
      ),
-     box(width = 12,closable = FALSE,collapsible = TRUE,collapsed = TRUE,title = tags$div(style = "padding-top: 8px;","Sankey diagram"),
-       dropdownButton(label = "Export Sankey Plot",right = FALSE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
-         selectInput(ns("export_format"), "Select format:", choices = c("HTML" = "html", "PNG" = "png")),
-         downloadButton(ns("Sankey_download"),"Download")),
-       br(),
-       tags$div(style = "display: flex; justify-content: space-between; width: 100%;",
-         tags$span(style = "margin-left: 3cm;", "Variant"),
-         tags$span(style = "margin-right: 2cm;", "Gene"),
-         tags$span(style = "margin-right: 10cm;", "Pathway")),
-       uiOutput(ns("diagram"))
+     div(class = "collapsible-box",
+       box(width = 12,closable = FALSE,collapsible = TRUE,collapsed = TRUE,title = tags$div(style = "padding-top: 8px;","Sankey diagram"),
+         dropdownButton(label = "Export Sankey Plot",right = FALSE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
+           selectInput(ns("export_format"), "Select format:", choices = c("HTML" = "html", "PNG" = "png")),
+           downloadButton(ns("Sankey_download"),"Download")),
+         br(),
+         tags$div(style = "display: flex; justify-content: space-between; width: 100%;",
+           tags$span(style = "margin-left: 3cm;", "Variant"),
+           tags$span(style = "margin-right: 2cm;", "Gene"),
+           tags$span(style = "margin-right: 10cm;", "Pathway")),
+         uiOutput(ns("diagram"))
+       )
      )
   )
 }
