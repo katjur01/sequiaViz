@@ -59,7 +59,7 @@ ui <- function(id){
             box(elevation = 2, collapsible = FALSE, headerBorder = FALSE, color = "teal",width = 12,
               title = span("Expression profile", class = "category"),
               tags$div(textOutput(ns("tissues"))),
-              tags$div(class = "item", "Tissue comparison: 2"),
+              tags$div(class = "item", "Over-expressed genes: 21"),
               tags$div(class = "item", "Under-expressed genes: 21"),
               tags$div(class = "item", "Altered pathways: 5"),
               icon = HTML('<span class="icon icon-green" title="Analysis available"><i class="fa-solid fa-circle-check"></i></span>'),
@@ -76,7 +76,9 @@ ui <- function(id){
         hr(),
         uiOutput(ns("germline_boxes")),
         hr(),
-        uiOutput(ns("fusion_boxes"))
+        uiOutput(ns("fusion_boxes")),
+        hr(),
+        uiOutput(ns("expression_box"))
       )
     )
     
@@ -339,6 +341,37 @@ server <- function(id, patient, shared_data){
        }
       }
     })
+    
+    output$expression_box <- renderUI({
+      
+      deregulated_genes <- as.data.table(shared_data$expression_var())
+      
+      if (is.null(deregulated_genes) || nrow(deregulated_genes) == 0) {
+        # return(NULL)
+        tags$div("No deregulated genes selected")
+      } else {
+        
+        deregulated_genes <- deregulated_genes[grepl(patient, sample)]
+        message("## deregulated_genes after filtering: ", class(deregulated_genes))
+        message("## deregulated_genes after filtering: ", colnames(deregulated_genes))
+        message("## deregulated_genes after filtering: ", deregulated_genes)
+        
+        if (nrow(deregulated_genes) == 0) {
+          return(tags$div("No deregulated genes have been selected"))
+        } else {
+          message("## uniqueN(deregulated_genes$geneid)g: ",uniqueN(deregulated_genes$geneid))
+          div(class = "expression-box",
+              box(solidHeader = TRUE,  collapsible = FALSE,  width = 12,
+                  title = HTML(sprintf('<span style="font-size:16px; font-weight:normal;">In total, </span>
+                                        <span style="font-size:16px; font-weight:bold;">%s</span>
+                                        <span style="font-size:16px; font-weight:normal;"> deregulated genes have been selected for report.</span>',
+                                        uniqueN(deregulated_genes$geneid)))
+                  ))
+          
+        }
+      }
+    })
+    
   })
 }
 

@@ -96,6 +96,22 @@
     padding: 20px 30px;
   }
 }
+    
+    
+.expression-box {
+  .card {
+    border: 2px solid #3c78d8ff; 
+  }
+  .card-header {
+    background-color: #f2f6fcff; 
+  }
+  .card-header .card-tools {
+    margin-top: -25px;
+  }
+  .card-body {
+    display: none;
+  }
+}
 
 .summary-card-container {
   display: flex;
