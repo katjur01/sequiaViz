@@ -54,8 +54,6 @@ box::use(
   app/view/germline_var_call_table,
   app/view/somatic_var_call_table,
   app/view/expression_profile_table,
-  app/view/expression_profile_table,
-  app/view/expression_profile_plot,
   app/view/dropdown_button[igvDropdown_ui,igvDropdown_server,colFilterDropdown_ui,colFilterDropdown_server],
   app/logic/patients_list[patients_list,set_patient_to_sample],
   app/view/IGV,
@@ -184,10 +182,10 @@ ui <- function(id){
                                       tabBox(id = ns(paste0("expression_profile_tabs_", patient)), width = 12, collapsible = FALSE,
                                              tabPanel("Genes of Interest",
                                                       tabName = ns("genesOfinterest_panel"), value = "genesOfinterest",
-                                                      expression_profile_table$ui(ns(paste0("genesOfinterest_tab_", patient)), patient)),
+                                                      expression_profile_table$ui(ns(paste0("genesOfinterest_tab_", patient)))),
                                              tabPanel("All Genes",
                                                       tabName = ns("allGenes_panel"), value = "allGenes",
-                                                      expression_profile_table$ui(ns(paste0("allGenes_tab_", patient)), patient)))
+                                                      expression_profile_table$ui(ns(paste0("allGenes_tab_", patient)))))
                                    ))})))))),
               tabItem(h1("Gene Interactions Network"),tabName = ns("network_graph"),
                       bs4Card(width = 12,headerBorder = FALSE, collapsible = FALSE,
@@ -315,33 +313,17 @@ server <- function(id) {
       colFilterDropdown_ui(ns("colFilter_dropdown_expression"), all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting,columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns)$dropdown_btn)
       })
 
-    # observe({
-    #   req(all_colnames_val_expression())
-    #   selected_columns_expression <- colFilterDropdown_server("colFilter_dropdown_expression", all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting)
-    # 
-    #   lapply(names(samples_expr), function(patient) {
-    #     expression_profile_table$server_allGenes(paste0("allGenes_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns),all_colnames_val_expression(),shared_data)
-    #     expression_profile_table$server_genesOfInterest(paste0("genesOfinterest_tab_", patient), samples_expr[[patient]],selected_columns_expression, columnName_map("expression",expr_flag(),all_colnames_val_expression()$all_columns),all_colnames_val_expression(),shared_data)
-    #     })
-    # })
-    
     observe({
       req(all_colnames_val_expression())
-      selected_columns_expression <- colFilterDropdown_server(
-        "colFilter_dropdown_expression", 
-        all_colnames_val_expression()$all_columns, 
-        all_colnames_val_expression()$default_setting
-      )
+      selected_columns_expression <- colFilterDropdown_server("colFilter_dropdown_expression", all_colnames_val_expression()$all_columns, all_colnames_val_expression()$default_setting)
       
       lapply(names(samples_expr), function(patient) {
         
         # Všechny genes_of_interest
-        expression_profile_TEST$server(
+        expression_profile_table$server(
           id = paste0("genesOfinterest_tab_", patient),
           patient = samples_expr[[patient]],
           dataset_type = "genes_of_interest",
-          pathways_colname = "pathway",
-          base_columns = c("sample", "feature_name", "geneid", "pathway", "mean_log2FC"),
           selected_columns = selected_columns_expression,
           column_mapping = columnName_map("expression", expr_flag(), all_colnames_val_expression()$all_columns),
           all_colnames = all_colnames_val_expression(),
@@ -349,12 +331,10 @@ server <- function(id) {
         )
         
         # Všechny all_genes
-        expression_profile_TEST$server(
+        expression_profile_table$server(
           id = paste0("allGenes_tab_", patient),
           patient = samples_expr[[patient]],
           dataset_type = "all_genes",
-          pathways_colname = "all_kegg_paths_name",
-          base_columns = c("sample", "feature_name", "geneid", "all_kegg_paths_name"),
           selected_columns = selected_columns_expression,
           column_mapping = columnName_map("expression", expr_flag(), all_colnames_val_expression()$all_columns),
           all_colnames = all_colnames_val_expression(),
@@ -365,16 +345,10 @@ server <- function(id) {
     })
     
 
-    # lapply(names(samples_expr), function(patient) {
-    #   expression_profile_plot$server(paste0("allGenes_plots_", patient), patient,"all_genes")
-    #   expression_profile_plot$server(paste0("genesOfinterest_plots_", patient), patient,"genes_of_interest")
-    # })
-
-
 ##################    
     ## run network graph module    
     
-    # networkGraph_cytoscape$server("network_graph", shared_data)
+    networkGraph_cytoscape$server("network_graph", shared_data)
     
     
 

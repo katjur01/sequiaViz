@@ -212,8 +212,9 @@ columnName_map <- function(tag, expr_flag = NULL, all_columns = NULL){
           type = "Type",
           gene_definition = "Gene definition",
           all_kegg_gene_names = "KEGG gene names",
-          all_kegg_paths_name = "Pathway",
-          num_of_paths = "Pathway (n)")
+          pathway = "Pathway",
+          num_of_paths = "Pathway (n)",
+          mean_log2FC = "Mean log2FC")
     } else {
         static_columns <- list(
           feature_name = "Gene name",

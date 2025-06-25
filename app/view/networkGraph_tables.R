@@ -59,7 +59,7 @@ tab_server <- function(id, tissue_dt, subTissue_dt, selected_nodes,selected_dt) 
                   fc = colDef(name = "FC", maxWidth = 100),
                   log2FC = colDef(show = F),
                   p_adj = colDef(show = F),
-                  all_kegg_paths_name = colDef(name = "Pathway name", minWidth = 140, resizable = TRUE),
+                  pathway = colDef(name = "Pathway name", minWidth = 140, resizable = TRUE),
                   tissue = colDef(show = F),
                   sample = colDef(show = F)
                 ),
@@ -101,7 +101,7 @@ tab_server <- function(id, tissue_dt, subTissue_dt, selected_nodes,selected_dt) 
                       fc = colDef(name = "FC", maxWidth = 100),
                       log2FC = colDef(show = F),
                       p_adj = colDef(show = F),
-                      all_kegg_paths_name = colDef(name = "Pathway name", minWidth = 140, resizable = TRUE),
+                      pathway = colDef(name = "Pathway name", minWidth = 140, resizable = TRUE),
                       tissue = colDef(show = F),
                       sample = colDef(show = F)
                     ),
@@ -141,14 +141,14 @@ tab_server <- function(id, tissue_dt, subTissue_dt, selected_nodes,selected_dt) 
       if (is.null(data) || nrow(data) == 0) {
         return(NULL)
       }
-      required_columns <- c("Gene_symbol", "var_name", "fusion", "all_kegg_paths_name")
+      required_columns <- c("Gene_symbol", "var_name", "fusion", "pathway")
       missing_columns <- setdiff(required_columns, colnames(data))
       # dont show empty columns
       for (col in missing_columns) {
         data[[col]] <- ""
       }
       # Vyber jen relevantní sloupce
-      data <- data[, c("Gene_symbol", "var_name", "fusion", "all_kegg_paths_name")]
+      data <- data[, c("Gene_symbol", "var_name", "fusion", "pathway")]
       
       reactable(
         data,
@@ -156,7 +156,7 @@ tab_server <- function(id, tissue_dt, subTissue_dt, selected_nodes,selected_dt) 
           Gene_symbol = colDef(name = "Gene name", minWidth = 120, maxWidth = 140),
           var_name = colDef(name = "Variant", width = 100, show = any(data$var_name != "")),  
           fusion = colDef(name = "Fusion", width = 100, show = any(data$fusion != "")),  
-          all_kegg_paths_name = colDef(name = "Pathway",minWidth = 180)
+          pathway = colDef(name = "Pathway",minWidth = 180)
         ),
         resizable = TRUE,
         pagination = FALSE,  

@@ -1,25 +1,24 @@
 # app/view/expression_profile_table.R
 
 box::use(
-  shiny[
-    moduleServer, NS, tagList, fluidRow, fluidPage, column, tabPanel, reactive, req, observe, div, observeEvent, reactiveVal, icon, splitLayout, h4, bindEvent,
-    updateSelectInput, selectInput, numericInput, actionButton, renderPlot, plotOutput, uiOutput, renderUI, verbatimTextOutput, renderPrint, reactiveValues, isolate
-  ],
+  shiny[moduleServer, NS, tagList, fluidRow, fluidPage, column, tabPanel, reactive, req, observe, div, observeEvent, reactiveVal, icon, splitLayout, h4, bindEvent,
+        updateSelectInput, selectInput, numericInput, actionButton, renderPlot, plotOutput, uiOutput, renderUI, verbatimTextOutput, renderPrint, reactiveValues, isolate],
   reactable,
   bs4Dash[box],
-  reactable[colDef, reactableOutput, renderReactable, reactable, colGroup],
+  reactable[colDef, reactableOutput, renderReactable, reactable, getReactableState, colGroup, JS],
   htmltools[tags],
   plotly[plotlyOutput, renderPlotly, toWebGL],
   reactablefmtr[pill_buttons, data_bars],
   utils[head],
-  shinyWidgets[
-    radioGroupButtons, checkboxGroupButtons, updateCheckboxGroupButtons, dropdown, actionBttn, awesomeCheckboxGroup, pickerInput
-  ],
+  shinyWidgets[radioGroupButtons, checkboxGroupButtons, updateCheckboxGroupButtons, dropdown, actionBttn, awesomeCheckboxGroup, pickerInput],
   data.table[rbindlist, dcast.data.table, as.data.table, melt.data.table, copy],
   grDevices[colorRampPalette],
   pheatmap[pheatmap],
   stats[setNames],
-  magrittr[`%>%`]
+  magrittr[`%>%`],
+  shinyalert[shinyalert,useShinyalert],
+  shinyjs[useShinyjs,hide,show],
+  data.table[data.table,as.data.table]
 )
 
 box::use(
@@ -43,23 +42,40 @@ input_data <- function(sample,expr_flag){
 
 
 
-ui <- function(id, patient, use_column_wrapper = FALSE) {
+ui <- function(id) {
   ns <- NS(id)
+  useShinyjs()
   tagList(
     div(class = "filter-button-wrapper",
         uiOutput(ns("filterTab")),
-        use_spinner(reactableOutput(ns("expression_table"))),
-        plot_ui(ns("plot")) 
+        use_spinner(reactableOutput(ns("expression_table")))
+    ),
+    # div(
+    #   tags$br(),
+    #   actionButton(ns("selectDeregulated_button"), "Select deregulated genes for report", status = "info"),
+    #   tags$br(),
+    #   reactableOutput(ns("selectDeregulated_tab")),
+    #   tags$br(),
+    #   actionButton(ns("delete_button"), "Delete genes", icon = icon("trash-can")),
+    #   tags$br()
+    # )
+    div(
+      tags$br(),
+      actionButton(ns("selectDeregulated_button"), "Select deregulated genes for report", status = "info"),
+      tags$br(),
+      fluidRow(
+        column(12,reactableOutput(ns("selectDeregulated_tab")))),
+      tags$br(),
+      fluidRow(
+        column(3,actionButton(ns("delete_button"),"Delete genes", icon = icon("trash-can"))))
     )
+    # plot_ui(ns("plot"))
   )
 }
 
 
-server <- function(id,  patient,
-        dataset_type, # "genes_of_interest" nebo "all_genes"
-        pathways_colname, # "pathway" nebo "all_kegg_paths_name"
-        base_columns, # vektor základních sloupců
-        selected_columns, column_mapping, all_colnames, shared_data) {
+server <- function(id,  patient, dataset_type, # "genes_of_interest" nebo "all_genes"
+                   selected_columns, column_mapping, all_colnames, shared_data) {
   
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -84,21 +100,25 @@ server <- function(id,  patient,
     pval_btn_final <- reactiveVal(FALSE)
     padj_btn_final <- reactiveVal(FALSE)
     
+    # # Reactive value to store selected rows.
+    selected_genes <- reactiveVal(data.frame(patient = character(), feature_name = character(), geneid = character()))
+    
     # Načtení dat
     data <- reactive({
       input_data(patient, dataset_type)
     })
-    
+      
     # Filtrace dat
     filtered_data <- reactive({
       req(data())
       df <- copy(data())
+      base_cols <- c("sample", "feature_name", "geneid", "pathway", "mean_log2FC")
       
       # --- Pathways filtr ---
       pathways_selected <- selected_pathway_final()
       if (!is.null(pathways_selected) && length(pathways_selected) > 0 && length(pathways_selected) < length(get_pathway_list(dataset_type))) {
         pattern <- paste(pathways_selected, collapse = "|")
-        df <- df[grepl(pattern, get(pathways_colname))]
+        df <- df[grepl(pattern, pathway)]
       }
       
       # --- Tkáně a prahové hodnoty ---
@@ -127,12 +147,12 @@ server <- function(id,  patient,
       
       # --- Výběr sloupců ---
       tissues <- selected_tissues_final()
-      if (is.null(tissues) || length(tissues) == 0) return(df[, ..base_columns])
+      if (is.null(tissues) || length(tissues) == 0) return(df[, ..base_cols])
       selected_cols <- unlist(lapply(tissues, function(tissue) {
         c(paste0("log2FC_", tissue), paste0("p_value_", tissue), paste0("p_adj_", tissue))
       }))
       valid_cols <- intersect(selected_cols, names(df))
-      df_filtered <- df[, c(base_columns, valid_cols), with = FALSE]
+      df_filtered <- df[, c(base_cols, valid_cols), with = FALSE]
       return(df_filtered)
     })
     
@@ -144,8 +164,12 @@ server <- function(id,  patient,
     })
     
     output$expression_table <- renderReactable({
+      message("Rendering Reactable for expressions: ", colnames(filtered_data()))
+      filtered_data <- filtered_data() 
+      deregulated_genes <- selected_genes() # seznam variant, které byly označeny jako patogenní
+      
       reactable(
-        as.data.frame(filtered_data()),
+        as.data.frame(filtered_data),
         class = "expression-table",
         columns = column_defs(),
         resizable = TRUE,
@@ -160,9 +184,127 @@ server <- function(id,  patient,
         compact = TRUE,
         defaultColDef = colDef(sortNALast = TRUE, align = "center"),
         columnGroups = custom_colGroup_setting("expression", selected_tissues_final()),
-        defaultSorted = list("geneid" = "asc")
+        defaultSorted = list("geneid" = "asc"),
+        rowStyle = function(index) {
+          gene_in_row <- filtered_data$feature_name[index]
+          var_in_row <- filtered_data$geneid[index]
+          if (var_in_row %in% deregulated_genes$geneid &           # Pokud je aktuální řádek v seznamu patogenních variant, zvýrazníme ho
+              gene_in_row %in% deregulated_genes$feature_name) {
+            list(backgroundColor = "#B5E3B6",fontWeight = "bold")
+          } else {
+            NULL
+          }
+        },
+        selection = "multiple",
+        onClick = JS("function(rowInfo, column, event) {
+                        if (event.target.classList.contains('rt-expander') || event.target.classList.contains('rt-expander-button')) {
+                        } else {
+                            rowInfo.toggleRowSelected();}}")
       )
     })
+    
+    
+    # Sledování vybraného řádku a genů
+    selected_gene <- reactive({
+      selected_row <- getReactableState("expression_table", "selected")
+      req(selected_row)
+      filtered_data()[selected_row, c("feature_name","geneid")]  # Získání varianty z vybraného řádku
+      message("data expression tab: ", filtered_data()[selected_row, c("feature_name","geneid")])
+    })
+    
+    # Akce po kliknutí na tlačítko pro přidání varianty
+    observeEvent(input$selectDeregulated_button, {
+      selected_rows <- getReactableState("expression_table", "selected")
+      req(selected_rows)
+      
+      new_variants <- filtered_data()[selected_rows, c("feature_name","geneid")]# c("feature_name","geneid","log2FC")
+      new_variants$sample <- patient
+      
+      current_variants <- selected_genes()  # Stávající přidané varianty
+      new_unique_variants <- new_variants[!(new_variants$feature_name %in% current_variants$feature_name &       # Porovnání - přidáme pouze ty varianty, které ještě nejsou v tabulce
+                                              new_variants$geneid %in% current_variants$geneid), ]
+      
+      if (nrow(new_unique_variants) > 0) selected_genes(rbind(current_variants, new_unique_variants))
+      
+      # Aktualizace globální proměnné shared_data$somatic_var:
+      global_data <- shared_data$expression_var()
+      
+      if (is.null(global_data) || nrow(global_data) == 0 || !("sample" %in% names(global_data))) {
+        global_data <- data.table(
+          sample = character(),
+          feature_name = character(),
+          geneid = character()
+          #log2FC = character()
+        )
+      }
+      # Odstraníme data, která patří právě tomuto pacientovi
+      global_data <- global_data[sample != patient]
+      
+      # Přidáme nově aktualizované lokální data daného pacienta
+      updated_global_data <- rbind(global_data, selected_genes())
+      shared_data$expression_var(updated_global_data)
+    })
+    
+    output$selectDeregulated_tab <- renderReactable({
+      genes <- selected_genes()
+      if (nrow(genes) == 0) {
+        return(NULL)
+      } else {
+        genes <- as.data.table(genes)[,.(feature_name,geneid)] #Consequence,HGVSc,HGVSp,Feature
+        reactable(
+          as.data.frame(genes),
+          columns = list(
+            feature_name = colDef(name = "Gene name"),
+            geneid = colDef(name = "Gene ID")),
+          selection = "multiple", onClick = "select")
+      }
+    })
+    
+    
+    observeEvent(input$delete_button, {
+      rows <- getReactableState("selectDeregulated_tab", "selected")
+      req(rows)
+      current_variants <- selected_genes()
+      updated_variants <- current_variants[-rows, ]
+      selected_genes(updated_variants)
+      shared_data$expression_var(updated_variants)
+      session$sendCustomMessage("resetReactableSelection",selected_genes())
+
+      if (nrow(selected_genes()) == 0) {
+        hide("delete_button")
+      }
+    })
+    
+    # Při stisku tlačítka pro výběr
+    observeEvent(input$selectDeregulated_button, {
+      if (nrow(selected_genes()) == 0) {
+        # Pokud nejsou vybrány žádné řádky, zůstaň u původního stavu
+        # variant_selected(FALSE)
+        hide("delete_button")
+        shinyalert(
+          title = "No deregulated genes selected",
+          text = "Please select the deregulated genes for report from table above.",
+          type = "warning",
+          showCancelButton = FALSE,
+          confirmButtonText = "OK",
+          callbackR = function(value) {
+            # value bude TRUE pro OK, FALSE pro "Go to variant"
+            if (!value) {
+              # updateTabItems(session = session$userData$parent_session,  # použijeme parent session
+              #                inputId = "sidebar_menu",  # bez namespace
+              #                selected = "fusion_genes")
+            }})
+      } else {
+        # Pokud jsou nějaké řádky vybrány, nastav fusion_selected na TRUE
+        # variant_selected(TRUE)
+        
+        # Zobraz tlačítka pomocí shinyjs
+        show("delete_button")
+      }
+    })
+
+    hide("delete_button")
+
     
     # Obsluha tlačítka Confirm
     observeEvent(filter_state$confirm(), {

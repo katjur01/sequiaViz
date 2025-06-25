@@ -152,7 +152,7 @@ server <- function(id, shared_data) {
 
     pathway_dt <- reactive({
       req(input$selected_pathway)
-      unique(dt[grepl(input$selected_pathway, all_kegg_paths_name,fixed = TRUE),-c("all_kegg_gene_names","counts_tpm_round","size","mu","lower_than_p","higher_than_p","type","gene_definition")])
+      unique(dt[grepl(input$selected_pathway, pathway,fixed = TRUE),-c("all_kegg_gene_names","counts_tpm_round","size","mu","lower_than_p","higher_than_p","type","gene_definition")])
     })
 
     tissue_dt <- reactive({
@@ -408,13 +408,13 @@ server <- function(id, shared_data) {
         }
         combined_variants <- unique(rbindlist(list(as.data.table(selected_som_variants)[, .(Gene_symbol, var_name = "somatic")],as.data.table(selected_germ_variants)[, .(Gene_symbol, var_name = "germline")])))
         combined_selected <- merge(combined_variants, selected_fusions, by = "Gene_symbol", all = TRUE)
-        pathways_info <- subTissue_dt()[feature_name %in% combined_selected$Gene_symbol, .(Gene_symbol = feature_name, all_kegg_paths_name)]
+        pathways_info <- subTissue_dt()[feature_name %in% combined_selected$Gene_symbol, .(Gene_symbol = feature_name, pathway)]
         combined_selected <- merge(combined_selected, pathways_info, by = "Gene_symbol", all.x = TRUE)
         setDF(combined_selected)
         
         selected_dt(combined_selected)
       } else {
-        selected_dt(data.frame(Gene_symbol = character(0), variant = character(0), fusion = character(0), all_kegg_paths_name = character(0)))
+        selected_dt(data.frame(Gene_symbol = character(0), variant = character(0), fusion = character(0), pathway = character(0)))
       }
     })
     

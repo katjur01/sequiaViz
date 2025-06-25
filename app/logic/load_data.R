@@ -82,6 +82,7 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
       combined_dt <- rbindlist(dt_list, use.names = TRUE, fill = TRUE)
       combined_dt$sample <- NULL
       combined_dt[, sample := sample]
+      setnames(combined_dt, "all_kegg_paths_name", "pathway")
     } else{
       stop("Your data table has wrong name. Must contain string gene_of_interest or all_genes.")
     }

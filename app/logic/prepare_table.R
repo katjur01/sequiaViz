@@ -160,12 +160,14 @@ prepare_expression_table <- function(combined_dt,expr_flag){
     # }))
     # wide_dt <- wide_dt[, c(ordered_columns, tissue_cols), with = FALSE]
   } else if (expr_flag == "all_genes"){
+    setnames(combined_dt, "all_kegg_paths_name", "pathway")
     wide_dt <- dcast(combined_dt,
                      sample + feature_name + geneid + refseq_id + type + all_kegg_gene_names
-                     + gene_definition + all_kegg_paths_name + num_of_paths ~ tissue,
+                     + gene_definition + pathway + num_of_paths ~ tissue,
                      value.var = c("log2FC", "p_value", "p_adj"))
+    wide_dt[, mean_log2FC := rowMeans(.SD, na.rm = TRUE), .SDcols = patterns("^log2FC_")]
     
-    column_order <- c("sample","feature_name","geneid","refseq_id","type","gene_definition","all_kegg_gene_names","all_kegg_paths_name", "num_of_paths",as.vector(rbind(log2FC_cols, p_value_cols, p_adj_cols)))
+    column_order <- c("sample","feature_name","geneid","refseq_id","type","gene_definition","all_kegg_gene_names","pathway", "num_of_paths","mean_log2FC",as.vector(rbind(log2FC_cols, p_value_cols, p_adj_cols)))
     wide_dt <- wide_dt[, column_order, with = FALSE]
 
     
@@ -238,7 +240,7 @@ colFilter <- function(flag,expr_flag = NULL){
 
       tissue <- unique(gsub("^.*/|_all_genes_multiRow\\.tsv$", "", filenames$expression.files[grep("multiRow", filenames$expression.files)]))
       if (expr_flag == "all_genes"){
-        keep_columns <- c("feature_name", "geneid", "all_kegg_paths_name")
+        keep_columns <- c("feature_name", "geneid", "pathway")
         hide_columns <- c("refseq_id", "type", "all_kegg_gene_names", "gene_definition", "num_of_paths")
       } else {
         keep_columns <- c("feature_name", "geneid", "pathway", "mean_log2FC")
