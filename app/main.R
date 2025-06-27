@@ -232,6 +232,10 @@ server <- function(id) {
                                   fusion_overview = list(),
                                   navigation_context = reactiveVal(NULL))     # somatic or germline or fusion     # from where are we opening IGV
     
+    getColFilterValues <- function(flag,expr_flag = NULL) {
+      colnames_list <- colFilter(flag,expr_flag)
+      list(all_columns = colnames_list$all_columns, default_columns = colnames_list$default_columns)
+    }
 ## run summary module
     
     lapply(patients_list(), function(patient) {
@@ -241,12 +245,12 @@ server <- function(id) {
     })
 
 
-    getColFilterValues <- function(flag,expr_flag) {
-      reactive({
-        colnames_list <- colFilter(flag,expr_flag)
-        list(all_columns = colnames_list$all_columns, default_setting = colnames_list$default_setting)
-      })
-    }
+    # getColFilterValues <- function(flag,expr_flag) {
+    #   reactive({
+    #     colnames_list <- colFilter(flag,expr_flag)
+    #     list(all_columns = colnames_list$all_columns, default_setting = colnames_list$default_setting)
+    #   })
+    # }
 
 # #################
 #   ## filter table columns dropdown button for fusion

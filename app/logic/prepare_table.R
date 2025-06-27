@@ -260,11 +260,15 @@ set_pathway_colors <- function(){
 }
 
 #' @export
-colFilter <- function(flag,expr_flag = NULL){
+colFilter <- function(flag,expr_flag){
   filenames <- get_inputs("per_sample_file")
   # message(paste("Getting columns for flag:", flag))
-
-  if (flag == "germline"){
+  if (flag == "somatic"){
+    all_column_var <- names(fread(filenames$var_call.somatic[1], nrows = 0))
+    all_column_names  <- setdiff(all_column_var, c("sample"))  # dont show/add sample column in table
+    default_selection <- c("var_name","tumor_variant_freq","in_library","Gene_symbol", "tumor_depth","gene_region",
+                           "gnomAD_NFE","clinvar_sig","clinvar_DBN","snpDB","CGC_Somatic","COSMIC","HGMD","Consequence","HGVSc", "HGVSp","all_full_annot_name")
+  } else if (flag == "germline"){
     all_column_var <- names(fread(filenames$var_call.germline[1], nrows = 0))
     all_column_names  <- setdiff(all_column_var, c("sample"))  # dont show/add sample column in table
     default_selection <- c("var_name","variant_freq","in_library","Gene_symbol","coverage_depth","gene_region",
@@ -317,7 +321,7 @@ colFilter <- function(flag,expr_flag = NULL){
   ordered_columns <- factor(all_column_names, levels = default_selection)
   all_column_names_sorted <- all_column_names[order(ordered_columns)]
   # message(paste("Returning column names for flag:", flag))
-  return(list(all_columns = all_column_names_sorted, default_setting = default_selection))
+  return(list(all_columns = all_column_names_sorted, default_columns = default_selection))
 }
 
 #' @export

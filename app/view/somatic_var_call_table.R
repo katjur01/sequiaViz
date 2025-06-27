@@ -27,10 +27,13 @@ box::use(
                         handle_delete_variant, handle_confirm_selected],
   app/view/export_functions[get_table_download_handler,get_sankey_download_handler,get_hist_download_handler],
   app/logic/load_data[get_inputs,load_data],
-  app/logic/prepare_table[prepare_somatic_table],
+  app/logic/prepare_table[prepare_somatic_table,colFilter],
   app/logic/patients_list[sample_list_som],
-  app/logic/reactable_helpers[create_clinvar_filter,create_consequence_filter]
+  app/logic/reactable_helpers[create_clinvar_filter,create_consequence_filter,columnName_map],
+  app/view/dropdown_button[igvDropdown_ui,igvDropdown_server,colFilterDropdown_ui,colFilterDropdown_server],
+
 )
+
 
 
 # Load and process data table
@@ -115,13 +118,28 @@ server <- function(id, selected_samples, shared_data) {
       input_data(selected_samples)
     })
     
+    getColFilterValues <- function(flag,expr_flag = NULL) {
+        colnames_list <- colFilter(flag,expr_flag)
+        list(all_columns = colnames_list$all_columns, default_columns = colnames_list$default_columns)
+    }
+    
+    colnames_list <- getColFilterValues("somatic")
+    
     output$filterTab <- renderUI({
       req(data())
-      filterTab_ui(ns("filterTab_dropdown"),data())
+      req(colnames_list)
+      message("#### colnames_list$default_columns): ",colnames_list$default_columns)
+      message("#### setdiff(colnames_list$all_columns,colnames_list$default_columns): ",setdiff(colnames_list$all_columns,colnames_list$default_columns))
+      filterTab_ui(ns("filterTab_dropdown"),data(), colnames_list, columnName_map("somatic"))
     })
-    
-    
+
     filter_state <- filterTab_server("filterTab_dropdown")
+    ##############
+
+    
+
+    
+    ############
     
     selected_tumor_depth <- reactiveVal(NULL)
     selected_gnomAD_min  <- reactiveVal(NULL)
@@ -130,6 +148,7 @@ server <- function(id, selected_samples, shared_data) {
     selected_consequence <- reactiveVal(NULL)
 
 
+    
     observeEvent(filter_state$confirm(), {
       message("🟢 Confirm clicked – storing gene region filter")
       selected_gene_region(filter_state$gene_regions())
@@ -425,9 +444,9 @@ filterTab_server <- function(id) {
 }
 
 
-filterTab_ui <- function(id,data){
+filterTab_ui <- function(id, data, colnames_list, columnName_map = NULL){
   ns <- NS(id)
-
+#column_list,default_setting,columnName_map
   filenames <- get_inputs("per_sample_file")
   file_paths <- filenames$var_call.somatic[1]
   patient_names <- substr(basename(file_paths), 1, 6)
@@ -477,12 +496,8 @@ filterTab_ui <- function(id,data){
               prettyCheckboxGroup(
                 inputId = ns("colFilter_checkBox"),
                 label = NULL,
-                choices = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq",
-                            "tumor_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic",
-                            "gene_region", "Consequence", "all_full_annot_name"),
-                selected = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq",
-                             "tumor_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic",
-                             "gene_region", "Consequence", "all_full_annot_name"),
+                choices = colnames_list$all_columns, #setNames(colnames_list$all_columns, sapply(colnames_list$all_columns, function(x) columnName_map[[x]])),
+                selected = colnames_list$default_columns,
                 icon = icon("check"),
                 status = "primary",
                 outline = FALSE
