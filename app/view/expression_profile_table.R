@@ -6,11 +6,11 @@ box::use(
   reactable,
   bs4Dash[box],
   reactable[colDef, reactableOutput, renderReactable, reactable, getReactableState, colGroup, JS],
-  htmltools[tags],
+  htmltools[tags,HTML],
   plotly[plotlyOutput, renderPlotly, toWebGL],
   reactablefmtr[pill_buttons, data_bars],
   utils[head],
-  shinyWidgets[radioGroupButtons, checkboxGroupButtons, updateCheckboxGroupButtons, dropdown, actionBttn, awesomeCheckboxGroup, pickerInput],
+  shinyWidgets[radioGroupButtons, checkboxGroupButtons, updateCheckboxGroupButtons, dropdown, dropdownButton, actionBttn, awesomeCheckboxGroup, pickerInput],
   data.table[rbindlist, dcast.data.table, as.data.table, melt.data.table, copy],
   grDevices[colorRampPalette],
   pheatmap[pheatmap],
@@ -46,10 +46,14 @@ ui <- function(id) {
   ns <- NS(id)
   useShinyjs()
   tagList(
-    div(class = "filter-button-wrapper",
-        uiOutput(ns("filterTab")),
-        use_spinner(reactableOutput(ns("expression_table")))
-    ),
+    fluidRow(
+      div(style = "width: 100%; text-align: right;",
+    # div(class = "filter-button-wrapper",
+        uiOutput(ns("filterTab"))
+        )),
+      use_spinner(reactableOutput(ns("expression_table"))),
+    # ),
+    
     # div(
     #   tags$br(),
     #   actionButton(ns("selectDeregulated_button"), "Select deregulated genes for report", status = "info"),
@@ -75,7 +79,7 @@ ui <- function(id) {
 
 
 server <- function(id,  patient, dataset_type, # "genes_of_interest" nebo "all_genes"
-                   selected_columns, column_mapping, all_colnames, shared_data) {
+                   selected_columns, column_mapping, all_colnames, expression_var) {
   
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -111,6 +115,7 @@ server <- function(id,  patient, dataset_type, # "genes_of_interest" nebo "all_g
     # Filtrace dat
     filtered_data <- reactive({
       req(data())
+      message("▶ filtered_data computed")
       df <- copy(data())
       base_cols <- c("sample", "feature_name", "geneid", "pathway", "mean_log2FC")
       
@@ -158,13 +163,16 @@ server <- function(id,  patient, dataset_type, # "genes_of_interest" nebo "all_g
     
     # Generování columns pro reactable
     column_defs <- reactive({
-      message("Generating colDef for expression")
+      req(data())
       req(selected_columns())
+      message("▶ column_defs recomputed")
       generate_columnsDef(names(data()), selected_columns(), "expression", column_mapping$table, session)
     })
     
     output$expression_table <- renderReactable({
-      message("Rendering Reactable for expressions: ", colnames(filtered_data()))
+      req(filtered_data())
+      req(column_defs())
+      message("▶ Rendering reactable for expressions: ",dataset_type)
       filtered_data <- filtered_data() 
       deregulated_genes <- selected_genes() # seznam variant, které byly označeny jako patogenní
       
@@ -209,7 +217,7 @@ server <- function(id,  patient, dataset_type, # "genes_of_interest" nebo "all_g
       selected_row <- getReactableState("expression_table", "selected")
       req(selected_row)
       filtered_data()[selected_row, c("feature_name","geneid")]  # Získání varianty z vybraného řádku
-      message("data expression tab: ", filtered_data()[selected_row, c("feature_name","geneid")])
+      # message("data expression tab: ", filtered_data()[selected_row, c("feature_name","geneid")])
     })
     
     # Akce po kliknutí na tlačítko pro přidání varianty
@@ -217,7 +225,7 @@ server <- function(id,  patient, dataset_type, # "genes_of_interest" nebo "all_g
       selected_rows <- getReactableState("expression_table", "selected")
       req(selected_rows)
       
-      new_variants <- filtered_data()[selected_rows, c("feature_name","geneid")]# c("feature_name","geneid","log2FC")
+      new_variants <- filtered_data()[selected_rows, c("sample", "feature_name", "geneid", "pathway", "mean_log2FC")]# c("feature_name","geneid","log2FC")
       new_variants$sample <- patient
       
       current_variants <- selected_genes()  # Stávající přidané varianty
@@ -226,15 +234,16 @@ server <- function(id,  patient, dataset_type, # "genes_of_interest" nebo "all_g
       
       if (nrow(new_unique_variants) > 0) selected_genes(rbind(current_variants, new_unique_variants))
       
-      # Aktualizace globální proměnné shared_data$somatic_var:
-      global_data <- shared_data$expression_var()
+      # Aktualizace globální proměnné shared_data$expression_var:
+      global_data <- expression_var()
       
       if (is.null(global_data) || nrow(global_data) == 0 || !("sample" %in% names(global_data))) {
         global_data <- data.table(
           sample = character(),
           feature_name = character(),
-          geneid = character()
-          #log2FC = character()
+          geneid = character(),
+          pathway = character(),
+          mean_log2FC = character()
         )
       }
       # Odstraníme data, která patří právě tomuto pacientovi
@@ -242,7 +251,7 @@ server <- function(id,  patient, dataset_type, # "genes_of_interest" nebo "all_g
       
       # Přidáme nově aktualizované lokální data daného pacienta
       updated_global_data <- rbind(global_data, selected_genes())
-      shared_data$expression_var(updated_global_data)
+      expression_var(updated_global_data)
     })
     
     output$selectDeregulated_tab <- renderReactable({
@@ -250,12 +259,13 @@ server <- function(id,  patient, dataset_type, # "genes_of_interest" nebo "all_g
       if (nrow(genes) == 0) {
         return(NULL)
       } else {
-        genes <- as.data.table(genes)[,.(feature_name,geneid)] #Consequence,HGVSc,HGVSp,Feature
+        genes <- as.data.table(genes)[,.(sample, feature_name, geneid, pathway, mean_log2FC)]
         reactable(
           as.data.frame(genes),
           columns = list(
-            feature_name = colDef(name = "Gene name"),
-            geneid = colDef(name = "Gene ID")),
+              feature_name = colDef(name = "Gene name"),
+              geneid = colDef(name = "Gene ID"),
+              mean_log2FC = colDef(name = "log2FC")),
           selection = "multiple", onClick = "select")
       }
     })
@@ -267,7 +277,7 @@ server <- function(id,  patient, dataset_type, # "genes_of_interest" nebo "all_g
       current_variants <- selected_genes()
       updated_variants <- current_variants[-rows, ]
       selected_genes(updated_variants)
-      shared_data$expression_var(updated_variants)
+      expression_var(updated_variants)
       session$sendCustomMessage("resetReactableSelection",selected_genes())
 
       if (nrow(selected_genes()) == 0) {
@@ -371,7 +381,12 @@ filterTab_server <- function(id) {
 filterTab_ui <- function(id,expr_tag,columnName_map,column_list,default_setting){
   ns <- NS(id)
   tagList(
-    dropdown(right = TRUE,size = "xs",icon = icon("filter"),style = "material-flat",width = "auto",
+    dropdownButton(
+      label = NULL,
+      right = TRUE,
+      # width = "480px",
+      icon = HTML('<i class="fa-solid fa-filter download-button"></i>'),
+    # dropdown(right = TRUE,size = "xs",icon = icon("filter"),style = "material-flat",width = "auto",
              fluidRow(style = "width: 45rem;",
                       column(6,
                              div(style = "display: flex; flex-direction: column; flex-wrap: wrap; align-items: baseline; width: 100% !important; border-right: 1px solid #e0e0e0;",

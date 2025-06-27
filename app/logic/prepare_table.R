@@ -112,7 +112,31 @@ prepare_somatic_table <- function(dt){
   dt <- replace_dot_with_na(dt)
   dt[,gnomAD_NFE := as.numeric(gnomAD_NFE)]
   dt[,tumor_variant_freq := as.numeric(tumor_variant_freq)]
-  dt[is.na(clinvar_sig), clinvar_sig := " "]
+  # dt[is.na(clinvar_sig), clinvar_sig := " "]
+  dt[,consequence_trimws := lapply(Consequence, function(x) {
+    if (is.na(x) || trimws(x) == "") {
+      return("missing_value")
+    } else {
+      parts <- unlist(strsplit(x, ","))
+      cleaned_parts <- trimws(parts)
+      cleaned_parts <- cleaned_parts[cleaned_parts != ""]
+      return(cleaned_parts)
+    }
+  })]
+  dt[,clinvar_trimws := lapply(clinvar_sig, function(x) {
+    if (is.na(x) || trimws(x) == "") {
+      return("missing_value")
+    } else {
+      parts <- unlist(strsplit(x, ","))
+      all_parts <- unlist(lapply(parts, function(part) {
+        unlist(strsplit(part, "[|/]"))
+      }))
+      cleaned_parts <- trimws(gsub("^_+", "", all_parts))
+      cleaned_parts <- cleaned_parts[cleaned_parts != ""]
+      
+      return(cleaned_parts)
+    }
+  })]
   dt <- dt[, c("SOMATIC", "PHENO","GENE_PHENO") := NULL]
   order <- c("var_name","in_library","Gene_symbol","tumor_variant_freq","tumor_depth","gene_region",
              "fOne","CGC_Somatic","gnomAD_NFE","clinvar_sig","clinvar_DBN","snpDB","COSMIC",
@@ -129,6 +153,31 @@ prepare_germline_table <- function(dt){
   dt <- replace_dot_with_na(dt)
   dt[,gnomAD_NFE := as.numeric(gnomAD_NFE)]
   dt[,variant_freq := as.numeric(variant_freq)]
+  dt[,consequence_trimws := lapply(Consequence, function(x) {
+    if (is.na(x) || trimws(x) == "") {
+      return("missing_value")
+    } else {
+      parts <- unlist(strsplit(x, ","))
+      cleaned_parts <- trimws(parts)
+      cleaned_parts <- cleaned_parts[cleaned_parts != ""]
+      return(cleaned_parts)
+    }
+  })]
+  dt[,clinvar_trimws := lapply(clinvar_sig, function(x) {
+    if (is.na(x) || trimws(x) == "") {
+      return("missing_value")
+    } else {
+      parts <- unlist(strsplit(x, ","))
+      all_parts <- unlist(lapply(parts, function(part) {
+        unlist(strsplit(part, "[|/]"))
+      }))
+      cleaned_parts <- trimws(gsub("^_+", "", all_parts))
+      cleaned_parts <- cleaned_parts[cleaned_parts != ""]
+      
+      return(cleaned_parts)
+    }
+  })]
+  
   default_selection <- c("var_name","variant_freq","in_library","Gene_symbol","coverage_depth","gene_region",
                          "gnomAD_NFE","clinvar_sig","snpDB","CGC_Germline","trusight_genes","fOne","Consequence","HGVSc", "HGVSp","all_full_annot_name")
   setcolorder(dt, default_selection)
@@ -160,7 +209,7 @@ prepare_expression_table <- function(combined_dt,expr_flag){
     # }))
     # wide_dt <- wide_dt[, c(ordered_columns, tissue_cols), with = FALSE]
   } else if (expr_flag == "all_genes"){
-    setnames(combined_dt, "all_kegg_paths_name", "pathway")
+    # setnames(combined_dt, "all_kegg_paths_name", "pathway")
     wide_dt <- dcast(combined_dt,
                      sample + feature_name + geneid + refseq_id + type + all_kegg_gene_names
                      + gene_definition + pathway + num_of_paths ~ tissue,

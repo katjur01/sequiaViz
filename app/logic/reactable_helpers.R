@@ -6,7 +6,8 @@ box::use(
   stats[na.omit],
   bs4Dash[actionButton],
   reactablefmtr[pill_buttons,data_bars],
-  htmltools[HTML,span, div, tagList]
+  htmltools[HTML,span, div, tagList],
+  data.table[uniqueN]
 )
 
 box::use(
@@ -579,13 +580,70 @@ set_pathway_colors <- function(){
   return(pathway_colors)
 }
 
+#' @export
+create_clinvar_filter <- function(data, selected_clinvar_sig) {  #data[is.na(clinvar_sig) | clinvar_sig == "Benign",]
+  if ("missing_value" %in% selected_clinvar_sig) {
+    if (length(selected_clinvar_sig) == 1) {
+      return(data[is.na(clinvar_sig) | trimws(clinvar_sig) == ""])
+    } else {
+      # Pokud jsou vybrány i jiné hodnoty
+      other_terms <- selected_clinvar_sig[selected_clinvar_sig != "missing_value"]
+      
+      if (length(other_terms) > 0) {
+        conditions <- sapply(other_terms, function(term) {
+          escaped_term <- gsub("([.|()\\^{}+$*?]|\\[|\\])", "\\\\\\1", term)
+          paste0("(^|[|/_])", escaped_term, "($|[|/_])")
+        })
+        final_pattern <- paste(conditions, collapse = "|")
+        
+        # Kombinace missing values a pattern matching
+        return(data[is.na(clinvar_sig) | trimws(clinvar_sig) == "" | 
+                      (!is.na(clinvar_sig) & grepl(final_pattern, clinvar_sig, ignore.case = TRUE))])
+      }
+    }
+    
+  } else {
+  
+    # Normální případ - žádné "missing_value"
+    conditions <- sapply(selected_clinvar_sig, function(term) {
+      escaped_term <- gsub("([.|()\\^{}+$*?]|\\[|\\])", "\\\\\\1", term)
+      paste0("(^|[|/_])", escaped_term, "($|[|/_])")
+    })
+    
+    final_pattern <- paste(conditions, collapse = "|")
+    
+    filtered_data <- data[!is.na(clinvar_sig) & 
+                            grepl(final_pattern, clinvar_sig, ignore.case = TRUE)]
+    return(filtered_data)
+  }
+}
 
-# #' @export
-# rating_stars <- function(rating, max_rating = 4) {
-#   star_icon <- function(empty = FALSE) {
-#     tagAppendAttributes(shiny::icon("star"),
-#                         style = paste("color:", if (empty) "#edf0f2" else "orange"),
-#                         "aria-hidden" = "true"
-#     )
-#   }
-# }
+
+#' @export
+create_consequence_filter <- function(data, selected_consequences, include_missing = FALSE) {
+
+  if(!"consequence_trimws" %in% names(data)) {
+    data$consequence_trimws <- data$Consequence
+  }
+  
+  # Vytvoříme logický vektor pro filtrování
+  keep_rows <- sapply(data$consequence_trimws, function(x) {
+    if(is.null(x) || length(x) == 0) return(FALSE)
+    
+    # Pokud obsahuje missing_value
+    if(any(x == "missing_value")) {
+      # Pokud chceme zahrnout missing values, vracíme TRUE
+      if(include_missing) return(TRUE)
+      # Jinak kontrolujeme, jestli jsou i jiné hodnoty než missing_value
+      non_missing_values <- x[x != "missing_value"]
+      if(length(non_missing_values) == 0) return(FALSE)
+      return(any(non_missing_values %in% selected_consequences))
+    }
+    # Standardní kontrola
+    any(x %in% selected_consequences)
+  })
+  
+  filtered_data <- data[keep_rows]
+  
+  return(filtered_data)
+}

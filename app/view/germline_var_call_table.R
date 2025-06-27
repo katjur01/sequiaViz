@@ -11,17 +11,18 @@
 box::use(
   shiny[moduleServer,NS,h2,h3,tagList,div,tabsetPanel,tabPanel,observeEvent,fluidPage,fluidRow, reactive,icon,textInput,isTruthy,verbatimTextOutput,
         sliderInput,showModal,modalDialog,modalButton,column,uiOutput,renderUI,textOutput,renderText,reactiveVal,req,observe,outputOptions,checkboxInput,
-        renderPrint,getDefaultReactiveDomain],
+        renderPrint,getDefaultReactiveDomain,selectInput,downloadButton,numericInput,updateNumericInput],
   bs4Dash[actionButton, box,popover,addPopover],
   reactable,
   reactable[reactable,reactableOutput,renderReactable,colDef,colGroup,JS,getReactableState],
   # reactable.extras[reactable_extras_ui,reactable_extras_server],
   htmltools[tags,HTML],
   app/logic/patients_list[set_patient_to_sample],
-  shinyWidgets[prettyCheckbox,searchInput,pickerInput, dropdown,actionBttn,pickerOptions],
+  shinyWidgets[prettyCheckbox,prettyCheckboxGroup,updatePrettyCheckboxGroup,searchInput,pickerInput, dropdown,actionBttn,pickerOptions,dropdownButton],
   shinyalert[shinyalert,useShinyalert],
   shinyjs[useShinyjs,hide,show],
-  data.table[data.table,uniqueN],
+  data.table[data.table,as.data.table,uniqueN],
+  stats[setNames],
   # reactablefmtr
 )
 
@@ -30,8 +31,10 @@ box::use(
   app/logic/prepare_table[prepare_germline_table],
   app/logic/patients_list[sample_list_germ],
   app/logic/waiters[use_spinner],
-  app/logic/reactable_helpers[selectFilter,minRangeFilter,filterMinValue,generate_columnsDef]
+  app/logic/reactable_helpers[selectFilter,minRangeFilter,filterMinValue,generate_columnsDef,create_clinvar_filter,create_consequence_filter]
+  
 )
+
 
 # Load and process data table
 input_data <- function(sample){
@@ -46,10 +49,14 @@ ui <- function(id) {
   ns <- NS(id)
   useShinyjs()
   tagList(
+    fluidRow(
+      div(style = "width: 100%; text-align: right;",
+        dropdownButton(label = NULL,right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download download-button"></i>'),
+                       selectInput(ns("export_data_table"), "Select data:", choices = c("All data" = "all", "Filtered data" = "filtered")),
+                       selectInput(ns("export_format_table"), "Select format:", choices = c("CSV" = "csv", "TSV" = "tsv", "Excel" = "xlsx")),
+                       downloadButton(ns("Table_download"),"Download")),
+        uiOutput(ns("filterTab")))),
     use_spinner(reactableOutput(ns("germline_var_call_tab"))),
-    tags$br(),
-    tags$div(id = ns("checkbox_popover"), style = "width:245px; position: absolute; right: 10;", #margin-top: 13.5px;
-             checkboxInput(ns("fullTable_checkbox"),label = "Keep pre-filtered variant table",value = TRUE)),
     tags$br(),
     div(style = "display: flex; justify-content: space-between; align-items: top; width: 100%;",
       div(
@@ -73,60 +80,88 @@ ui <- function(id) {
 
 server <- function(id, selected_samples, selected_columns, column_mapping, shared_data) {
   moduleServer(id, function(input, output, session) {
-    
+    ns <- session$ns
     # Call loading function to load data
     data <- reactive({
       message("Loading input data for germline")
       input_data(selected_samples)
     })
     
-    observe({
-        req(data())
-        overview_dt <- data.table(
-            clinvar_N = uniqueN(data()[clinvar_sig %in% c("Pathogenic", "Likely_pathogenic", "Pathogenic/Likely_pathogenic",
-                                                          "Pathogenic_(VUS)", "Likely_pathogenic (VUS)", "Pathogenic_(VUS)")]),
-            for_review = uniqueN(data()[gnomAD_NFE <= 0.01 & coverage_depth > 10 & Consequence != "synonymous_variant" &
-                                          (gene_region == "exon" | gene_region == "splice")]))
-        shared_data$germline_overview[[ selected_samples ]] <- overview_dt
-    })
+    # observe({
+    #     req(data())
+    #     overview_dt <- data.table(
+    #         clinvar_N = uniqueN(data()[clinvar_sig %in% c("Pathogenic", "Likely_pathogenic", "Pathogenic/Likely_pathogenic",
+    #                                                       "Pathogenic_(VUS)", "Likely_pathogenic (VUS)", "Pathogenic_(VUS)")]),
+    #         for_review = uniqueN(data()[gnomAD_NFE <= 0.01 & coverage_depth > 10 & Consequence != "synonymous_variant" &
+    #                                       (gene_region == "exon" | gene_region == "splice")]))
+    #     shared_data$germline_overview[[ selected_samples ]] <- overview_dt
+    # })
 
     
-    # Call generate_columnsDef to generate colDef setting for reactable
-    column_defs <- reactive({
-      req(selected_columns())
-      generate_columnsDef(names(filtered_data()), selected_columns(), "germline", column_mapping, session)
+    # # Call generate_columnsDef to generate colDef setting for reactable
+    # column_defs <- reactive({
+    #   req(selected_columns())
+    #   generate_columnsDef(names(filtered_data()), selected_columns(), "germline", column_mapping, session)
+    # })
+    
+    output$filterTab <- renderUI({
+      req(data())
+      filterTab_ui(ns("filterTab_dropdown"),data())
+    })
+    
+    
+    filter_state <- filterTab_server("filterTab_dropdown")
+    
+    selected_coverage_depth <- reactiveVal(NULL)
+    selected_gnomAD_min  <- reactiveVal(NULL)
+    selected_gene_region <- reactiveVal(NULL)
+    selected_clinvar_sig <- reactiveVal(NULL)
+    selected_consequence <- reactiveVal(NULL)
+    
+    observeEvent(filter_state$confirm(), {
+      message("🟢 Confirm clicked – storing gene region filter")
+      selected_gene_region(filter_state$gene_regions())
     })
     
     filtered_data <- reactive({
-      message("Before filtering")
-      print(input$fullTable_checkbox)
-      
+      req(data())
       dt <- data()
-      
-      if (isTruthy(input$fullTable_checkbox)) {
-        dt <- dt[gnomAD_NFE <= 0.01 & coverage_depth > 10 & Consequence != "synonymous_variant"]
-        dt <- dt[gene_region == "exon" | gene_region == "splice"]
-        message("Filtered data for germline")
-      } else {
-        message("Full data for germline")
+
+      if (!is.null(selected_coverage_depth())) {
+        dt <- dt[selected_coverage_depth() <= coverage_depth, ]
       }
-      as.data.frame(dt)
+      if (!is.null(selected_gnomAD_min())) {
+        dt <- dt[gnomAD_NFE <= selected_gnomAD_min()]
+      }
+      if (!is.null(selected_gene_region()) && length(selected_gene_region()) > 0) {
+        dt <- dt[gene_region %in% selected_gene_region(), ]
+      }
+      if (!is.null(selected_clinvar_sig()) && length(selected_clinvar_sig()) > 0) {
+        dt <- create_clinvar_filter(dt, selected_clinvar_sig())
+      }
+      if (!is.null(selected_consequence()) && length(selected_consequence()) > 0) {
+        dt <- create_consequence_filter(dt, selected_consequence())
+      }
+      return(dt)
     })
+
+  
     
     # # Reactive value to store selected rows
     selected_variants <- reactiveVal(data.frame(patient = character(),var_name = character(), Gene_symbol = character()))
     
     # Render reactable with conditional selection
     output$germline_var_call_tab <- renderReactable({
+      req(filtered_data())
+      # req(column_defs())
       message("Rendering Reactable for germline")
       filtered_data <- filtered_data() # tvoje data pro hlavní tabulku
       pathogenic_variants <- selected_variants() # seznam variant, které byly označeny jako patogenní
       
       
       reactable(
-        # filtered_data(),
-        filtered_data,
-        columns = column_defs(),
+        as.data.frame(filtered_data),
+        # columns = column_defs(),
         resizable = TRUE,
         showPageSizeOptions = TRUE,
         pageSizeOptions = c(10, 20, 50, 100),
@@ -156,8 +191,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
                         if (event.target.classList.contains('rt-expander') || event.target.classList.contains('rt-expander-button')) {
                         } else {
                             rowInfo.toggleRowSelected();}}"),
-        class = "germline-table",
-        elementId = "tbl-germline"
+        class = "germline-table"
       )
     })
     
@@ -257,9 +291,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       }
     })
 
-    # variant_selected <- reactiveVal(FALSE)
-    
-    # Při stisku tlačítka pro výběr fúze
+    # Při stisku tlačítka pro výběr varianty
     observeEvent(input$selectPathogenic_button, {
       if (nrow(selected_variants()) == 0) {
         # Pokud nejsou vybrány žádné řádky, zůstaň u původního stavu
@@ -294,14 +326,16 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
     hide("delete_button")
     
     
-    addPopover(id = "checkbox_popover",
-               options = list(
-                 title = "Current filters:",
-                 content = "gnomAD NFE <= 0.01, Coverage > 10, Consequence w/o synonymous_variant, Gene region is exon or splice",
-                 placement = "bottom",
-                 trigger = "hover"))
     
-    
+    observeEvent(filter_state$confirm(), {
+      message("🟢 Confirm button was clicked")
+      selected_coverage_depth(filter_state$coverage_depth())
+      selected_gnomAD_min(filter_state$gnomAD_min())
+      selected_gene_region(filter_state$gene_region())
+      selected_clinvar_sig(filter_state$clinvar_sig())
+      selected_consequence(filter_state$consequence())
+    })
+
     
     #############
     ## run IGV ##
@@ -343,4 +377,112 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
 
 
 
+
+filterTab_server <- function(id) {
+  moduleServer(id, function(input, output, session) {
+    
+    observe({
+      if(isTruthy(is.na(input$coverage_depth))) updateNumericInput(session, "coverage_depth", value = 10)
+    })
+    observe({
+      if(isTruthy(is.na(input$gnomAD_min))) updateNumericInput(session, "gnomAD_min", value = 0.01)
+    })
+    
+    return(list(
+      confirm = reactive(input$confirm_btn),
+      coverage_depth = reactive(input$coverage_depth),
+      gnomAD_min = reactive(input$gnomAD_min),
+      gene_regions = reactive(input$gene_regions),
+      clinvar_sig = reactive(input$clinvar_sig),
+      consequence = reactive(input$consequence)
+      
+    ))
+  })
+}
+
+
+filterTab_ui <- function(id,data){
+  ns <- NS(id)
+  
+  filenames <- get_inputs("per_sample_file")
+  file_paths <- filenames$var_call.somatic[1]
+  patient_names <- substr(basename(file_paths), 1, 6)
+  consequence_split <- unique(unlist(unique(data$consequence_trimws)))
+  consequence_list <- sort(unique(ifelse(is.na(consequence_split) | consequence_split == "", "missing value", consequence_split)))
+  clinvar_split <- unique(unlist(unique(data$clinvar_trimws)))
+  clinvar_list <- sort(unique(ifelse(is.na(clinvar_split) | clinvar_split == "", "missing value", clinvar_split)))
+  
+  tagList(
+    tags$head(tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"),
+              tags$style(HTML(".dropdown-toggle {border-radius: 0; padding: 0; background-color: transparent; border: none; float: right;margin-top -1px;}
+                    .checkbox label {font-weight: normal !important;}
+                    .checkbox-group .checkbox {margin-bottom: 0px !important;}
+                    .my-blue-btn {background-color: #007bff;color: white;border: none;}
+                    .dropdown-menu .bootstrap-select .dropdown-toggle {border: 1px solid #ced4da !important; background-color: #fff !important;
+                      color: #495057 !important; height: 38px !important; font-size: 16px !important; border-radius: 4px !important;
+                      box-shadow: none !important;}
+                    .sw-dropdown-content {border: 1px solid #ced4da !important; border-radius: 4px !important; box-shadow: none !important;
+                      background-color: white !important;}
+                    .glyphicon-triangle-bottom {font-size: 12px !important; line-height: 12px !important; vertical-align: middle;}
+                    .glyphicon-triangle-bottom {display: none !important; width: 0 !important; margin: 0 !important; padding: 0 !important;}
+                    #app-somatic_var_call_tab-igv_dropdownButton {width: 230px !important; height: 38px !important; font-size: 16px !important;}
+                    "))
+    ),
+    dropdownButton(
+      label = NULL,
+      right = TRUE,
+      # width = "480px",
+      icon = HTML('<i class="fa-solid fa-filter download-button"></i>'),
+      
+      fluidRow(style = "display: flex; align-items: stretch;",
+               column(8,
+                      box(width = 12,title = tags$div(style = "padding-top: 8px;","Filter data by:"),closable = FALSE, collapsible = FALSE,style = "height: 100%;",
+                          fluidRow(
+                            column(6, numericInput(ns("coverage_depth"), tags$strong("Coverage min"), value = 10, min = 0, max = 1000)),
+                            column(6, numericInput(ns("gnomAD_min"), tags$strong("gnomAD NFE min"), value = 0.01, min = 0, max = 1))
+                          ),
+                          div(class = "card-body two-col-checkbox-group",
+                            div(
+                              div(class = "two-col-checkbox-group", style = "margin-bottom: 15px;",
+                                  prettyCheckboxGroup(ns("gene_regions"), label = tags$strong("Gene region"), icon = icon("check"), status = "primary", outline = FALSE,
+                                                      choices = unique(data$gene_region),selected = c("exon","intron"))),#unique(data$gene_region)
+                              div(class = "two-col-checkbox-group",
+                                  prettyCheckboxGroup(ns("clinvar_sig"),label = tags$strong("ClinVar significance"),icon = icon("check"),status = "primary",outline = FALSE,
+                                                      selected = unique(clinvar_list),
+                                                      choices = setNames(clinvar_list, clinvar_list)))),
+                            div(class = "two-col-checkbox-group",
+                                prettyCheckboxGroup(ns("consequence"),label = tags$strong("Consequence"),icon = icon("check"),status = "primary",outline = FALSE,
+                                                    selected = setdiff(consequence_list, "synonymous_variant"),
+                                                    choices = setNames(consequence_list, consequence_list)))
+                      ))
+               ),
+               column(4,
+                      box(width = 12,title = tags$div(style = "padding-top: 8px;","Select columns:"),closable = FALSE,collapsible = FALSE,height = "100%",
+                          div(class = "two-col-checkbox-group",
+                              prettyCheckboxGroup(
+                                inputId = ns("colFilter_checkBox"),
+                                label = NULL,
+                                choices = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq",
+                                            "coverage_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic",
+                                            "gene_region", "Consequence", "all_full_annot_name"),
+                                selected = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq",
+                                             "coverage_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic",
+                                             "gene_region", "Consequence", "all_full_annot_name"),
+                                icon = icon("check"),
+                                status = "primary",
+                                outline = FALSE
+                              )
+                          ),
+                          div(style = "display: flex; gap: 10px; width: 100%;",
+                              actionButton(inputId = ns("show_all"), label = "Show All", style = "flex-grow: 1; width: 0;"),
+                              actionButton(inputId = ns("show_default"), label = "Show Default", style = "flex-grow: 1; width: 0;"))
+                      )
+               )
+      ),
+      
+      div(style = "display: flex; justify-content: center; margin-top: 10px;",
+          actionBttn(ns("confirm_btn"),"Apply changes",style = "stretch",color = "success",size = "md",individual = TRUE,value = 0))
+    )
+  )
+}
 

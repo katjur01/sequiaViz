@@ -155,8 +155,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
                                               rowInfo.toggleRowExpanded();  
                                           } else {
                                               rowInfo.toggleRowSelected();
-                                        }}"),
-                          elementId = "tbl-fusion"
+                                        }}")
         )
   })
     

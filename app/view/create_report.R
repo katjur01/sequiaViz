@@ -209,6 +209,55 @@ server <- function(id, patient, shared_data) {
       ft
     }
     
+    
+    expression_dt <- reactive({
+      exp_goi <- as.data.table(shared_data$expression_goi_var())
+      exp_all <- as.data.table(shared_data$expression_all_var())
+      exp_genes <- unique(rbind(exp_goi, exp_all, use.names = TRUE, fill = TRUE))
+      
+      if (is.null(exp_genes) || nrow(exp_genes) == 0) {
+      } else {
+        exp_genes <- exp_genes[grepl(patient, sample)]
+        if (nrow(exp_genes) == 0) {
+          dt <- data.table(
+            Gene              = character(),
+            Transcript        = character(),
+            Expression_level  = character(),
+            log2FC            = character(),
+            pathway           = character(),
+            treatment         = character()
+          )
+        } else {
+          dt <- data.table(
+            Gene              = exp_genes$feature_name,
+            Transcript        = exp_genes$geneid,
+            Expression_level  = "",
+            log2FC            = exp_genes$log2FC,
+            pathway           = noNA_text(exp_genes$pathway),
+            treatment         = noNA_text("")
+          )
+        }
+        return(dt)
+      }
+    })
+    
+    preprare_expression_dt <- function(expression_dt) {
+      ft <- flextable(expression_dt, col_keys = c("Gene","Transcript","Expression_level","log2FC","treatment"))
+      ft <- set_header_labels(ft,
+                              Gene = "Gene",
+                              Transcript = "Transcript",
+                              Expression_level = "Expression level",
+                              log2FC = "log2FC",
+                              treatment = "Therapeutic option")
+      ft <- myReport_theme(ft)
+      ft <- set_table_properties(ft, width = 1, layout = "autofit")
+      ft <- width(ft, j = ~ Expression_level, width = 0.8)
+      ft <- width(ft, j =  ~ log2FC, width = 0.8)
+      ft <- width(ft, j =  ~ treatment, width = 1.5)
+      ft <- bold(ft, j = ~ Gene, bold = TRUE)
+      ft
+    }
+    
     mutation_load <- reactive({
       filenames <- get_inputs("per_sample_file")
       if (file.exists(filenames$var_call.somatic.mut_load)) {
@@ -287,63 +336,37 @@ server <- function(id, patient, shared_data) {
     #   # Nyní můžeme bezpečně získat poslední řádek
     #   last_row <- nrow_part(ft, part = "body")
     #   
-    #   # Aplikujeme formátování
-    #   ft <- ft |>
-    #     theme_vanilla() |>
-    #     fontsize(size = 8, part = "all") |>
-    #     align(align = "center", part = "header") |>
-    #     empty_blanks() |>
-    #     bg(part = "header", bg = "white") |>
-    #     bg(i = seq_len(last_row), bg = "white", part = "body") |>
-    #     bg(i = seq(1, last_row, by = 2), bg = "#bce5ec", part = "body") |>
-    #     border(part = "header",
-    #            border.top = top_bottom_border,
-    #            border.bottom = top_bottom_border) |>
-    #     border(part = "body",
-    #            i = last_row,
-    #            j = active_cols,
-    #            border.bottom = top_bottom_border) |>
-    #     bold(part = "header", bold = TRUE) |>
-    #     width(j = "attribute", width = 1.5) |>
-    #     # width(j = "germline", width = 1.5) |>
-    #     # width(j = "fusion", width = 1.5) |>
-    #     # width(j = "expression", width = 1.5) |>
-    #     set_table_properties(width = 1, layout = "autofit") |>
-    #     set_header_labels(attribute = "") |>
-    #     bold(j = "attribute", bold = TRUE) |>
-    #     italic(j = "attribute", italic = TRUE) |>
-    #     bg(j = space_cols, bg = "white", part = "body")
-    #   
-    #   ft
+      # Aplikujeme formátování
+      # ft <- ft |>
+      #   theme_vanilla() |>
+      #   fontsize(size = 8, part = "all") |>
+      #   align(align = "center", part = "header") |>
+      #   empty_blanks() |>
+      #   bg(part = "header", bg = "white") |>
+      #   bg(i = seq_len(last_row), bg = "white", part = "body") |>
+      #   bg(i = seq(1, last_row, by = 2), bg = "#bce5ec", part = "body") |>
+      #   border(part = "header",
+      #          border.top = top_bottom_border,
+      #          border.bottom = top_bottom_border) |>
+      #   border(part = "body",
+      #          i = last_row,
+      #          j = active_cols,
+      #          border.bottom = top_bottom_border) |>
+      #   bold(part = "header", bold = TRUE) |>
+      #   width(j = "attribute", width = 1.5) |>
+      #   # width(j = "germline", width = 1.5) |>
+      #   # width(j = "fusion", width = 1.5) |>
+      #   # width(j = "expression", width = 1.5) |>
+      #   set_table_properties(width = 1, layout = "autofit") |>
+      #   set_header_labels(attribute = "") |>
+      #   bold(j = "attribute", bold = TRUE) |>
+      #   italic(j = "attribute", italic = TRUE) |>
+      #   bg(j = space_cols, bg = "white", part = "body")
+      # 
+      # ft
     # }
-    # 
-    # data <- reactive({
-    #   data.frame(
-    #     Kategorie = sample(c("A", "B", "C"), 100, replace = TRUE)
-    #   )
-    # })
-    # 
-    # summary_text <- reactive({
-    #   sprintf("Dataset obsahuje %d záznamů rozdělených do %d kategorií.",
-    #           nrow(data()), length(unique(data()$Kategorie)))
-    # })
-    # 
-    # plot_file <- reactive({
-    #   file <- tempfile(fileext = ".png")
-    #   p <- ggplot(data(), aes(Kategorie)) +
-    #     geom_bar(fill = "steelblue") +
-    #     theme_minimal()
-    #   ggsave(filename = file, plot = p, width = 6, height = 4)
-    #   return(file)
-    # })
-    # 
-    # 
-    # output$plot <- renderPlot({
-    #   ggplot(data(), aes(Kategorie)) +
-    #     geom_bar(fill = "tomato") +
-    #     theme_minimal()
-    # })
-    # 
+
+    
     # Cesta k výchozí šabloně
     default_template_path <- paste0(getwd(),"/input_files/report_template.docx")
 
@@ -384,7 +407,6 @@ server <- function(id, patient, shared_data) {
       }
       return(sum_fus)
     })
-
 
     somatic_interpretation <- reactive({
       if (is.null(somatic_dt()) || nrow(somatic_dt()) == 0) {
@@ -528,7 +550,6 @@ server <- function(id, patient, shared_data) {
             message("Placeholder <<germline_table>> was not found. Germline table will not be added.")
         })
 
-
         tryCatch({
           doc <- cursor_reach(doc, "<<fusion_table>>")
 
@@ -542,8 +563,25 @@ server <- function(id, patient, shared_data) {
         }, error = function(e) {
           message("Placeholder <<fusion_table>> was not found. Fusion table will not be added.")
         })
-
-
+        
+        tryCatch({
+          doc <- cursor_reach(doc, "<<expression_table>>")
+          if (is.null(expression_dt()) || nrow(expression_dt()) == 0) {
+            doc <- body_add_par(doc, "No deregulated genes were selected for this report.")
+          } else {
+            pathways <- rev(unique(expression_dt()$pathway)) # Musím převrátit, jinak bude seznam pathways v opačném pořadí
+            for (p in pathways) {
+              subset_dt <- expression_dt()[pathway == p,]
+              doc <- body_add_flextable(doc, preprare_expression_dt(subset_dt[,-c("pathway")]), pos = "before")
+              doc <- body_add_par(doc, p, style = "heading 5", pos = "before") # Přidej nadpis (podsekce) s názvem pathway
+            }
+          }
+          doc <- cursor_reach(doc, "<<expression_table>>")
+          doc <- body_remove(doc)
+        }, error = function(e) {
+          message("Placeholder <<expression_table>> was not found. Expression profile table will not be added.")
+        })
+        
         tryCatch({
           doc <- cursor_reach(doc, "<<mutation_burden>>")
           if (is.null(mutation_load()) || is.na(mutation_load())) {
@@ -561,30 +599,7 @@ server <- function(id, patient, shared_data) {
         }, error = function(e) {
           message("Placeholder <<mutation_burden>> was not found. Mutational signatures table will not be added.")
         })
-
-        
-  #       # 
-  #       # tryCatch({
-  #       #   doc <- cursor_reach(doc, "<<expression_table>>")
-  #       #   
-  #       #   dt <- expression_dt()
-  #       #   if (is.null(dt) || nrow(dt) == 0) {
-  #       #     doc <- body_add_par(doc, "No data from expression profile analysis were found.")
-  #       #   } else {
-  #       #     pathways <- rev(unique(dt$pathway)) # Musím převrátit, jinak bude seznam pathways v opačném pořadí
-  #       #     for (p in pathways) {
-  #       #       subset_dt <- dt[pathway == p, .(gene, expression_level, FC, therapeutic_option)]
-  #       #       doc <- body_add_flextable(doc, preprare_expression_dt(subset_dt), pos = "before")
-  #       #       doc <- body_add_par(doc, p, style = "heading 5", pos = "before") # Přidej nadpis (podsekce) s názvem pathway
-  #       #     }
-  #       #   } 
-  #       #   doc <- cursor_reach(doc, "<<expression_table>>")
-  #       #   doc <- body_remove(doc)
-  #       # }, error = function(e) {
-  #       #   message("Placeholder <<expression_table>> was not found. Expression profile table will not be added.")
-  #       # })
-  #       # 
-         
+      
         tryCatch({
           doc <- cursor_reach(doc, "<<somatic_interpretation>>")
 
@@ -612,8 +627,6 @@ server <- function(id, patient, shared_data) {
         }, error = function(e) {
           message("Placeholder <<germline_interpretation>> was not found. No pathogenic variants will be added.")
         })
-
-
         
         
         print(doc, target = file)

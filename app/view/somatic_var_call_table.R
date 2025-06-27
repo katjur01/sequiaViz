@@ -1,8 +1,8 @@
 #app/view/somatic_var_call_table.R
 
 box::use(
-  shiny[NS, sliderInput, fluidRow, column, tagList, br, uiOutput, plotOutput, downloadButton, actionButton, numericInput, renderPlot, checkboxGroupInput, fluidPage, selectInput,
-        icon,div,tabPanel,moduleServer,downloadHandler,observe, observeEvent,reactive,renderUI,updateCheckboxGroupInput,updateSliderInput,updateNumericInput,req,
+  shiny[NS, sliderInput, fluidRow, column, tagList, br, uiOutput, plotOutput, downloadButton, actionButton, numericInput, renderPlot, fluidPage, selectInput,
+        icon,div,tabPanel,moduleServer,downloadHandler,observe, observeEvent,reactive,renderUI,updateSliderInput,updateNumericInput,req,
         reactiveVal,showModal,modalDialog,modalButton,isTruthy],
   reactable[colDef,reactableOutput,renderReactable,reactable,getReactableState,JS],
   bs4Dash[box,tabsetPanel,updateTabItems],
@@ -29,7 +29,7 @@ box::use(
   app/logic/load_data[get_inputs,load_data],
   app/logic/prepare_table[prepare_somatic_table],
   app/logic/patients_list[sample_list_som],
-  # app/logic/reactable_helpers[selectFilter,minRangeFilter,filterMinValue,generate_columnsDef]
+  app/logic/reactable_helpers[create_clinvar_filter,create_consequence_filter]
 )
 
 
@@ -47,17 +47,15 @@ ui <- function(id) {
   ns <- NS(id)
   useShinyjs()
   tagList(
-
-     dropdownButton(label = NULL,right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC; margin-bottom: 0; padding-bottom: 0;"></i>'),
-       selectInput(ns("export_data_table"), "Select data:", choices = c("All data" = "all", "Filtered data" = "filtered")),
-       selectInput(ns("export_format_table"), "Select format:", choices = c("CSV" = "csv", "TSV" = "tsv", "Excel" = "xlsx")),
-       downloadButton(ns("Table_download"),"Download")),
-     uiOutput(ns("filterTab")),
-     tags$div(style = "margin-top: 49px;"),
-     br(),
+    fluidRow(
+      div(style = "width: 100%; text-align: right;",
+         dropdownButton(label = NULL,right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download download-button"></i>'),
+           selectInput(ns("export_data_table"), "Select data:", choices = c("All data" = "all", "Filtered data" = "filtered")),
+           selectInput(ns("export_format_table"), "Select format:", choices = c("CSV" = "csv", "TSV" = "tsv", "Excel" = "xlsx")),
+           downloadButton(ns("Table_download"),"Download")),
+         uiOutput(ns("filterTab")))),
      use_spinner(reactableOutput(ns("somatic_var_call_tab"))),
      tags$br(),
-     # uiOutput(ns("confirm_button_ui")),
      div(style = "display: flex; justify-content: space-between; align-items: top; width: 100%;",
        div(
          actionButton(ns("selectPathogenic_button"), "Select variants as possibly oncogenic", status = "info"),
@@ -82,7 +80,7 @@ ui <- function(id) {
      tags$br(),
      div(class = "collapsible-box",
        box(width = 12, closable = FALSE,collapsible = TRUE, collapsed = TRUE, title = tags$div(style = "padding-top: 8px;","Tumor variant frequency histogram"),
-         dropdownButton(label = "Export Circos Plot",right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
+         dropdownButton(label = "Export Circos Plot",right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download download-button"></i>'),
            downloadButton(ns("Hist_download"),"Download as PNG")),
          br(),br(),
          div(style = "width: 100%; margin: auto;",
@@ -92,7 +90,7 @@ ui <- function(id) {
      ),
      div(class = "collapsible-box",
        box(width = 12,closable = FALSE,collapsible = TRUE,collapsed = TRUE,title = tags$div(style = "padding-top: 8px;","Sankey diagram"),
-         dropdownButton(label = "Export Sankey Plot",right = FALSE,width = "240px",icon = HTML('<i class="fa-solid fa-download" style="color: #74C0FC;"></i>'),
+         dropdownButton(label = "Export Sankey Plot",right = FALSE,width = "240px",icon = HTML('<i class="fa-solid fa-download download-button"></i>'),
            selectInput(ns("export_format"), "Select format:", choices = c("HTML" = "html", "PNG" = "png")),
            downloadButton(ns("Sankey_download"),"Download")),
          br(),
@@ -129,6 +127,7 @@ server <- function(id, selected_samples, shared_data) {
     selected_gnomAD_min  <- reactiveVal(NULL)
     selected_gene_region <- reactiveVal(NULL)
     selected_clinvar_sig <- reactiveVal(NULL)
+    selected_consequence <- reactiveVal(NULL)
 
 
     observeEvent(filter_state$confirm(), {
@@ -139,19 +138,20 @@ server <- function(id, selected_samples, shared_data) {
     filtered_data <- reactive({
       req(data())
       dt <- data()
-      
+
       if (!is.null(selected_tumor_depth())) {
         dt <- dt[selected_tumor_depth() <= tumor_depth, ]
       }
       if (!is.null(selected_gnomAD_min())) {
         dt <- dt[gnomAD_NFE <= selected_gnomAD_min()]
       }
-      
+
       if (!is.null(selected_gene_region()) && length(selected_gene_region()) > 0) {
         dt <- dt[gene_region %in% selected_gene_region(), ]
       }
-      if (!is.null(selected_clinvar_sig()) && length(selected_clinvar_sig()) > 0) {
-        dt <- dt[clinvar_sig %in% selected_clinvar_sig(), ]
+
+      if (!is.null(selected_consequence()) && length(selected_consequence()) > 0) {
+        dt <- create_consequence_filter(dt, selected_consequence())
       }
 
       return(dt)
@@ -192,8 +192,7 @@ server <- function(id, selected_samples, shared_data) {
                         if (event.target.classList.contains('rt-expander') || event.target.classList.contains('rt-expander-button')) {
                         } else {
                             rowInfo.toggleRowSelected();}}"),
-        class = "somatic-table",
-        elementId = "tbl-somatic"
+        class = "somatic-table"
         # columns = reactive_columns()
       )
     })
@@ -319,7 +318,7 @@ server <- function(id, selected_samples, shared_data) {
       selected_tumor_depth(filter_state$tumor_depth())
       selected_gnomAD_min(filter_state$gnomAD_min())
       selected_gene_region(filter_state$gene_region())
-      selected_clinvar_sig(filter_state$clinvar_sig())
+      selected_consequence(filter_state$consequence())
     })
     
     # plot VAF histogram
@@ -412,7 +411,7 @@ filterTab_server <- function(id) {
       if(isTruthy(is.na(input$tumor_depth))) updateNumericInput(session, "tumor_depth", value = 10)
     })
     observe({
-      if(isTruthy(is.na(input$gnomAD_min))) updateNumericInput(session, "gnomAD_min", value = 0.0001)
+      if(isTruthy(is.na(input$gnomAD_min))) updateNumericInput(session, "gnomAD_min", value = 0.01)
     })
     
     return(list(
@@ -420,28 +419,29 @@ filterTab_server <- function(id) {
       tumor_depth = reactive(input$tumor_depth),
       gnomAD_min = reactive(input$gnomAD_min),
       gene_regions = reactive(input$gene_regions),
-      clinvar_sig = reactive(input$clinvar_sig)
+      consequence = reactive(input$consequence)
     ))
   })
 }
 
+
 filterTab_ui <- function(id,data){
   ns <- NS(id)
-  
+
   filenames <- get_inputs("per_sample_file")
   file_paths <- filenames$var_call.somatic[1]
   patient_names <- substr(basename(file_paths), 1, 6)
+  consequence_split <- unique(unlist(unique(data$consequence_trimws)))
+  consequence_list <- sort(unique(ifelse(is.na(consequence_split) | consequence_split == "", "missing_value", consequence_split)))
   
   tagList(
     tags$head(tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"),
       tags$style(HTML(".dropdown-toggle {border-radius: 0; padding: 0; background-color: transparent; border: none; float: right;margin-top -1px;}
                     .checkbox label {font-weight: normal !important;}
                     .checkbox-group .checkbox {margin-bottom: 0px !important;}
-                    .pretty-checkbox-group .shiny-options-group {column-count: 2 !important; column-gap: 20px !important;}
-                    .pretty-checkbox-group label {font-weight: normal !important;}
                     .my-blue-btn {background-color: #007bff;color: white;border: none;}
                     .dropdown-menu .bootstrap-select .dropdown-toggle {border: 1px solid #ced4da !important; background-color: #fff !important;
-                      color: #495057 !important; height: 38px !important; font-size: 16px !important; border-radius: 4px !important; 
+                      color: #495057 !important; height: 38px !important; font-size: 16px !important; border-radius: 4px !important;
                       box-shadow: none !important;}
                     .sw-dropdown-content {border: 1px solid #ced4da !important; border-radius: 4px !important; box-shadow: none !important;
                       background-color: white !important;}
@@ -450,45 +450,53 @@ filterTab_ui <- function(id,data){
                     #app-somatic_var_call_tab-igv_dropdownButton {width: 230px !important; height: 38px !important; font-size: 16px !important;}
                     "))
   ),
-  br(),
   dropdownButton(
     label = NULL,
     right = TRUE,
-    width = "480px",
-    icon = HTML('<i class="fa-solid fa-filter fa-2sm" style="color: #74C0FC; margin-bottom: 0; padding-bottom: 0;"></i>'),
-    div(class = "pretty-checkbox-group",
-        prettyCheckboxGroup(
-          inputId = ns("colFilter_checkBox"),
-          label = HTML("<b>Show columns:</b>"),
-          choices = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq", 
-                      "tumor_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic", 
-                      "gene_region", "Consequence", "all_full_annot_name"),
-          selected = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq", 
-                       "tumor_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic", 
-                       "gene_region", "Consequence", "all_full_annot_name"),
-          icon = icon("check"),
-          status = "primary",
-          outline = FALSE
-        )
-    ),
-    div(style = "display: flex; gap: 10px; width: 100%;",
-        actionButton(inputId = ns("show_all"), label = "Show All", style = "flex-grow: 1; width: 0;"),
-        actionButton(inputId = ns("show_default"), label = "Show Default", style = "flex-grow: 1; width: 0;")),
-    fluidRow(
-       box(width = 12,title = tags$div(style = "padding-top: 8px;","Filter data by:"),closable = FALSE,collapsible = FALSE,
-           tagList(
+    # width = "480px",
+    icon = HTML('<i class="fa-solid fa-filter download-button"></i>'),
+    fluidRow(style = "display: flex; align-items: stretch;",
+      column(8,
+         box(width = 12,title = tags$div(style = "padding-top: 8px;","Filter data by:"),closable = FALSE, collapsible = FALSE,style = "height: 100%;",
              fluidRow(
                column(6, numericInput(ns("tumor_depth"), tags$strong("Tumor coverage min"), value = 10, min = 0, max = 1000)),
-               column(6, numericInput(ns("gnomAD_min"), tags$strong("gnomAD NFE min"), value = 0.0001, min = 0, max = 1))
+               column(6, numericInput(ns("gnomAD_min"), tags$strong("gnomAD NFE min"), value = 0.01, min = 0, max = 1))
              ),
-             checkboxGroupInput(ns("gene_regions"), label = tags$strong("Gene region"),choices = unique(data$gene_region),selected = c("exon","intron")),#unique(data$gene_region)
-             checkboxGroupInput(ns("clinvar_sig"),label = tags$strong("ClinVar significance"), selected = unique(data$clinvar_sig),
-                                choices = setNames(unique(data$clinvar_sig), ifelse(trimws(unique(data$clinvar_sig)) == "", "missing value",unique(data$clinvar_sig))))
-           )
+             div(class = "two-col-checkbox-group", style = "margin-bottom: 15px;",
+                 prettyCheckboxGroup(ns("gene_regions"),label = tags$strong("Gene region"),icon = icon("check"),status = "primary",outline = FALSE,
+                                     choices = unique(data$gene_region),selected = c("exon","intron"))),#unique(data$gene_region)
+             div(class = "two-col-checkbox-group",
+                 prettyCheckboxGroup(ns("consequence"),label = tags$strong("Consequence"),icon = icon("check"),status = "primary",outline = FALSE,
+                                     selected = setdiff(consequence_list, "synonymous_variant"),
+                                     choices = setNames(consequence_list, consequence_list)))
+             )
+      ),
+      column(4,
+        box(width = 12,title = tags$div(style = "padding-top: 8px;","Select columns:"),closable = FALSE,collapsible = FALSE,height = "100%",
+          div(class = "two-col-checkbox-group",
+              prettyCheckboxGroup(
+                inputId = ns("colFilter_checkBox"),
+                label = NULL,
+                choices = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq",
+                            "tumor_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic",
+                            "gene_region", "Consequence", "all_full_annot_name"),
+                selected = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq",
+                             "tumor_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic",
+                             "gene_region", "Consequence", "all_full_annot_name"),
+                icon = icon("check"),
+                status = "primary",
+                outline = FALSE
+              )
+          ),
+          div(style = "display: flex; gap: 10px; width: 100%;",
+              actionButton(inputId = ns("show_all"), label = "Show All", style = "flex-grow: 1; width: 0;"),
+              actionButton(inputId = ns("show_default"), label = "Show Default", style = "flex-grow: 1; width: 0;"))
         )
+      )
     ),
+
     div(style = "display: flex; justify-content: center; margin-top: 10px;",
-      actionBttn(ns("confirm_btn"),"Apply changes",style = "stretch",color = "success",size = "sm",individual = TRUE,value = 0))
+      actionBttn(ns("confirm_btn"),"Apply changes",style = "stretch",color = "success",size = "md",individual = TRUE,value = 0))
     )
   )
 }

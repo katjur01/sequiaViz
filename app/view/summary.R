@@ -59,9 +59,9 @@ ui <- function(id){
             box(elevation = 2, collapsible = FALSE, headerBorder = FALSE, color = "teal",width = 12,
               title = span("Expression profile", class = "category"),
               tags$div(textOutput(ns("tissues"))),
-              tags$div(class = "item", "Over-expressed genes: 21"),
-              tags$div(class = "item", "Under-expressed genes: 21"),
-              tags$div(class = "item", "Altered pathways: 5"),
+              tags$div(class = "item", "Over-expressed genes: "),
+              tags$div(class = "item", "Under-expressed genes: "),
+              tags$div(class = "item", "Altered pathways: "),
               icon = HTML('<span class="icon icon-green" title="Analysis available"><i class="fa-solid fa-circle-check"></i></span>'),
               style = "height:136px; overflow:auto;")
           )
@@ -183,26 +183,22 @@ server <- function(id, patient, shared_data){
 
     noNA_text <- function(x) ifelse(is.na(x) | x == "", "-", x)
 
-
     output$somatic_boxes <- renderUI({
       som_vars <- as.data.table(shared_data$somatic_var())
 
       if (is.null(som_vars) || nrow(som_vars) == 0) {
         tags$div("No somatic variants selected")
       } else {
-
         som_vars <- som_vars[grepl(patient, sample)]
-        message("## som_vars after filtering: ", som_vars)
 
         if (nrow(som_vars) == 0) {
           return(tags$div("No somatic variants selected"))
         } else {
-
           boxes <- lapply(1:nrow(som_vars), function(i) {
             variant <- som_vars[i, ]
             var_name_split <- unlist(strsplit(variant$var_name, "_"))
             allele_change <- unlist(strsplit(var_name_split[3],"/"))
-
+            
             div(class = "somatic-box",
                 box(solidHeader = TRUE, collapsed = TRUE, width = 12,
                     title = HTML(sprintf(
@@ -236,22 +232,17 @@ server <- function(id, patient, shared_data){
       }
     })
 
-    # Dynamicky generované karty pro germline varianty
     output$germline_boxes <- renderUI({
       germ_vars <- as.data.table(shared_data$germline_var())
 
       if (is.null(germ_vars) || nrow(germ_vars) == 0) {
-        # return(NULL)
         tags$div("No germline variants selected")
       } else {
-
-      germ_vars <- germ_vars[grepl(patient, sample)]
-      message("## germ_vars after filtering: ", germ_vars)
+        germ_vars <- germ_vars[grepl(patient, sample)]
 
       if (nrow(germ_vars) == 0) {
         return(tags$div("No germline variants selected"))
       } else {
-
         boxes <- lapply(1:nrow(germ_vars), function(i) {
           variant <- germ_vars[i, ]
           var_name_split <- unlist(strsplit(variant$var_name, "_"))
@@ -264,8 +255,8 @@ server <- function(id, patient, shared_data){
                      <span style="font-size:14px; font-weight:normal;"> %s </span>
                      <span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>
                      <span style="font-size:14px; font-weight:normal;"> %s </span>',
-                    noNA_text(variant$Gene_symbol),
-                    noNA_text(variant$Consequence),
+                     noNA_text(variant$Gene_symbol),
+                     noNA_text(variant$Consequence),
                     noNA_text(variant$clinvar_sig)
                   )),
                   fluidRow(
@@ -294,22 +285,16 @@ server <- function(id, patient, shared_data){
     })
 
     output$fusion_boxes <- renderUI({
-
       fusion_vars <- as.data.table(shared_data$fusion_var())
 
       if (is.null(fusion_vars) || nrow(fusion_vars) == 0) {
-        # return(NULL)
         tags$div("No fusion genes selected")
       } else {
-
-      fusion_vars <- fusion_vars[grepl(patient, sample)]
-      message("## fusion_vars after filtering: ", fusion_vars)
+        fusion_vars <- fusion_vars[grepl(patient, sample)]
 
       if (nrow(fusion_vars) == 0) {
         return(tags$div("No fusion genes selected"))
       } else {
-
-        # Pro každou variantu vytvoříme box (kartu)
         boxes <- lapply(1:nrow(fusion_vars), function(i) {
           fusion <- fusion_vars[i, ]
           div(class = "fusion-box",
@@ -318,8 +303,8 @@ server <- function(id, patient, shared_data){
                       '<span style="font-size:16px; font-weight:bold;">%s</span>
                        <span style="display:inline-block; vertical-align:middle; margin:0 8px; border-left:1px solid #ccc; height:18px;"></span>
                        <span style="font-size:14px; font-weight:normal;">%s</span>',
-                      paste0(fusion$gene1," - ", fusion$gene2),
-                      noNA_text(fusion$arriba.confidence))),
+                       paste0(fusion$gene1," - ", fusion$gene2),
+                       noNA_text(fusion$arriba.confidence))),
                   fluidRow(
                     column(3,
                            tags$p(strong(sprintf("%s: ", fusion$gene1))),
@@ -343,23 +328,19 @@ server <- function(id, patient, shared_data){
     })
     
     output$expression_box <- renderUI({
-      
-      deregulated_genes <- as.data.table(shared_data$expression_var())
+      exp_goi <- as.data.table(shared_data$expression_goi_var())
+      exp_all <- as.data.table(shared_data$expression_all_var())
+      deregulated_genes <- unique(rbind(exp_goi, exp_all, use.names = TRUE, fill = TRUE))
+
       
       if (is.null(deregulated_genes) || nrow(deregulated_genes) == 0) {
-        # return(NULL)
-        tags$div("No deregulated genes selected")
+        tags$div("None of the deregulated genes will be reported.")
       } else {
-        
         deregulated_genes <- deregulated_genes[grepl(patient, sample)]
-        message("## deregulated_genes after filtering: ", class(deregulated_genes))
-        message("## deregulated_genes after filtering: ", colnames(deregulated_genes))
-        message("## deregulated_genes after filtering: ", deregulated_genes)
         
         if (nrow(deregulated_genes) == 0) {
           return(tags$div("No deregulated genes have been selected"))
         } else {
-          message("## uniqueN(deregulated_genes$geneid)g: ",uniqueN(deregulated_genes$geneid))
           div(class = "expression-box",
               box(solidHeader = TRUE,  collapsible = FALSE,  width = 12,
                   title = HTML(sprintf('<span style="font-size:16px; font-weight:normal;">In total, </span>
@@ -367,7 +348,6 @@ server <- function(id, patient, shared_data){
                                         <span style="font-size:16px; font-weight:normal;"> deregulated genes have been selected for report.</span>',
                                         uniqueN(deregulated_genes$geneid)))
                   ))
-          
         }
       }
     })

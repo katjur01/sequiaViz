@@ -1,13 +1,4 @@
 
-.main-header {
-  padding-bottom: 1rem !important;
-  border-bottom: 1px solid #dee2e6;
-}
-
-.main-header.navbar {
-  font-size: 23px;
-}
-
 .collapsible-box {
   .card-header .card-tools {
     margin-top: -25px;
@@ -19,13 +10,17 @@
   }
 }
 
-.report-btn {
-  float: right; 
-  margin-left: auto;
+.card .card-body .two-col-checkbox-group {
+  column-count: 2; 
+  column-gap: 20px;
+}
 
-  .h3 {
-      .card-title {
-        float: right !important;
-      }
-  }
+.card .card-body .two-col-checkbox-group label {
+  font-weight: normal;
+}
+
+.download-button {
+   color: #74C0FC; 
+   margin-bottom: 0; 
+   padding-bottom: 0;
 }

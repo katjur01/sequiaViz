@@ -24,7 +24,7 @@ load_data <- function(input_files, flag, sample = NULL,expr_flag = NULL){
       filenames_all <- get_inputs("all_sample_file")
       input_files_all <- filenames_all$var_call.germline
       input_var_all <- lapply(input_files_all,fread)
-      dt_all <- rbindlist(input_var_all)
+      dt_all <- rbindlist(input_var_all,fill=TRUE)
       
       sample_list <- c()
       
@@ -202,7 +202,27 @@ get_inputs <- function(flag){
                 rna.chimeric_bam = RNA_chimeric_bam,
                 path_to_folder = path
     ))
-
+  } else if (flag == "goi_file"){ # genes_of_interest
+    
+    path = paste0("./input_files/", library)
+    
+    ## somatic var call path
+    somatic_project <- "117_WES_somatic"
+    somatic_filenames <- list.files(paste(path, somatic_project,sep = "/"), pattern = "*genes_of_interest.tsv", full.names = TRUE)
+    
+    ## gemline var call path
+    germline_project <- "117_WES_germline"
+    germline_filenames <- list.files(paste(path, germline_project, sep = "/"), pattern = "*genes_of_interest.tsv", full.names = TRUE)
+    
+    ## expression profile results path
+    expression_project <- "RNAseq21_NEW"
+    expression_filenames <- list.files(paste(path, expression_project,sep = "/"), pattern = "genes_of_interest.tsv", full.names = TRUE)
+    
+    return(list(goi.somatic = somatic_filenames,
+                goi.germline = germline_filenames,
+                goi.expression = expression_filenames
+    ))
+    
   } else {
     stop("Invalid tag. Use 'per_sample_file' or 'all_sample_file'.")
   }
