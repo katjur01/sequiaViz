@@ -247,7 +247,7 @@ server <- function(id) {
     samples_germ <- set_patient_to_sample("germline")
     
     lapply(names(samples_germ), function(patient) {
-      germline_var_call_table$server(paste0("germline_tab_", patient), samples_germ[[patient]], selected_columns_germ, shared_data)
+      germline_var_call_table$server(paste0("germline_tab_", patient), samples_germ[[patient]],shared_data)
     })
 
 ##################

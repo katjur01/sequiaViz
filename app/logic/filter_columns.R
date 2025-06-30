@@ -1,4 +1,5 @@
-box::use(  
+box::use(
+  htmltools[div,tags],
   reactable,
   reactable[colDef,JS,colGroup],
   stats[setNames], #na.omit,
@@ -120,96 +121,142 @@ colnames_map_list <- function(tag, expr_flag = NULL, all_columns = NULL){
       starfus.break_seq = "StarFus break sequence")
   } else if (tag == "somatic"){
     map_list <- list(
-      "var_name" = colDef(sticky='left', minWidth=140,filterable = TRUE, name = 'Variant name'),
-      "in_library"=colDef(sticky='left',header = "In library"),
-      "alarm" = colDef(name="Alarm"),
-      "full_annot_name" = colDef(name="Annotated name",minWidth = 240,),
-      "var_gen_coord" = colDef(name="Variant coordinates",minWidth = 240,filterable=TRUE),
-      "variant_type" = colDef(filterable = TRUE, name = 'Variant type',minWidth=110),
-      "Gene_symbol" = colDef(sticky = 'left',filterable = TRUE, minWidth=110,name = 'Gene symbol'),
-      "HGVSp" = colDef(minWidth=120,maxWidth=250,name="HGVSp"),
-      "HGVSc" = colDef(minWidth=120,maxWidth=250,name="HGVSc"),
-      "tumor_variant_freq" = colDef(name="Tumor variant frequency",minWidth=200, filterable = TRUE),
-      "tumor_depth" = colDef(name = "Tumor depth",minWidth=110),
-      "normal_variant_freq" = colDef(name="Normal variant frequency",minWidth=200),
-      "normal_depth" = colDef(name = "Normal depth",minWidth=120),
-      "Called_by"	= colDef(name="Called by"),
-      "1000g_EUR_AF" = colDef(name="1000G EUR AF",minWidth=130),
-      "gnomAD_NFE" = colDef(name = "GnomAD NFE",filterable=FALSE,minWidth=110),
-      "snpDB" = colDef(name="SnpDB",filterable=TRUE),
-      "COSMIC" = colDef(name="COSMIC",filterable=TRUE),
-      "HGMD" = colDef(name="HGMD"),
-      "NHLBI_ESP" = colDef(name="NHLBI ESP",minWidth=110),
-      "clinvar_sig" = colDef(name = "ClinVar significance", filterable = TRUE,minWidth=180),
-      "clinvar_DBN" = colDef(show=TRUE,name="ClinVar DBN",filterable = TRUE,minWidth=110),
-      "fOne" = colDef(name="fOne"),
-      "md-anderson" = colDef(name="MD Anderson",minWidth=110),
-      "trusight_genes" = colDef(name="TruSight genes",minWidth=130),
-      "CGC_Somatic" = colDef(name="CGC Somatic",minWidth=120),
-      "CGC_Tumour_Somatic" = colDef(name="CGC Tumour",minWidth=110),
-      "PolyPhen" = colDef(name="PolyPhen",minWidth=190),
-      "SIFT" = colDef(name="SIFT",minWidth=180),
-      "gene_region" = colDef(name="Gene region",filterable = TRUE, minWidth=110),
-      "IMPACT" = colDef(name="Impact",filterable=TRUE),
-      "Consequence" = colDef(name = "Consequence",minWidth=140,filterable=TRUE),
-      "EXON" = colDef( name= "Exon"),
-      "INTRON" = colDef( name = "Intron"),
-      "Feature" = colDef( name = "Feature",minWidth=180,filterable=TRUE),
-      "Feature_type" = colDef( name = "Feature type",filterable=TRUE,minWidth=110),
-      "Annotation source" = colDef( name = "Annotation source",minWidth=160),
-      "all_full_annot_name" = colDef(name = "Full annotated name", minWidth = 240,show=TRUE),
-      "Gene" = colDef( name = "Gene")
+      var_name = colDef(sticky='left', minWidth=140,filterable = TRUE, name = 'Variant name'),
+      in_library = colDef(sticky='left',header = "In library"),
+      alarm = colDef(name="Alarm"),
+      full_annot_name = colDef(name="Annotated name",minWidth = 240,),
+      var_gen_coord = colDef(name="Variant coordinates",minWidth = 240,filterable=TRUE),
+      variant_type = colDef(filterable = TRUE, name = 'Variant type',minWidth=110),
+      Gene_symbol = colDef(sticky = 'left',filterable = TRUE, minWidth=110,name = 'Gene symbol'),
+      HGVSp = colDef(minWidth=120,maxWidth=250,name="HGVSp"),
+      HGVSc = colDef(minWidth=120,maxWidth=250,name="HGVSc"),
+      tumor_variant_freq = colDef(name="Tumor variant frequency",minWidth=200, filterable = TRUE),
+      tumor_depth = colDef(name = "Tumor depth",minWidth=110),
+      normal_variant_freq = colDef(name="Normal variant frequency",minWidth=200),
+      normal_depth = colDef(name = "Normal depth",minWidth=120),
+      Called_by	= colDef(name="Called by"),
+      `1000g_EUR_AF` = colDef(name="1000G EUR AF",minWidth=130),
+      gnomAD_NFE = colDef(name = "GnomAD NFE",filterable=FALSE,minWidth=110),
+      snpDB = colDef(name="SnpDB",filterable=TRUE),
+      COSMIC = colDef(name="COSMIC",filterable=TRUE),
+      NHLBI_ESP = colDef(name="NHLBI ESP",minWidth=110),
+      clinvar_sig = colDef(name = "ClinVar significance", filterable = TRUE,minWidth=180),
+      clinvar_DBN = colDef(show=TRUE,name="ClinVar DBN",filterable = TRUE,minWidth=110),
+      `md-anderson` = colDef(name="MD Anderson",minWidth=110),
+      trusight_genes = colDef(name="TruSight genes",minWidth=130),
+      CGC_Somatic = colDef(name="CGC Somatic",minWidth=120,
+                           cell = function(value) {
+                             if (is.na(value)) {
+                               return(NULL)  # Do not render anything for NA values
+                             }
+                             div(class = paste0("db-", tolower(value)),value)}),
+      fOne = colDef(width = 100, name = "fOne",
+                    cell = function(value) {
+                      if (is.na(value)) {
+                        return(NULL)  # Do not render anything for NA values
+                      }
+                      div(class = paste0("db-", tolower(value)),value)}),
+      CGC_Tumour_Somatic = colDef(name="CGC Tumour",minWidth=110),
+      PolyPhen = colDef(name="PolyPhen",minWidth=190),
+      SIFT = colDef(name="SIFT",minWidth=180),
+      gene_region = colDef(name="Gene region",filterable = TRUE, minWidth=110),
+      HGMD = colDef(name="HGMD"),
+      IMPACT = colDef(name="Impact",filterable=TRUE),
+      Consequence = colDef(name = "Consequence",minWidth=140,filterable=TRUE),
+      EXON = colDef(name = "Exon"),
+      INTRON = colDef(name = "Intron"),
+      Feature = colDef(name = "Feature",minWidth=180,filterable=TRUE),
+      Feature_type = colDef(name = "Feature type",filterable=TRUE,minWidth=110),
+      `Annotation source` = colDef(name = "Annotation source",minWidth=160),
+      Gene = colDef(name = "Gene"),
+      all_full_annot_name = colDef(name = "Full annotated name", minWidth = 240,show=TRUE)
     )
   } else if (tag == "germline"){
     map_list <- list(
-      var_name = "Variant name",
-      variant_freq = "Frequency",
-      in_library = "In library",
-      Gene_symbol = "Gene name",
-      coverage_depth = "Coverage",
-      gene_region = "Gene region",
-      gnomAD_NFE = "gnomAD NFE",
-      clinvar_sig = "Clinvar sig",
-      snpDB = "Clinvar ID",
-      Consequence = "Consequence",
-      HGVSc = "HGVSc",
-      HGVSp = "HGVSp",
-      all_full_annot_name = "Full annotation name",
-      occurance_in_cohort = "Occurence in cohort",
-      in_samples = "In samples",
-      alarm = "Alarm",
-      full_annot_name = "Full annotation name",
-      var_gen_coord = "Variant genomic coordinate",
-      variant_type = "Variant type",
-      genotype = "Genotype",
-      Called_by = "Called by",
-      `1000g_EUR_AF` = "1000g EUR AF",
-      COSMIC = "COSMIC",
-      HGMD = "HGMD",
-      NHLBI_ESP = "NHLBI ESP",
-      clinvar_DBN = "ClinVar DBN",
-      fOne = "fOne",
-      BRONCO = "BRONCO",
-      `md-anderson` = "MD Anderson",
-      trusight_genes = "Trusight genes",
-      CGC_Germline = "CGC Germline",
-      CGC_Tumour_Germline = "CGC tumour germline",
-      PolyPhen = "PolyPhen",
-      SIFT = "SIFT",
-      CADD_RAW = "CADD raw",
-      CADD_PHRED = "CADD phred",
-      IMPACT = "Impact",
-      SOMATIC = "Somatic",
-      PHENO = "Phenotype",
-      GENE_PHENO = "Gene phenotype",
-      PUBMED = "PubMed",
-      EXON = "Exon",
-      INTRON = "Intron",
-      Feature = "Feature",
-      Feature_type = "Feature type",
-      `Annotation source` = "Annotation source",
-      Gene = "Gene ID")
-    
+      # original germline #
+      var_name = colDef(sticky='left', minWidth=140,filterable = TRUE, name = 'Variant name'),
+      in_library = colDef(sticky='left', maxWidth = 100, header = "In library"),
+      variant_freq = colDef(filterable = TRUE, minWidth = 100, name = "Variant frequency"),
+      Gene_symbol = colDef(sticky = 'left',filterable = TRUE, minWidth=110,name = 'Gene symbol'),
+      coverage_depth = colDef(maxWidth = 100,filterable = TRUE, name = "Coverage depth"),
+      gene_region = colDef(filterable = TRUE, minWidth=110, name="Gene region"),
+      gnomAD_NFE = colDef(minWidth = 140,maxWidth = 150,filterable = TRUE,name = "GnomAD NFE"),
+      clinvar_sig = colDef(minWidth = 180,filterable = TRUE, name = "ClinVar significance",
+                           cell = function(value) {
+                             if (is.na(value)) {
+                               return(NULL)  # Do not render anything for NA values
+                             }
+                             # div(class = paste0("clinvar-tag clinvar-", tolower(value)),value)}
+                             tags$div(
+                               lapply(strsplit(value, "/")[[1]], function(v) {
+                                 v_trimmed <- trimws(v)
+                                 class_name <- paste0("clinvar-tag clinvar-", tolower(gsub(" ", "_", v_trimmed)))
+                                 tags$span(class = class_name, v_trimmed)
+                               })
+                             )}
+      ),
+      Consequence = colDef(minWidth = 170,filterable = TRUE,name = "Consequence"),
+      HGVSp = colDef(minWidth=120,maxWidth=250,name="HGVSp"),
+      HGVSc = colDef(minWidth=120,maxWidth=250,name="HGVSc"),
+      all_full_annot_name = colDef(name = "Full annotated name", minWidth = 160),
+      snpDB = colDef(maxWidth = 120,filterable = TRUE,name="SnpDB",
+                     # header = function(value) {
+                     #   tagList(value, tags$a(
+                     #     href = "https://www.ncbi.nlm.nih.gov/clinvar/",
+                     #     target = "_blank",
+                     #     icon("external-link-alt", lib = "font-awesome"),
+                     #     style = "margin-left: 6px; color: #007bff; text-decoration: none;"
+                     #     ))}
+      ),
+      CGC_Germline = colDef(width = 130,name="CGC Germline",
+                            cell = function(value) {
+                              if (is.na(value)) {
+                                return(NULL)  # Do not render anything for NA values
+                              }
+                              div(class = paste0("db-", tolower(value)),value)}),
+      trusight_genes = colDef(width = 140,name="TruSight genes",
+                              cell = function(value) {
+                                if (is.na(value)) {
+                                  return(NULL)  # Do not render anything for NA values
+                                }
+                                div(class = paste0("db-", tolower(value)),value)}),
+      fOne = colDef(width = 100, name = "fOne",
+                    cell = function(value) {
+                      if (is.na(value)) {
+                        return(NULL)  # Do not render anything for NA values
+                      }
+                      div(class = paste0("db-", tolower(value)),value)}),
+      occurance_in_cohort = colDef(width = 170,name = "Occurence in cohort"),
+      in_samples = colDef(minWidth = 120,name = "In samples"),
+      alarm = colDef(minWidth = 120,name="Alarm"),
+      var_gen_coord = colDef(minWidth = 170,name="Variant coordinates",filterable=TRUE),
+      variant_type = colDef(minWidth = 120,filterable = TRUE, name = "Variant type"),
+      genotype = colDef(minWidth = 100,filterable = TRUE,name = "Genotype"),
+      Called_by = colDef(minWidth = 120, name="Called by"),
+      `1000g_EUR_AF` = colDef(width = 130, name="1000G EUR AF"),
+      COSMIC = colDef(minWidth = 120, name="COSMIC",filterable=TRUE),
+      HGMD = colDef(minWidth = 120, name="HGMD"),
+      NHLBI_ESP = colDef(minWidth = 120, name="NHLBI ESP"),
+      clinvar_DBN = colDef(name="ClinVar DBN",filterable = TRUE,minWidth=110),
+      BRONCO = colDef(width = 100,name="BRONCO"),
+      `md-anderson` = colDef(width = 130,name="MD Anderson"),
+      CGC_Tumour_Germline = colDef(minWidth = 180,filterable = TRUE,name="CGC tumour germline"),
+      PolyPhen = colDef(minWidth = 120,name="PolyPhen"),
+      Feature = colDef(minWidth = 140,filterable = TRUE,name = "Feature"),
+      Feature_type = colDef(minWidth = 130,name = "Feature type"),
+      `Annotation source` = colDef(minWidth = 170,name = "Annotation source"),
+      Gene = colDef(minWidth = 150,filterable = TRUE, name = "Gene"),
+      SIFT = colDef(minWidth = 120,name="SIFT"),
+      CADD_RAW = colDef(width = 100,name="CADD raw"),
+      CADD_PHRED = colDef(width = 120,name="CADD phred"),
+      IMPACT = colDef(minWidth = 110,filterable = TRUE,name="Impact"),
+      SOMATIC = colDef(minWidth = 110,name="Somatic"),
+      PHENO = colDef(minWidth = 110,name="Phenotype"),
+      GENE_PHENO = colDef(width = 150,name="Gene phenotype"),
+      PUBMED = colDef(minWidth = 150,name="PubMed"),
+      EXON = colDef(width = 110,name="Exon"),
+      INTRON = colDef(width = 110,name="Intron")
+      )
   } else if (tag == "expression"){
     
     dropdown_btn <- list()

@@ -31,8 +31,8 @@ box::use(
   app/logic/prepare_table[prepare_germline_table],
   app/logic/patients_list[sample_list_germ],
   app/logic/waiters[use_spinner],
-  app/logic/reactable_helpers[selectFilter,minRangeFilter,filterMinValue,create_clinvar_filter,create_consequence_filter]
-  
+  app/logic/reactable_helpers[selectFilter,minRangeFilter,filterMinValue,create_clinvar_filter,create_consequence_filter],
+  app/logic/filter_columns[getColFilterValues,map_checkbox_names,colnames_map_list,generate_columnsDef]
 )
 
 
@@ -78,7 +78,7 @@ ui <- function(id) {
   )
 }
 
-server <- function(id, selected_samples, selected_columns, column_mapping, shared_data) {
+server <- function(id, selected_samples, shared_data) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     # Call loading function to load data
@@ -97,30 +97,34 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
     #     shared_data$germline_overview[[ selected_samples ]] <- overview_dt
     # })
 
+    colnames_list <- getColFilterValues("germline") # gives list of all_columns and default_columns
+    map_list <- colnames_map_list("germline") # gives list of all columns with their column definitions
+    mapped_checkbox_names <- map_checkbox_names(map_list) # gives list of all columns with their display names for checkbox
     
-    # # Call generate_columnsDef to generate colDef setting for reactable
-    # column_defs <- reactive({
-    #   req(selected_columns())
-    #   generate_columnsDef(names(filtered_data()), selected_columns(), "germline", column_mapping, session)
-    # })
     
+  
     output$filterTab <- renderUI({
       req(data())
-      filterTab_ui(ns("filterTab_dropdown"),data())
+      req(map_list)
+      filterTab_ui(ns("filterTab_dropdown"),data(), colnames_list$default_columns, mapped_checkbox_names)
     })
     
     
-    filter_state <- filterTab_server("filterTab_dropdown")
+    filter_state <- filterTab_server("filterTab_dropdown",colnames_list)
     
     selected_coverage_depth <- reactiveVal(NULL)
     selected_gnomAD_min  <- reactiveVal(NULL)
     selected_gene_region <- reactiveVal(NULL)
     selected_clinvar_sig <- reactiveVal(NULL)
     selected_consequence <- reactiveVal(NULL)
+    selected_columns <- reactiveVal(colnames_list$default_columns)
+    selected_variants <- reactiveVal(data.frame(patient = character(),var_name = character(), Gene_symbol = character()))
+
     
-    observeEvent(filter_state$confirm(), {
-      message("🟢 Confirm clicked – storing gene region filter")
-      selected_gene_region(filter_state$gene_regions())
+    column_defs <- reactive({
+      req(data())
+      req(selected_columns())
+      generate_columnsDef(names(data()), selected_columns(), "germline", map_list)
     })
     
     filtered_data <- reactive({
@@ -145,15 +149,11 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       return(dt)
     })
 
-  
-    
-    # # Reactive value to store selected rows
-    selected_variants <- reactiveVal(data.frame(patient = character(),var_name = character(), Gene_symbol = character()))
     
     # Render reactable with conditional selection
     output$germline_var_call_tab <- renderReactable({
       req(filtered_data())
-      # req(column_defs())
+      req(column_defs())
       message("Rendering Reactable for germline")
       filtered_data <- filtered_data() # tvoje data pro hlavní tabulku
       pathogenic_variants <- selected_variants() # seznam variant, které byly označeny jako patogenní
@@ -161,7 +161,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       
       reactable(
         as.data.frame(filtered_data),
-        # columns = column_defs(),
+        columns = column_defs(),
         resizable = TRUE,
         showPageSizeOptions = TRUE,
         pageSizeOptions = c(10, 20, 50, 100),
@@ -334,6 +334,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
       selected_gene_region(filter_state$gene_region())
       selected_clinvar_sig(filter_state$clinvar_sig())
       selected_consequence(filter_state$consequence())
+      selected_columns(filter_state$selected_columns())
     })
 
     
@@ -378,7 +379,7 @@ server <- function(id, selected_samples, selected_columns, column_mapping, share
 
 
 
-filterTab_server <- function(id) {
+filterTab_server <- function(id,colnames_list) {
   moduleServer(id, function(input, output, session) {
     
     observe({
@@ -388,24 +389,34 @@ filterTab_server <- function(id) {
       if(isTruthy(is.na(input$gnomAD_min))) updateNumericInput(session, "gnomAD_min", value = 0.01)
     })
     
+    
+    observeEvent(input$show_all, {
+      updatePrettyCheckboxGroup(session, "colFilter_checkBox", selected = colnames_list$all_columns)
+    })
+    
+    observeEvent(input$show_default, {
+      updatePrettyCheckboxGroup(session, "colFilter_checkBox", selected = colnames_list$default_columns)
+    })
+    
     return(list(
       confirm = reactive(input$confirm_btn),
       coverage_depth = reactive(input$coverage_depth),
       gnomAD_min = reactive(input$gnomAD_min),
       gene_regions = reactive(input$gene_regions),
       clinvar_sig = reactive(input$clinvar_sig),
-      consequence = reactive(input$consequence)
+      consequence = reactive(input$consequence),
+      selected_columns = reactive(input$colFilter_checkBox)
       
     ))
   })
 }
 
 
-filterTab_ui <- function(id,data){
+filterTab_ui <- function(id,data, default_columns, mapped_checkbox_names){
   ns <- NS(id)
   
   filenames <- get_inputs("per_sample_file")
-  file_paths <- filenames$var_call.somatic[1]
+  file_paths <- filenames$var_call.germline[1]
   patient_names <- substr(basename(file_paths), 1, 6)
   consequence_split <- unique(unlist(unique(data$consequence_trimws)))
   consequence_list <- sort(unique(ifelse(is.na(consequence_split) | consequence_split == "", "missing value", consequence_split)))
@@ -425,7 +436,7 @@ filterTab_ui <- function(id,data){
                       background-color: white !important;}
                     .glyphicon-triangle-bottom {font-size: 12px !important; line-height: 12px !important; vertical-align: middle;}
                     .glyphicon-triangle-bottom {display: none !important; width: 0 !important; margin: 0 !important; padding: 0 !important;}
-                    #app-somatic_var_call_tab-igv_dropdownButton {width: 230px !important; height: 38px !important; font-size: 16px !important;}
+                    #app-germline_var_call_tab-igv_dropdownButton {width: 230px !important; height: 38px !important; font-size: 16px !important;}
                     "))
     ),
     dropdownButton(
@@ -462,12 +473,8 @@ filterTab_ui <- function(id,data){
                               prettyCheckboxGroup(
                                 inputId = ns("colFilter_checkBox"),
                                 label = NULL,
-                                choices = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq",
-                                            "coverage_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic",
-                                            "gene_region", "Consequence", "all_full_annot_name"),
-                                selected = c("var_name", "library", "Gene_symbol", "HGVSp", "HGVSc", "tumor_variant_freq",
-                                             "coverage_depth", "gnomAD_NFE", "clinvar_sig", "clinvar_DBN", "CGC_Somatic",
-                                             "gene_region", "Consequence", "all_full_annot_name"),
+                                choices = mapped_checkbox_names[order(mapped_checkbox_names)],
+                                selected = default_columns,
                                 icon = icon("check"),
                                 status = "primary",
                                 outline = FALSE
