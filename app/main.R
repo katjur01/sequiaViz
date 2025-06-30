@@ -54,13 +54,10 @@ box::use(
   app/view/germline_var_call_table,
   app/view/somatic_var_call_table,
   app/view/expression_profile_table,
-  app/view/dropdown_button[igvDropdown_ui,igvDropdown_server,colFilterDropdown_ui,colFilterDropdown_server],
   app/logic/patients_list[patients_list,set_patient_to_sample],
   app/view/IGV,
   app/logic/igv_helper[start_static_server,stop_static_server],
 #   app/logic/load_data[load_data,get_inputs],
-  app/logic/prepare_table[colFilter],
-  app/logic/reactable_helpers[columnName_map],
   app/view/networkGraph_cytoscape,
   app/logic/load_data[get_inputs],
   app/view/create_report,
@@ -128,32 +125,10 @@ ui <- function(id){
                                       tags$style(HTML(".btn-group > .btn.active {background-color: skyblue; color: white;}
                                                  .btn-mygrey {background-color: lightgray; color: black;}
                                                 ")),
-                                      # 
-                                      # div(style = "width: 100%;",do.call(tabsetPanel, c(
-                                      #   lapply(seq_along(patient_names), function(i) {
-                                      #     tabPanel(patient_names[i], use_spinner(reactableOutput(ns(paste0("my_table", i)))))}),
-                                      #   id = ns("tabset")))
-                                      
                                       do.call(tabsetPanel, c(id = ns("tabset"), lapply(names(set_patient_to_sample("somatic")), function(sample) {
                                         tabPanel(title = sample, somatic_var_call_table$ui(ns(paste0("somatic_tab_", sample))))
-                                      })))
-                             ),
+                                      })))),
                              tabPanel("Germline small variant calling",tabName = ns("germline_var_call_panel"),value = "germline",
-                                      # ## this css changes color of selected buttons in IGV dropdown button
-                                      # tags$style(
-                                      #   HTML(".btn-group > .btn.active {
-                                      #            background-color: skyblue;
-                                      #            color: white;
-                                      #          }
-                                      #          .btn-mygrey {
-                                      #            background-color: lightgray;
-                                      #            color: black;
-                                      #            }
-                                      #         ")
-                                      # ),
-                                      fluidPage(
-                                        div(style = "width: 2.8%; position: absolute; right: 0; margin-top: 13.5px;",
-                                            uiOutput(ns("colFilter_dropdown_ui_germline")))),
                                       do.call(tabsetPanel, c(id = ns("germline_patients"), lapply(names(set_patient_to_sample("germline")), function(sample) {
                                         tabPanel(title = sample, germline_var_call_table$ui(ns(paste0("germline_tab_", sample))))
                                       })))
@@ -163,18 +138,13 @@ ui <- function(id){
               tabItem(tabName = ns("fusion_genes"),
                       bs4Card(width = 12,headerBorder = FALSE, collapsible = FALSE,
                         fluidPage(
-                          div(style = "width: 2.8%; position: absolute; right: 0; margin-top: 13.5px;",
-                              uiOutput(ns("colFilter_dropdown_ui_fusion")))),
                           do.call(tabsetPanel, c(id = ns("fusion_genes_patients"), lapply(names(set_patient_to_sample("fusion")), function(sample) {
                             tabPanel(title = sample, fusion_genes_table$ui(ns(paste0("geneFusion_tab_", sample))))
                           })))
-                        )
+                        ))
                       ),
               tabItem(tabName = ns("expression_profile"),
                       bs4Card(width = 12,headerBorder = FALSE, collapsible = FALSE,
-                        fluidPage(
-                          div(style = "width: 2.8%; position: absolute; right: 0; margin-top: 13.5px;",
-                              uiOutput(ns("colFilter_dropdown_ui_expression")))),
                         fluidPage(
                           do.call(tabsetPanel, c(id = ns("expression_profile_patients"),
                                lapply(names(set_patient_to_sample("expression")), function(patient) {
@@ -232,10 +202,6 @@ server <- function(id) {
                                   fusion_overview = list(),
                                   navigation_context = reactiveVal(NULL))     # somatic or germline or fusion     # from where are we opening IGV
     
-    getColFilterValues <- function(flag,expr_flag = NULL) {
-      colnames_list <- colFilter(flag,expr_flag)
-      list(all_columns = colnames_list$all_columns, default_columns = colnames_list$default_columns)
-    }
 ## run summary module
     
     lapply(patients_list(), function(patient) {
@@ -276,19 +242,12 @@ server <- function(id) {
     })
 
 ##################
-    # filter table columns dropdown button for germline
-    all_colnames_val_germline <- getColFilterValues("germline")
-    output$colFilter_dropdown_ui_germline <- renderUI({
-      req(all_colnames_val_germline())
-      colFilterDropdown_ui(ns("colFilter_dropdown_germ"), all_colnames_val_germline()$all_columns, all_colnames_val_germline()$default_setting, columnName_map("germline"))
-    })
 
     # Run germline varcall module
     samples_germ <- set_patient_to_sample("germline")
-    selected_columns_germ <- colFilterDropdown_server("colFilter_dropdown_germ", all_colnames_val_germline()$all_columns, all_colnames_val_germline()$default_setting)
-
+    
     lapply(names(samples_germ), function(patient) {
-      germline_var_call_table$server(paste0("germline_tab_", patient), samples_germ[[patient]], selected_columns_germ, columnName_map("germline"), shared_data)
+      germline_var_call_table$server(paste0("germline_tab_", patient), samples_germ[[patient]], selected_columns_germ, shared_data)
     })
 
 ##################

@@ -25,7 +25,7 @@ box::use(
   app/logic/plots[prepare_barPlot_data, create_barPlot, prepare_volcano, volcanoPlot, ggvolcanoPlot, classify_volcano_genes],
   app/logic/waiters[use_spinner],
   app/logic/load_data[get_inputs, load_data],
-  app/logic/reactable_helpers[generate_columnsDef, custom_colGroup_setting],
+  app/logic/reactable_helpers[ custom_colGroup_setting],
   app/logic/prepare_table[prepare_expression_table, set_pathway_colors, get_tissue_list],
   app/logic/networkGraph_helper[get_pathway_list]
 )

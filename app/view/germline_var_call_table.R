@@ -31,7 +31,7 @@ box::use(
   app/logic/prepare_table[prepare_germline_table],
   app/logic/patients_list[sample_list_germ],
   app/logic/waiters[use_spinner],
-  app/logic/reactable_helpers[selectFilter,minRangeFilter,filterMinValue,generate_columnsDef,create_clinvar_filter,create_consequence_filter]
+  app/logic/reactable_helpers[selectFilter,minRangeFilter,filterMinValue,create_clinvar_filter,create_consequence_filter]
   
 )
 

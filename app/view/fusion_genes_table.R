@@ -19,7 +19,6 @@ box::use(
   app/logic/prepare_table[prepare_fusion_genes_table,prepare_arriba_images], 
   app/logic/waiters[use_spinner],
   app/logic/patients_list[sample_list_fuze],
-  app/logic/reactable_helpers[generate_columnsDef]
 )
 
 # Load and process data table

@@ -137,11 +137,11 @@ prepare_somatic_table <- function(dt){
       return(cleaned_parts)
     }
   })]
-  dt <- dt[, c("SOMATIC", "PHENO","GENE_PHENO") := NULL]
-  order <- c("var_name","in_library","Gene_symbol","tumor_variant_freq","tumor_depth","gene_region",
-             "fOne","CGC_Somatic","gnomAD_NFE","clinvar_sig","clinvar_DBN","snpDB","COSMIC",
-             "HGMD","Consequence","HGVSc","HGVSp","all_full_annot_name")
-  dt <- setcolorder(dt,order)
+  
+  default_columns <- colFilter("somatic")$default_columns
+  # dt <- dt[, c("SOMATIC", "PHENO","GENE_PHENO") := NULL]
+  
+  dt <- setcolorder(dt,default_columns)
   
   message(paste0("Somatic varcall, pacient ",unique(dt$sample)," (prepare_table script)"))
   return(dt)
@@ -266,8 +266,8 @@ colFilter <- function(flag,expr_flag){
   if (flag == "somatic"){
     all_column_var <- names(fread(filenames$var_call.somatic[1], nrows = 0))
     all_column_names  <- setdiff(all_column_var, c("sample"))  # dont show/add sample column in table
-    default_selection <- c("var_name","tumor_variant_freq","in_library","Gene_symbol", "tumor_depth","gene_region",
-                           "gnomAD_NFE","clinvar_sig","clinvar_DBN","snpDB","CGC_Somatic","COSMIC","HGMD","Consequence","HGVSc", "HGVSp","all_full_annot_name")
+    default_selection <- c("var_name","in_library","Gene_symbol","tumor_variant_freq","tumor_depth","gene_region","gnomAD_NFE","clinvar_sig",
+                           "clinvar_DBN","snpDB","CGC_Somatic","fOne","COSMIC","HGMD","Consequence","HGVSc", "HGVSp","all_full_annot_name")
   } else if (flag == "germline"){
     all_column_var <- names(fread(filenames$var_call.germline[1], nrows = 0))
     all_column_names  <- setdiff(all_column_var, c("sample"))  # dont show/add sample column in table
@@ -322,43 +322,6 @@ colFilter <- function(flag,expr_flag){
   all_column_names_sorted <- all_column_names[order(ordered_columns)]
   # message(paste("Returning column names for flag:", flag))
   return(list(all_columns = all_column_names_sorted, default_columns = default_selection))
-}
-
-#' @export
-prepare_variant_calling_table <- function(dt,selected_samples){
-
-  if ("CGC_Somatic" %in% names(dt)){
-    observe({
-      print(selected_samples)
-    })
-
-    patients = c("DZ1601","MR1507","VH0452")
-
-    dt <- dt[, names(dt) %in% c("var_name", "Gene_symbol", patients,"HGVSc", "HGVSp", "tumor_variant_freq", "tumor_depth", "gnomAD_NFE", "gene_region",
-                                "Consequence","snpDB", "COSMIC", "HGMD", "clinvar_sig","clinvar_DBN","fOne","CGC_Somatic","all_full_annot_name"),with=FALSE]
-    dt[,Visual_Check := ""]
-    setcolorder(dt,c("var_name", "Gene_symbol", patients,"Visual_Check","tumor_variant_freq", "tumor_depth","gnomAD_NFE","fOne","CGC_Somatic","clinvar_sig","clinvar_DBN","snpDB", "COSMIC", "HGMD","gene_region","Consequence","HGVSc", "HGVSp"))
-
-  } else if ("CGC_Germline" %in% names(dt)) {
-    patients = c("DZ1601krev","MR1507krev","VH0452krev")
-
-  } else(print("Neither CGC_Germline nor CGC_Somatic column exists"))
-
-  return(dt)
-}
-
-#' @export
-default_sorted_table <- function(dt){
-
-  if ("CGC_Somatic" %in% names(dt)){
-    default_sorted <- list("fOne" = "desc","clinvar_sig" = "desc","CGC_Somatic" = "desc")
-
-  } else if ("CGC_Germline" %in% names(dt)) {
-    default_sorted <- list("fOne" = "desc","clinvar_sig" = "desc","CGC_Germline" = "desc")
-
-  } else(print("Neither CGC_Germline nor CGC_Somatic column exists"))
-
-  return(default_sorted)
 }
 
 

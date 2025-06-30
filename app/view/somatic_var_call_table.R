@@ -22,18 +22,15 @@ box::use(
   app/logic/vaf_plot[generate_vaf],
   app/logic/sankey_plot[sankey_plot],
   app/logic/waiters[use_spinner],
-  app/view/col_settings[default_col],
   app/view/selected_variants[render_selected_variants_ui,render_selected_variants_table,
                         handle_delete_variant, handle_confirm_selected],
   app/view/export_functions[get_table_download_handler,get_sankey_download_handler,get_hist_download_handler],
   app/logic/load_data[get_inputs,load_data],
   app/logic/prepare_table[prepare_somatic_table,colFilter],
   app/logic/patients_list[sample_list_som],
-  app/logic/reactable_helpers[create_clinvar_filter,create_consequence_filter,columnName_map],
-  app/view/dropdown_button[igvDropdown_ui,igvDropdown_server,colFilterDropdown_ui,colFilterDropdown_server],
-
+  app/logic/reactable_helpers[create_clinvar_filter,create_consequence_filter],
+  app/logic/filter_columns[getColFilterValues,map_checkbox_names,colnames_map_list,generate_columnsDef]
 )
-
 
 
 # Load and process data table
@@ -118,27 +115,21 @@ server <- function(id, selected_samples, shared_data) {
       input_data(selected_samples)
     })
     
-    getColFilterValues <- function(flag,expr_flag = NULL) {
-        colnames_list <- colFilter(flag,expr_flag)
-        list(all_columns = colnames_list$all_columns, default_columns = colnames_list$default_columns)
-    }
     
-    colnames_list <- getColFilterValues("somatic")
+    colnames_list <- getColFilterValues("somatic") # gives list of all_columns and default_columns
+    map_list <- colnames_map_list("somatic") # gives list of all columns with their column definitions
+    mapped_checkbox_names <- map_checkbox_names(map_list) # gives list of all columns with their display names for checkbox
+    
     
     output$filterTab <- renderUI({
       req(data())
-      req(colnames_list)
-      message("#### colnames_list$default_columns): ",colnames_list$default_columns)
-      message("#### setdiff(colnames_list$all_columns,colnames_list$default_columns): ",setdiff(colnames_list$all_columns,colnames_list$default_columns))
-      filterTab_ui(ns("filterTab_dropdown"),data(), colnames_list, columnName_map("somatic"))
+      req(map_list)
+      filterTab_ui(ns("filterTab_dropdown"),data(), colnames_list$default_columns, mapped_checkbox_names)
     })
 
-    filter_state <- filterTab_server("filterTab_dropdown")
-    ##############
-
+    filter_state <- filterTab_server("filterTab_dropdown",colnames_list)
     
 
-    
     ############
     
     selected_tumor_depth <- reactiveVal(NULL)
@@ -146,13 +137,17 @@ server <- function(id, selected_samples, shared_data) {
     selected_gene_region <- reactiveVal(NULL)
     selected_clinvar_sig <- reactiveVal(NULL)
     selected_consequence <- reactiveVal(NULL)
-
+    selected_columns <- reactiveVal(colnames_list$default_columns)
+    selected_variants <- reactiveVal(data.frame(patient = character(),var_name = character(), Gene_symbol = character()))
 
     
-    observeEvent(filter_state$confirm(), {
-      message("🟢 Confirm clicked – storing gene region filter")
-      selected_gene_region(filter_state$gene_regions())
+    # Call generate_columnsDef to generate colDef setting for reactable
+    column_defs <- reactive({
+      req(data())
+      req(selected_columns())
+      generate_columnsDef(names(data()), selected_columns(), "somatic", map_list)
     })
+    
     
     filtered_data <- reactive({
       req(data())
@@ -164,28 +159,27 @@ server <- function(id, selected_samples, shared_data) {
       if (!is.null(selected_gnomAD_min())) {
         dt <- dt[gnomAD_NFE <= selected_gnomAD_min()]
       }
-
       if (!is.null(selected_gene_region()) && length(selected_gene_region()) > 0) {
         dt <- dt[gene_region %in% selected_gene_region(), ]
       }
-
       if (!is.null(selected_consequence()) && length(selected_consequence()) > 0) {
         dt <- create_consequence_filter(dt, selected_consequence())
       }
-
+      
       return(dt)
     })
-    
-    # # Reactive value to store selected rows
-    selected_variants <- reactiveVal(data.frame(patient = character(),var_name = character(), Gene_symbol = character()))
+
     
     output$somatic_var_call_tab <- renderReactable({
-      message("Rendering Reactable for somatic")
+      req(filtered_data())
+      req(column_defs())
+      message("🟢 Rendering Reactable for somatic")
       filtered_data <- filtered_data() 
       pathogenic_variants <- selected_variants() # seznam variant, které byly označeny jako patogenní
     
       reactable(
         as.data.frame(filtered_data),
+        columns = column_defs(),
         resizable = TRUE,
         showPageSizeOptions = TRUE,
         pageSizeOptions = c(10, 20, 50, 100),
@@ -212,7 +206,6 @@ server <- function(id, selected_samples, shared_data) {
                         } else {
                             rowInfo.toggleRowSelected();}}"),
         class = "somatic-table"
-        # columns = reactive_columns()
       )
     })
     
@@ -338,6 +331,7 @@ server <- function(id, selected_samples, shared_data) {
       selected_gnomAD_min(filter_state$gnomAD_min())
       selected_gene_region(filter_state$gene_region())
       selected_consequence(filter_state$consequence())
+      selected_columns(filter_state$selected_columns())
     })
     
     # plot VAF histogram
@@ -423,7 +417,7 @@ server <- function(id, selected_samples, shared_data) {
   })
 }
 
-filterTab_server <- function(id) {
+filterTab_server <- function(id,colnames_list) {
   moduleServer(id, function(input, output, session) {
     
     observe({
@@ -433,25 +427,39 @@ filterTab_server <- function(id) {
       if(isTruthy(is.na(input$gnomAD_min))) updateNumericInput(session, "gnomAD_min", value = 0.01)
     })
     
+    observeEvent(input$show_all, {
+      updatePrettyCheckboxGroup(session, "colFilter_checkBox", selected = colnames_list$all_columns)
+    })
+    
+    observeEvent(input$show_default, {
+      updatePrettyCheckboxGroup(session, "colFilter_checkBox", selected = colnames_list$default_columns)
+    })
+    
     return(list(
       confirm = reactive(input$confirm_btn),
       tumor_depth = reactive(input$tumor_depth),
       gnomAD_min = reactive(input$gnomAD_min),
       gene_regions = reactive(input$gene_regions),
-      consequence = reactive(input$consequence)
+      consequence = reactive(input$consequence),
+      selected_columns = reactive(input$colFilter_checkBox)
     ))
   })
 }
 
 
-filterTab_ui <- function(id, data, colnames_list, columnName_map = NULL){
+  
+filterTab_ui <- function(id, data, default_columns, mapped_checkbox_names){
   ns <- NS(id)
-#column_list,default_setting,columnName_map
   filenames <- get_inputs("per_sample_file")
   file_paths <- filenames$var_call.somatic[1]
   patient_names <- substr(basename(file_paths), 1, 6)
   consequence_split <- unique(unlist(unique(data$consequence_trimws)))
   consequence_list <- sort(unique(ifelse(is.na(consequence_split) | consequence_split == "", "missing_value", consequence_split)))
+  
+  
+
+
+  
   
   tagList(
     tags$head(tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"),
@@ -496,16 +504,16 @@ filterTab_ui <- function(id, data, colnames_list, columnName_map = NULL){
               prettyCheckboxGroup(
                 inputId = ns("colFilter_checkBox"),
                 label = NULL,
-                choices = colnames_list$all_columns, #setNames(colnames_list$all_columns, sapply(colnames_list$all_columns, function(x) columnName_map[[x]])),
-                selected = colnames_list$default_columns,
+                choices = mapped_checkbox_names[order(mapped_checkbox_names)],
+                selected = default_columns,
                 icon = icon("check"),
                 status = "primary",
                 outline = FALSE
               )
           ),
           div(style = "display: flex; gap: 10px; width: 100%;",
-              actionButton(inputId = ns("show_all"), label = "Show All", style = "flex-grow: 1; width: 0;"),
-              actionButton(inputId = ns("show_default"), label = "Show Default", style = "flex-grow: 1; width: 0;"))
+              actionButton(ns("show_all"), label = "Show All", style = "flex-grow: 1; width: 0;"),
+              actionButton(ns("show_default"), label = "Show Default", style = "flex-grow: 1; width: 0;"))
         )
       )
     ),
