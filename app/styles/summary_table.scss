@@ -178,3 +178,38 @@
     height: auto;
   }
 }
+
+.summary-box {
+  .elevation-2 {
+    position: relative;
+    overflow: hidden;
+  }
+}
+
+.ds-ribbon {
+  position: absolute;
+  top: 14px;
+  right: -40px;
+  width: 150px;
+  transform: rotate(45deg) translate(6px, 0);
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 4px 0;
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  z-index: 5;
+
+  &.in-progress {
+    background: #ced4da;
+    color: #495057;
+  }
+  &.complete {
+    &.somatic    { background: #7ac143; }
+    &.germline   { background: #45818e; }
+    &.fusion     { background: #f1c232; }
+    &.expression { background: #3c78d8; }
+  }
+}

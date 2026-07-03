@@ -173,6 +173,25 @@ prepare_expression_table <- function(combined_dt) {
     value.var = c("log2fc", "p_value", "p_adj"),
     fun.aggregate = function(x) x[1L]
   )
+  
+  # A gene can carry several RefSeq transcripts, which fans it out into multiple wide
+  # rows differing only in transcript-level annotation. We want one row per gene.
+  # Expression values are gene-level and repeat across transcripts, so we keep the
+  # first; annotation columns (refseq_id, type, pathway, all_kegg_gene_names, ...) are
+  # merged, joining their distinct values with ", " so nothing is lost and multiple
+  # pathways end up in a single cell, exactly like the all-genes table.
+  dedup_keys <- intersect(c("feature_name", "geneid"), names(wide_dt))
+  if (length(dedup_keys) > 0) {
+    other_cols <- setdiff(names(wide_dt), dedup_keys)
+    wide_dt <- wide_dt[, lapply(.SD, function(col) {
+      if (is.numeric(col)) {
+        col[1L]
+      } else {
+        vals <- unique(col[!is.na(col) & nzchar(as.character(col))])
+        if (length(vals) == 0) NA_character_ else paste(vals, collapse = ", ")
+      }
+    }), by = dedup_keys, .SDcols = other_cols]
+  }
 
   # pomocné metriky
   wide_dt[, mean_log2fc := rowMeans(.SD, na.rm = TRUE), .SDcols = patterns("^log2fc_")]

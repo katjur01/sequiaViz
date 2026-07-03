@@ -10,7 +10,7 @@ box::use(
   htmltools[tags,HTML,h6,h5],
   plotly[plotlyOutput, renderPlotly, toWebGL],
   shinyWidgets[radioGroupButtons, checkboxGroupButtons, updateCheckboxGroupButtons,prettyCheckboxGroup, updatePrettyCheckboxGroup, dropdown, dropdownButton, actionBttn,
-               awesomeCheckboxGroup, pickerInput, updatePickerInput],
+               awesomeCheckboxGroup, pickerInput, updatePickerInput,prettySwitch,updatePrettySwitch],
   data.table[rbindlist, dcast.data.table, as.data.table, melt.data.table, copy, setnames],
   grDevices[colorRampPalette],
   # pheatmap[pheatmap],
@@ -121,6 +121,8 @@ ui <- function(id, tissue_list, goi = FALSE) {
                div(
                  tags$br(),
                  actionButton(ns("selectDeregulated_button_goi"), "Select deregulated genes for report", status = "info"),
+                 tags$div(style = "margin-top: 9px; font-size: 13px; color: #868e96; font-style: italic;",
+                          HTML("Done reviewing? <b style=\"color:#495057; font-style:normal;\">Mark this analysis complete above &#8593;</b>")),
                  tags$br(),
                  fluidRow(column(8, reactableOutput(ns("selectDeregulated_tab_goi")))),
                  tags$br(),
@@ -166,6 +168,8 @@ ui <- function(id, tissue_list, goi = FALSE) {
              div(
                tags$br(),
                actionButton(ns("selectDeregulated_button"), "Select deregulated genes for report", status = "primary"),
+               tags$div(style = "margin-top: 9px; font-size: 13px; color: #868e96; font-style: italic;",
+                        HTML("Done reviewing? <b style=\"color:#495057; font-style:normal;\">Mark this analysis complete above &#8593;</b>")),
                tags$br(),
                fluidRow(column(8, reactableOutput(ns("selectDeregulated_tab")))),
                tags$br(),
@@ -179,7 +183,18 @@ ui <- function(id, tissue_list, goi = FALSE) {
   tabbox_id <- if (isTRUE(goi)) "expression_profile_tabs_goi" else "expression_profile_tabs_allGenes"
   selected_tab <- if (isTRUE(goi)) "genesOfinterest" else "allGenes"
   
-  do.call(tabBox, c(list(id = ns(tabbox_id), width = 12, collapsible = FALSE, selected = selected_tab, headerBorder = FALSE), tabs))
+  tabbox <- do.call(tabBox, c(list(id = ns(tabbox_id), width = 12, collapsible = FALSE, selected = selected_tab, headerBorder = FALSE), tabs))
+  
+  tagList(
+    tags$style(HTML(
+      ".mark-complete-sw .form-group { margin-bottom: 0; }
+       .mark-complete-sw label, .mark-complete-sw label span { font-weight: 400 !important; }"
+    )),
+    div(style = "display: flex; align-items: center; margin-bottom: 8px;",
+        div(class = "mark-complete-sw", style = "flex: 0 0 auto; padding-left: 12px;",
+            prettySwitch(ns("mark_complete"), label = "Mark analysis complete", status = "success", slim = TRUE))),
+    tabbox
+  )
 }
 
 server <- function(id, patient, shared_data, patient_files, file_list) {
@@ -264,6 +279,20 @@ server <- function(id, patient, shared_data, patient_files, file_list) {
       )
       
       shared_data$expression.overview[[ patient ]] <- overview_dt
+    })
+    
+    observeEvent(input$mark_complete, {
+      dm <- shared_data$dataset_done()
+      if (is.null(dm[[patient]])) dm[[patient]] <- list()
+      dm[[patient]][["expression"]] <- isTRUE(input$mark_complete)
+      shared_data$dataset_done(dm)
+    }, ignoreInit = TRUE)
+    
+    isolate({
+      dm <- shared_data$dataset_done()
+      if (isTRUE(dm[[patient]][["expression"]])) {
+        updatePrettySwitch(session, "mark_complete", value = TRUE)
+      }
     })
     
     prepare_data <- reactive({

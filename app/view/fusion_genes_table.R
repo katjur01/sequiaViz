@@ -11,7 +11,7 @@ box::use(
   shinyjs[useShinyjs,runjs,hide,show],
   shinyalert[shinyalert,useShinyalert],
   data.table[data.table,uniqueN,as.data.table,copy,is.data.table,fifelse,setcolorder,fread,setnames,rbindlist],
-  shinyWidgets[pickerInput,updatePickerInput,dropdownButton,prettyCheckboxGroup,updatePrettyCheckboxGroup,actionBttn,pickerOptions,dropdown],
+  shinyWidgets[pickerInput,updatePickerInput,dropdownButton,prettyCheckboxGroup,updatePrettyCheckboxGroup,actionBttn,pickerOptions,dropdown,prettySwitch,updatePrettySwitch],
   stats[setNames],
   waiter[waiter_show, waiter_hide, spin_fading_circles],
   tools[file_path_sans_ext],
@@ -46,19 +46,24 @@ ui <- function(id) {
     div(style = "position: relative;",
       uiOutput(ns("prerun_loading")),
       div(id = ns("main_content"),
-      fluidRow(
-        div(class = "download-dropdown-wrapper", style = "width: 100%; text-align: right; display: flex; flex-direction: row-reverse;",
-            dropdownButton(label = NULL,right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download download-button"></i>'),
-                           selectInput(ns("export_data_table"), "Select data:", choices = c("All data" = "all", "Filtered data" = "filtered")),
-                           selectInput(ns("export_format_table"), "Select format:", choices = c("CSV" = "csv", "TSV" = "tsv", "Excel" = "xlsx"), selected = "tsv"),
-                           downloadButton(ns("Table_download"),"Download")),
-            filterTab_ui(ns("filterTab_dropdown")))),
+          tags$style(HTML( ".mark-complete-sw .form-group { margin-bottom: 0; } .mark-complete-sw label, .mark-complete-sw label span { font-weight: 400 !important; }" )),
+          div(style = "display: flex; align-items: center; width: 100%;",
+              div(class = "mark-complete-sw", style = "flex: 0 0 auto; padding-left: 12px;",
+                  prettySwitch(ns("mark_complete"), label = "Mark analysis complete", status = "success", slim = TRUE)),
+              div(class = "download-dropdown-wrapper", style = "flex: 0 0 auto; margin-left: auto; display: flex; flex-direction: row-reverse;",
+                  dropdownButton(label = NULL,right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download download-button"></i>'),
+                                 selectInput(ns("export_data_table"), "Select data:", choices = c("All data" = "all", "Filtered data" = "filtered")),
+                                 selectInput(ns("export_format_table"), "Select format:", choices = c("CSV" = "csv", "TSV" = "tsv", "Excel" = "xlsx"), selected = "tsv"),
+                                 downloadButton(ns("Table_download"),"Download")),
+                  filterTab_ui(ns("filterTab_dropdown")))),
       use_spinner(reactableOutput(ns("fusion_genes_tab"))),
       tags$br(),
       div(style = "display: flex; justify-content: space-between; align-items: top; width: 100%;",
         column(6,
           tags$br(),
           actionButton(ns("selectFusion_button"), "Select fusion as causal", status = "info"),
+          tags$div(style = "margin-top: 9px; font-size: 13px; color: #868e96; font-style: italic;",
+                   HTML("Done reviewing? <b style=\"color:#495057; font-style:normal;\">Mark this analysis complete above &#8593;</b>")),
           tags$br(),
           fluidRow(
             column(12,reactableOutput(ns("selectFusion_tab")))),
@@ -95,6 +100,22 @@ server <- function(id, selected_samples, shared_data, file, file_list, load_sess
     ns <- session$ns
    
     is_restoring_session <- reactiveVal(FALSE)
+    
+    observeEvent(input$mark_complete, {
+      dm <- shared_data$dataset_done()
+      if (is.null(dm[[selected_samples]])) dm[[selected_samples]] <- list()
+      dm[[selected_samples]][["fusion"]] <- isTRUE(input$mark_complete)
+      shared_data$dataset_done(dm)
+    }, ignoreInit = TRUE)
+    
+    # On mount, reflect any restored "complete" state in the switch
+    isolate({
+      dm <- shared_data$dataset_done()
+      if (isTRUE(dm[[selected_samples]][["fusion"]])) {
+        updatePrettySwitch(session, "mark_complete", value = TRUE)
+      }
+    })
+    
     
     # IGV snapshot watcher - sleduje .progress a .done soubory
     observe({

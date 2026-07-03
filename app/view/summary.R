@@ -80,6 +80,7 @@ ui <- function(id, dataset_availability = NULL){
           div(class = get_box_class("somatic", "summary-box somatic-infobox"),
               box(elevation = 2, collapsible = FALSE, headerBorder = FALSE,width = 12,
                 title = span("Somatic var call", class = "category"),
+                uiOutput(ns("somatic_ribbon")),
                 tags$div(textOutput(ns("TMB"))),
                 tags$div(textOutput(ns("for_review_som"))),
                 style = "height:140px; overflow:auto;")
@@ -87,6 +88,7 @@ ui <- function(id, dataset_availability = NULL){
           div(class = get_box_class("germline", "summary-box germline-infobox"),
             box(elevation = 2, collapsible = FALSE, headerBorder = FALSE,width = 12,
               title = span("Germline var call", class = "category"),
+              uiOutput(ns("germline_ribbon")),
               tags$div(textOutput(ns("clinvar_N_germ"))),
               tags$div(textOutput(ns("for_review_germ"))),
               style = "height:140px; overflow:auto;")
@@ -94,6 +96,7 @@ ui <- function(id, dataset_availability = NULL){
           div(class = get_box_class("fusion", "summary-box fusion-infobox"),
             box(elevation = 2, collapsible = FALSE, headerBorder = FALSE,width = 12,
               title = span("Fusion genes", class = "category"),
+              uiOutput(ns("fusion_ribbon")),
               tags$div(textOutput(ns("high_confidence"))),
               tags$div(textOutput(ns("potencially_fused"))),
               style = "height:140px; overflow:auto;")
@@ -101,6 +104,7 @@ ui <- function(id, dataset_availability = NULL){
           div(class = get_box_class("expression", "summary-box expression-infobox"),
             box(elevation = 2, collapsible = FALSE, headerBorder = FALSE, color = "teal",width = 12,
               title = span("Expression profile", class = "category"),
+              uiOutput(ns("expression_ribbon")),
               tags$div(textOutput(ns("tissues"))),
               tags$div(textOutput(ns("for_review_expr"))),
               tags$div(textOutput(ns("altered_pathways"))),
@@ -129,6 +133,28 @@ ui <- function(id, dataset_availability = NULL){
 server <- function(id, patient, shared_data, dataset_availability = NULL){ #,active_tab
   moduleServer(id, function(input, output, session){
 
+   #####################
+   ### Card ribbon ###
+   #####################
+    
+    render_ribbon <- function(dataset, css_suffix) {
+      renderUI({
+        if (!isTRUE(dataset_availability[[dataset]])) return(NULL)
+        done_map <- shared_data$dataset_done()
+        is_done  <- isTRUE(done_map[[patient]][[dataset]])
+        if (is_done) {
+          tags$div(class = paste("ds-ribbon complete", css_suffix), "Complete")
+        } else {
+          tags$div(class = "ds-ribbon in-progress", "In progress")
+        }
+      })
+    }
+    
+    output$somatic_ribbon    <- render_ribbon("somatic",    "somatic")
+    output$germline_ribbon   <- render_ribbon("germline",   "germline")
+    output$fusion_ribbon     <- render_ribbon("fusion",     "fusion")
+    output$expression_ribbon <- render_ribbon("expression", "expression")
+    
 #     #####################
 #     ### Card overview ###
 #     #####################

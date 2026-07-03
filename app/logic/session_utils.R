@@ -178,6 +178,12 @@ load_session <- function(file, shared_data, module_configs = NULL) {
   
   if (is.null(module_configs)) module_configs <- get_default_module_configs()
   
+  # Restore per-dataset "analysis complete" flags
+  if (!is.null(session_json$dataset_done) && length(session_json$dataset_done) > 0) {
+    message("🔄 Restoring dataset completion flags")
+    shared_data$dataset_done(session_json$dataset_done)
+  } 
+  
   for (module_type in names(module_configs)) {
     if (!is.null(session_data[[module_type]])) {
       config <- module_configs[[module_type]]
@@ -271,7 +277,8 @@ save_session <- function(file = "session_data.json", shared_data, module_types =
     dataset_name = if (!is.null(shared_data$data_path())) basename(shared_data$data_path()) else NULL,
     saved_at = Sys.time(),
     fusion_prerun_completed = fusion_prerun_completed,  # Add fusion prerun status
-    igv_genome = nz(shared_data$igv_genome(), NULL)  # Add IGV genome selection
+    igv_genome = nz(shared_data$igv_genome(), NULL),  # Add IGV genome selection
+    dataset_done = isolate(shared_data$dataset_done())   # per-patient / per-dataset "analysis complete" flags
   )
   
   message("[SAVE] IGV genome value: ", nz(shared_data$igv_genome(), "NULL"))

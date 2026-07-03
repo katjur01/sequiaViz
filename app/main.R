@@ -54,6 +54,25 @@ box::use(
   jsonlite[fromJSON]
 )
 
+box::use(
+  app/view/upload_data,
+  app/view/summary,
+  app/view/fusion_genes_table,
+  app/view/germline_var_call_table,
+  app/view/somatic_var_call_table,
+  app/view/expression_profile_table,
+  app/view/IGV,
+  # app/logic/helper_igv[start_static_server,stop_static_server],
+  app/view/networkGraph_cytoscape,
+  app/logic/session_utils[load_session, save_session, cleanup_old_sessions, create_session_cache],
+  app/logic/prerun_fusion[fusion_patients_to_prerun,prerun_fusion_data,prerun_fusion_patient,get_fusion_prerun_status,check_fusion_status,cleanup_patient_fusion_outputs],
+  
+  app/logic/helper_main[get_patients, get_files_by_patient, add_dataset_tabs, add_summary_boxes],
+  app/logic/waiter[show_waiter_with_progress, update_waiter_progress, hide_waiter_progress, wait_for_summary_rendered, get_waiter_js],
+  app/logic/navigation_lock[lock_navigation, unlock_navigation, get_navigation_lock_css, get_navigation_lock_js, set_enabled_tabs],
+  app/logic/helper_prerun_dialog[check_and_show_fusion_dialog],
+)
+
   # Set up mirai daemon pool — one daemon per physical core minus one for Shiny.
   # mirai() NEVER blocks the main thread regardless of how many tasks are queued.
   # Tasks in excess of the pool size are automatically queued without blocking.
@@ -84,10 +103,7 @@ box::use(
       period <- as.numeric(readLines(period_file, n = 1L))
       if (!is.na(quota) && quota > 0 && !is.na(period) && period > 0)
         return(max(floor(quota / period), 1L))
-    }docker system prune -f
-    docker compose down
-    docker compose build
-    docker compose up -d
+    }
     return(NULL)
   }
 
@@ -111,25 +127,6 @@ box::use(
   ))
   daemons(n = n_workers)
 
-
-box::use(
-  app/view/upload_data,
-  app/view/summary,
-  app/view/fusion_genes_table,
-  app/view/germline_var_call_table,
-  app/view/somatic_var_call_table,
-  app/view/expression_profile_table,
-  app/view/IGV,
-  # app/logic/helper_igv[start_static_server,stop_static_server],
-  app/view/networkGraph_cytoscape,
-  app/logic/session_utils[load_session, save_session, cleanup_old_sessions, create_session_cache],
-  app/logic/prerun_fusion[fusion_patients_to_prerun,prerun_fusion_data,prerun_fusion_patient,get_fusion_prerun_status,check_fusion_status,cleanup_patient_fusion_outputs],
-
-  app/logic/helper_main[get_patients, get_files_by_patient, add_dataset_tabs, add_summary_boxes],
-  app/logic/waiter[show_waiter_with_progress, update_waiter_progress, hide_waiter_progress, wait_for_summary_rendered, get_waiter_js],
-  app/logic/navigation_lock[lock_navigation, unlock_navigation, get_navigation_lock_css, get_navigation_lock_js],
-  app/logic/helper_prerun_dialog[check_and_show_fusion_dialog],
-)
 
 #####################################################
 
@@ -169,10 +166,56 @@ ui <- function(id){
           .navbar-nav > li > a.btn-link:focus,
           .navbar-nav > li > a.btn-link:active,
           .navbar-nav > li > a.btn-link:hover {
-            background-color: transparent !important;
-            box-shadow: none !important;
-            outline: none !important;
-          }
+              background-color: transparent !important;
+              box-shadow: none !important;
+              outline: none !important;}
+/* Left module group grows so there is free space to push Upload data right */
+.main-header .navbar-nav.sidebar-menu {
+  flex-grow: 1;
+}
+
+/* Larger navbar text */
+.main-header .navbar-nav.sidebar-menu .nav-link {
+  font-size: 17px;
+}
+
+/* Softer emphasis for the active tab */
+.main-header .navbar-nav.sidebar-menu .nav-link.active {
+  font-weight: 500;
+}
+
+/* Upload data pushed to the right edge, next to save and help */
+.navbar-nav li:has(> a.nav-link[data-value$='upload_data']) {
+  order: 10;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+/* Divider between Upload data and the save/help icons */
+.navbar-nav li:has(> a.nav-link[data-value$='upload_data'])::after {
+  content: '|';
+  color: #74c0fc;
+  opacity: 0.5;
+  font-size: 18px;
+  margin: 0 4px 0 14px;
+}
+
+/* Short dividers between module tabs, drawn on the tab that follows each divider */
+.main-header .navbar-nav.sidebar-menu a.nav-link[data-value$='variant_calling'],
+.main-header .navbar-nav.sidebar-menu a.nav-link[data-value$='network_graph'] {
+  background-image: linear-gradient(#ced4da, #ced4da);
+  background-size: 1px 18px;
+  background-position: left center;
+  background-repeat: no-repeat;
+  margin-left: 10px;
+  padding-left: 22px;
+}
+
+/* Hide IGV from the menu; the tab stays in the DOM for cross-module links */
+.navbar-nav li:has(> a.nav-link[data-value$='hidden_igv']) {
+  display: none;
+}
         ")),
         tags$script(src = "static/js/app.min.js"),
         tags$script(src = "static/js/cytoscape_init.js"),
@@ -409,8 +452,9 @@ server <- function(id) {
       fusion_pending = reactiveVal(list()),
       expression_modules = reactiveVal(list()),
       expression_pending = reactiveVal(list()),
-      confirmed_paths = reactiveVal(NULL)  # Always-current file index — updated on every re-confirm so modules can read fresh BAM paths
-    )
+      confirmed_paths = reactiveVal(NULL),  # Always-current file index — updated on every re-confirm so modules can read fresh BAM paths
+      dataset_done = reactiveVal(list())  # per-patient / per-dataset "analysis complete" flags
+      )
     ############################
     ### Output path setup (already detected above)
     shared_data$output_path <- reactiveVal(output_base)
@@ -453,7 +497,6 @@ server <- function(id) {
       req(confirmed_paths)  # NULL is set momentarily before the real value — ignore that flush
       message("🚀 [OBSERVE] confirmed_paths changed - starting data loading...")
       output_dir <- shared_data$output_path()
-      unlock_navigation(session) # Unlock all navigation tabs after successful data confirmation
       mounted_summary <- reactiveValues(mounted = character(0))
       
       # Check for existing fusion outputs and show resume/clean-start dialog if needed
@@ -510,6 +553,32 @@ server <- function(id) {
       }
 
       update_waiter_progress(session, 15, "Checking session...")
+      
+      # Enable only modules that actually have data; keep the rest visible but locked with a hint
+      enabled_tabs <- c(ns("summary"), ns("upload_data"), ns("hidden_igv"))
+      tab_tooltips <- list()
+      
+      if (length(somatic_patients) > 0 || length(germline_patients) > 0) {
+        enabled_tabs <- c(enabled_tabs, ns("variant_calling"))
+      } else {
+        tab_tooltips[[ns("variant_calling")]] <- "Load somatic or germline data to enable this module"
+      }
+      
+      if (length(fusion_patients) > 0) {
+        enabled_tabs <- c(enabled_tabs, ns("fusion_genes"))
+      } else {
+        tab_tooltips[[ns("fusion_genes")]] <- "Load fusion gene data to enable this module"
+      }
+      
+      if (length(expression_patients) > 0) {
+        enabled_tabs <- c(enabled_tabs, ns("expression_profile"), ns("network_graph"))
+      } else {
+        tab_tooltips[[ns("expression_profile")]] <- "Load expression data to enable this module"
+        tab_tooltips[[ns("network_graph")]]      <- "Load expression data to enable this module"
+      }
+      
+      unlock_navigation(session)                          # clear the startup lock first
+      set_enabled_tabs(session, enabled_tabs, tab_tooltips)
       
       session_dir <- isolate(shared_data$session_dir())
       

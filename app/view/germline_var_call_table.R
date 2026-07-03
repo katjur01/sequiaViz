@@ -14,7 +14,7 @@ box::use(
   reactable,
   reactable[reactable,reactableOutput,renderReactable,colDef,colGroup,JS,getReactableState],
   htmltools[tags,HTML],
-  shinyWidgets[prettyCheckbox,prettyCheckboxGroup,updatePrettyCheckboxGroup,searchInput,pickerInput,updatePickerInput,dropdown,actionBttn,pickerOptions,dropdownButton],
+  shinyWidgets[prettyCheckbox,prettyCheckboxGroup,updatePrettyCheckboxGroup,searchInput,pickerInput,updatePickerInput,dropdown,actionBttn,pickerOptions,dropdownButton,prettySwitch,updatePrettySwitch],
   shinyalert[shinyalert,useShinyalert],
   shinyjs[useShinyjs,hide,show],
   data.table[data.table,as.data.table,uniqueN,copy,rbindlist,fread,is.data.table],
@@ -46,19 +46,35 @@ ui <- function(id) {
                                .download-dropdown-wrapper .glyphicon-triangle-bottom {display: none !important; width: 0 !important; margin: 0 !important; padding: 0 !important;}
                                button:has(.fa-play) .glyphicon-triangle-bottom { display: none !important; }
                                button:has(.fa-play) .fa-play { font-size: 0.75em; }"))),
-    fluidRow(
-      div(class = "download-dropdown-wrapper", style = "width: 100%; text-align: right; display: flex; flex-direction: row-reverse;",
-        dropdownButton(label = NULL,right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download download-button"></i>'),
-                       selectInput(ns("export_data_table"), "Select data:", choices = c("All data" = "all", "Filtered data" = "filtered")),
-                       selectInput(ns("export_format_table"), "Select format:", choices = c("CSV" = "csv", "TSV" = "tsv", "Excel" = "xlsx"), selected = "tsv"),
-                       downloadButton(ns("Table_download"),"Download")),
-        filterTab_ui(ns("filterTab_dropdown")))),
+    # fluidRow(
+    #   div(style = "display: flex; align-items: center; width: 100%;",
+    #       div(style = "flex: 0 0 auto;",
+    #           prettySwitch(ns("mark_complete"), label = "Mark analysis complete", status = "success", slim = TRUE)),
+    #       div(class = "download-dropdown-wrapper", style = "flex: 0 0 auto; margin-left: auto; display: flex; flex-direction: row-reverse;",
+    #           dropdownButton(label = NULL,right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download download-button"></i>'),
+    #                          selectInput(ns("export_data_table"), "Select data:", choices = c("All data" = "all", "Filtered data" = "filtered")),
+    #                          selectInput(ns("export_format_table"), "Select format:", choices = c("CSV" = "csv", "TSV" = "tsv", "Excel" = "xlsx"), selected = "tsv"),
+    #                          downloadButton(ns("Table_download"),"Download")),
+    #                 filterTab_ui(ns("filterTab_dropdown"))))),
+    tags$style(HTML(".mark-complete-sw .form-group { margin-bottom: 0; } .mark-complete-sw label, .mark-complete-sw label span { font-weight: 400 !important; }")),
+    div(style = "display: flex; align-items: center; width: 100%;",
+        div(class = "mark-complete-sw", style = "flex: 0 0 auto; padding-left: 12px;",
+            prettySwitch(ns("mark_complete"), label = "Mark analysis complete", status = "success", slim = TRUE)),
+        div(class = "download-dropdown-wrapper", style = "flex: 0 0 auto; margin-left: auto; display: flex; flex-direction: row-reverse;",
+            dropdownButton(label = NULL,right = TRUE,width = "240px",icon = HTML('<i class="fa-solid fa-download download-button"></i>'),
+                           selectInput(ns("export_data_table"), "Select data:", choices = c("All data" = "all", "Filtered data" = "filtered")),
+                           selectInput(ns("export_format_table"), "Select format:", choices = c("CSV" = "csv", "TSV" = "tsv", "Excel" = "xlsx"), selected = "tsv"),
+                           downloadButton(ns("Table_download"),"Download")),
+            filterTab_ui(ns("filterTab_dropdown")))),
+    
     use_spinner(reactableOutput(ns("germline_var_call_tab"))),
     tags$br(),
 
     div(style = "display: flex; justify-content: space-between; align-items: top; width: 100%;",
       column(6,
         actionButton(ns("selectPathogenic_button"), "Select variants as possibly pathogenic", status = "info"),
+        tags$div(style = "margin-top: 9px; font-size: 13px; color: #868e96; font-style: italic;",
+                 HTML("Done reviewing? <b style=\"color:#495057; font-style:normal;\">Mark this analysis complete above &#8593;</b>")),
         tags$br(),
         fluidRow(
           column(12,reactableOutput(ns("selectPathogenic_tab")))),
@@ -97,6 +113,23 @@ server <- function(id, selected_samples, shared_data, file, file_list) {
       # print(overview_dt)
       shared_data$germline.overview[[ selected_samples ]] <- overview_dt
     })
+    
+    # Persist the "analysis complete" flag for this patient's germline dataset
+    observeEvent(input$mark_complete, {
+      dm <- shared_data$dataset_done()
+      if (is.null(dm[[selected_samples]])) dm[[selected_samples]] <- list()
+      dm[[selected_samples]][["germline"]] <- isTRUE(input$mark_complete)
+      shared_data$dataset_done(dm)
+    }, ignoreInit = TRUE)
+    
+    # On mount, reflect any restored "complete" state in the switch
+    isolate({
+      dm <- shared_data$dataset_done()
+      if (isTRUE(dm[[selected_samples]][["germline"]])) {
+        updatePrettySwitch(session, "mark_complete", value = TRUE)
+      }
+    })
+    
     
     # Load and process data table
     prepare_data <- reactive({
