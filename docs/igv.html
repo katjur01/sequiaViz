@@ -6,14 +6,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>IGV | SeqUIaSCOPE Documentation</title>
 <meta name="author" content="Kateřina Jurásková">
-<meta name="generator" content="bookdown 0.46 with bs4_book()">
+<meta name="generator" content="bookdown 0.45 with bs4_book()">
 <meta property="og:title" content="IGV | SeqUIaSCOPE Documentation">
 <meta property="og:type" content="book">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="IGV | SeqUIaSCOPE Documentation">
 <!-- JS --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://kit.fontawesome.com/6ecbd6c532.js" crossorigin="anonymous"></script><script src="libs/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="libs/bootstrap-4.6.0/bootstrap.min.css" rel="stylesheet">
-<script src="libs/bootstrap-4.6.0/bootstrap.bundle.min.js"></script><script src="libs/bs3compat-0.9.0/transition.js"></script><script src="libs/bs3compat-0.9.0/tabs.js"></script><script src="libs/bs3compat-0.9.0/bs3compat.js"></script><link href="libs/bs4_book-1.0.0/bs4_book.css" rel="stylesheet">
+<script src="libs/bootstrap-4.6.0/bootstrap.bundle.min.js"></script><script src="libs/bs3compat-0.9.0.9000/transition.js"></script><script src="libs/bs3compat-0.9.0.9000/tabs.js"></script><script src="libs/bs3compat-0.9.0.9000/bs3compat.js"></script><link href="libs/bs4_book-1.0.0/bs4_book.css" rel="stylesheet">
 <script src="libs/bs4_book-1.0.0/bs4_book.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/autocomplete.js/0.38.0/autocomplete.jquery.min.js" integrity="sha512-GU9ayf+66Xx2TmpxqJpliWbT5PiGYxpaG8rfnBEk1LL8l1KGkRShhngwdXK1UgqhAzWpZHSiYPc09/NwDQIGyg==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js" integrity="sha512-5CYOlHXGh6QpOFA/TeTylKLWfB3ftPsde7AnmhuitiTX4K5SqCLBeKro6sPS8ilsz1Q4NRx3v8Ko2IBiszzdww==" crossorigin="anonymous"></script><!-- CSS --><style type="text/css">
     
     div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
@@ -87,13 +87,18 @@ in the analysis modules will not be available.</p>
 <div id="reference-genome" class="section level2 unnumbered">
 <h2>Reference Genome<a class="anchor" aria-label="anchor" href="#reference-genome"><i class="fas fa-link"></i></a>
 </h2>
-<p>The reference genome is set during upload in Step 1. The following genomes are available:
-<code>GRCh38/hg38</code>, <code>hg38 1kg/GATK</code>, <code>GRCh37/hg19</code>, <code>T2T CHM13-v2.0/hs1</code>, and a custom genome
-configured via <code>reference_paths.json</code> (see <a href="configuration.html#configuration">Configuration</a>).</p>
-<p>If <strong>Don’t create IGV snapshots</strong> was selected during upload, the genome picker was not set
-and the IGV module will display a genome selector allowing you to choose the reference genome
-directly before loading the viewer.</p>
-<hr>
+<p>The reference genome is handled differently depending on which module the viewer was opened
+from.</p>
+<p>When the IGV module is opened from the somatic or germline variant calling module, a genome
+selector is always shown before the viewer loads, so you can choose the reference for the
+variant tracks. The available options are <code>GRCh38/hg38</code>, <code>hg38 1kg/GATK</code>, <code>GRCh37/hg19</code>,
+<code>T2T CHM13-v2.0/hs1</code>, and a custom genome configured via <code>reference_paths.json</code>
+(see <a href="configuration.html#configuration">Configuration</a>).</p>
+<p>When the IGV module is opened from the fusion gene module, the viewer reuses the genome
+chosen during upload in Step 1, so it matches the reference used for the fusion snapshots.
+If <strong>Don’t create IGV snapshots</strong> was selected during upload, the same genome selector is
+shown in the module before the viewer loads.
+—</p>
 </div>
 <div id="bookmarks-table" class="section level2 unnumbered">
 <h2>Bookmarks Table<a class="anchor" aria-label="anchor" href="#bookmarks-table"><i class="fas fa-link"></i></a>
@@ -146,7 +151,7 @@ desktop version are not available.</p>
 <footer class="bg-primary text-light mt-5"><div class="container"><div class="row">
 
   <div class="col-12 col-md-6 mt-3">
-    <p>"<strong>SeqUIaSCOPE Documentation</strong>" was written by Kateřina Jurásková. It was last built on 2026-04-07.</p>
+    <p>"<strong>SeqUIaSCOPE Documentation</strong>" was written by Kateřina Jurásková. It was last built on 2026-07-04.</p>
   </div>
 
   <div class="col-12 col-md-6 mt-3">

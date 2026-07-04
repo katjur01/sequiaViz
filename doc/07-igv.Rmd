@@ -32,14 +32,19 @@ in the analysis modules will not be available.
 
 ## Reference Genome {-}
 
-The reference genome is set during upload in Step 1. The following genomes are available:
-`GRCh38/hg38`, `hg38 1kg/GATK`, `GRCh37/hg19`, `T2T CHM13-v2.0/hs1`, and a custom genome
-configured via `reference_paths.json` (see [Configuration](#configuration)).
+The reference genome is handled differently depending on which module the viewer was opened
+from.
 
-If **Don't create IGV snapshots** was selected during upload, the genome picker was not set
-and the IGV module will display a genome selector allowing you to choose the reference genome
-directly before loading the viewer.
+When the IGV module is opened from the somatic or germline variant calling module, a genome
+selector is always shown before the viewer loads, so you can choose the reference for the
+variant tracks. The available options are `GRCh38/hg38`, `hg38 1kg/GATK`, `GRCh37/hg19`,
+`T2T CHM13-v2.0/hs1`, and a custom genome configured via `reference_paths.json`
+(see [Configuration](#configuration)).
 
+When the IGV module is opened from the fusion gene module, the viewer reuses the genome
+chosen during upload in Step 1, so it matches the reference used for the fusion snapshots.
+If **Don't create IGV snapshots** was selected during upload, the same genome selector is
+shown in the module before the viewer loads.
 ---
 
 ## Bookmarks Table {-}

@@ -19,12 +19,12 @@ export, and flagging), see [Working with Tables](#working-with-tables).
 
 ## The Expression Table {-}
 
-Expression data is displayed with colour-coded rows to highlight deregulated genes at a glance:
+The `log2FC`, `p-value`, and `p-adj` columns are colour-coded at the cell level to highlight deregulated genes at a glance:
 
-- <span style="background-color:#FFE9E9; padding: 2px 6px; border-radius: 3px;">Red</span> — upregulated genes (`log2FC > 1`)
-- <span style="background-color:#E6F7FF; padding: 2px 6px; border-radius: 3px;">Blue</span> — downregulated genes (`log2FC < -1`)
-- <span style="background-color:#FFEFDE; padding: 2px 6px; border-radius: 3px;">Orange</span> — genes with `p-value < 0.05`
-- <span style="background-color:#E7FAEF; padding: 2px 6px; border-radius: 3px;">Green</span> — genes with `p-adj < 0.05`
+- <span style="background-color:#FFE9E9; padding: 2px 6px; border-radius: 3px;">Red</span> log2FC cell — upregulated gene (`log2FC > 1`)
+- <span style="background-color:#E6F7FF; padding: 2px 6px; border-radius: 3px;">Blue</span> log2FC cell — downregulated gene (`log2FC < -1`)
+- <span style="background-color:#FFEFDE; padding: 2px 6px; border-radius: 3px;">Orange</span> p-value cell — `p-value ≤ 0.05`
+- <span style="background-color:#E7FAEF; padding: 2px 6px; border-radius: 3px;">Green</span> p-adj cell — `p-adj ≤ 0.05`
 
 When multiple reference tissues are available, each tissue has its own set of `log2FC`,
 `p-value`, and `p-adj` columns, grouped under the tissue name.

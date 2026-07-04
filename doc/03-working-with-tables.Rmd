@@ -79,13 +79,10 @@ This is available in all main data tables (variants, fusions, expression).
 
 ## Exporting Data {-}
 
-All tables can be exported using the download buttons above the table. Two export options
-are available:
-
-- **Export filtered** — exports only the rows currently visible after applying your filters
-- **Export all** — exports the complete dataset regardless of active filters
-
-Supported export formats are TSV, XLSX, and CSV.
+Each table can be exported using the download button above it. Clicking it opens a small
+panel with two dropdowns. The first selects the data scope, either all data or only the rows
+currently visible after applying your filters. The second selects the file format from CSV,
+TSV, or Excel, with TSV preselected. The Download button then saves the file.
 
 ```{r, echo=FALSE, out.width="100%"}
 knitr::include_graphics("./screenshots/variant-calling-download.png")
@@ -95,7 +92,6 @@ knitr::include_graphics("./screenshots/variant-calling-download.png")
 
 ## Flagging Items for the Report {-}
 
-In each analysis module you can flag variants, fusions, or genes directly from the table
 for inclusion in the final clinical report. Flagged items appear in a dedicated review 
 panel below the table where you can check your selection and remove items if needed.
 
@@ -103,7 +99,7 @@ panel below the table where you can check your selection and remove items if nee
 knitr::include_graphics("./screenshots/variant-calling-pathogenic.png")
 ```
 
-Flagged items also become available for inspection in the IGV genome browser within the same module.
+In the variant calling and fusion modules, flagged items also become available for inspection in the IGV genome browser within the same module.
 
 ```{r, echo=FALSE, out.width="100%"}
 knitr::include_graphics("./screenshots/variant-calling-igv.png")

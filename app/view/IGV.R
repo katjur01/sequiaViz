@@ -34,7 +34,7 @@ igv_ui <- function(id) {
           conditionalPanel(
             condition = paste0("input['", ns("igv_genome_flag"), "'] == 'no_snapshot'"),
             pickerInput(inputId = ns("igv_browser_genome"),label = "Select reference genome:",
-              choices = c("GRCh38/hg38", "hg38 1kg/GATK", "GRCh37/hg19", "T2T CHM13-v2.0/hs1"), selected = "GRCh38/hg38",
+              choices = c("GRCh38/hg38", "hg38 1kg/GATK", "GRCh37/hg19", "T2T CHM13-v2.0/hs1", "Custom"), selected = "GRCh38/hg38",
               options = pickerOptions(container = "body",iconBase = "fas"),width = "100%")))),
       column(2),
       column(2, 
@@ -59,16 +59,22 @@ igv_server <- function(id, shared_data, root_path) {
     # clicks Load IGV a second time before the first render completes.
     igv_last_load_ts <- reactiveVal(0)
     
-    # Synchronize hidden input with shared_data for conditionalPanel
+    # Synchronize hidden input with shared_data for conditionalPanel.
+    # Depends on navigation_context so the picker behaves per originating module.
     observe({
+      from <- shared_data$navigation_context()
       genome_val <- shared_data$igv_genome()
-      # Always update, handle empty/NULL values with default
-      if (!is.null(genome_val) && length(genome_val) > 0 && genome_val != "") {
+      
+      if (!is.null(from) && from %in% c("somatic", "germline")) {
+        # Variant calling: always show the reference picker here, because variant
+        # BAMs may not share the genome chosen for fusion snapshots.
+        updateTextInput(session, "igv_genome_flag", value = "no_snapshot")
+      } else if (!is.null(genome_val) && length(genome_val) > 0 && genome_val != "") {
+        # Fusion with a genome chosen at upload: reuse it so the viewer matches the snapshots.
         updateTextInput(session, "igv_genome_flag", value = genome_val)
         message("[IGV] Updated genome flag to: ", genome_val)
       } else {
-        updateTextInput(session, "igv_genome_flag", value = "hg38")
-        message("[IGV] No genome value, using default: hg38")
+        updateTextInput(session, "igv_genome_flag", value = "no_snapshot")
       }
     })
     
@@ -270,19 +276,27 @@ igv_server <- function(id, shared_data, root_path) {
       
       message("##### track_block ##### : ", track_block)
       
-      # Get genome selection from shared_data (set in upload_data step1)
-      # or from the picker if snapshots were skipped
+      # Genome selection depends on the originating module.
+      # Variant calling always honours the IGV picker; fusion reuses the genome
+      # chosen at upload so the viewer matches the snapshots.
+      from <- shared_data$navigation_context()
       genome_val <- shared_data$igv_genome()
-
-      igv_genome <- if (!is.null(genome_val) && length(genome_val) > 0 && genome_val != "no_snapshot") {
-        genome_val  # Use genome selected in upload step1
+      
+      igv_genome <- if (!is.null(from) && from %in% c("somatic", "germline")) {
+        if (!is.null(input$igv_browser_genome)) {
+          get_igv_genome_id(input$igv_browser_genome, shared_data$custom_genome_config)
+        } else {
+          "hg38"
+        }
+      } else if (!is.null(genome_val) && length(genome_val) > 0 && genome_val != "no_snapshot") {
+        genome_val  # Fusion: genome selected in upload step1, matches snapshots
       } else if (!is.null(input$igv_browser_genome)) {
-        # Use genome selected in IGV module picker (convert display name → igv_id)
         get_igv_genome_id(input$igv_browser_genome, shared_data$custom_genome_config)
       } else {
-        "hg38"  # Default
+        "hg38"
       }
-      message("[IGV] Using genome: ", igv_genome, " (from ", if (!is.null(genome_val) && length(genome_val) > 0 && genome_val != "no_snapshot") "upload_step1" else "IGV_picker", ")")
+      message("[IGV] Using genome: ", igv_genome)
+      
       
       # Check if custom genome is being used
       custom_genome_config <- shared_data$custom_genome_config

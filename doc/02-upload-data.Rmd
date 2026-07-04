@@ -132,7 +132,7 @@ The expected variant, fusion, or expression file was not found for a patient. Ch
 - The file exists in the patient directory
 - The patient ID appears somewhere in the file path
 - The dataset type keyword appears somewhere in the file path (see [Data Requirements — Dataset Type Keywords](#dataset-type-keywords))
-- The file has the correct extension (`.tsv`, `.vcf`, `.xlsx`)
+- The file has the correct extension (`.tsv` for variants, `.tsv` or `.xlsx` for fusion and expression)
 
 **Multiple files found**
 

@@ -1,28 +1,32 @@
 /* ── Font Awesome ───────────────────────────────────────────────────────── */
 @import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css");
 
-/* ── Page width ─────────────────────────────────────────────────────────── */
-/* Widen the main content column without touching Bootstrap grid classes    */
-/* bs4_book layout: left nav (col-lg-3) + main (col-lg-7) + right TOC (col-lg-2) */
+/* ── Single right-hand navigation ───────────────────────────────────────── */
+/* Keep only the chapter list, move it to the right, drop "On this page" */
+/* bs4_book layout: header.sidebar-book + main#content + .sidebar-chapter */
+
+/* Hide the "On this page" section list entirely */
+.sidebar-chapter { display: none !important; }
+
+/* Desktop: content on the left, chapter navigation on the right */
 @media (min-width: 992px) {
   main#content {
-    flex: 0 0 66.666% !important;
-    max-width: 66.666% !important;
+    order: 1;
+    flex: 0 0 75% !important;
+    max-width: 75% !important;
   }
-  .sidebar-chapter {
-    flex: 0 0 8.333% !important;
-    max-width: 8.333% !important;
+  header.sidebar-book {
+    order: 2;
+    flex: 0 0 25% !important;
+    max-width: 25% !important;
   }
 }
 
-@media (min-width: 1200px) {
+/* Tablet: no right column, use full width for content */
+@media (min-width: 768px) and (max-width: 991.98px) {
   main#content {
-    flex: 0 0 70% !important;
-    max-width: 70% !important;
-  }
-  .sidebar-chapter {
-    flex: 0 0 10% !important;
-    max-width: 10% !important;
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
   }
 }
 
@@ -139,7 +143,7 @@ pre {
 
 .file-card-header.somatic-header    { background-color: #5a9e2f; }
 .file-card-header.germline-header   { background-color: #45818e; }
-.file-card-header.fusion-header     { background-color: #b8860b; }
+.file-card-header.fusion-header     { background-color: #f1c232; }
 .file-card-header.expression-header { background-color: #3c78d8; }
 
 .file-card-body {

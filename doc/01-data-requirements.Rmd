@@ -106,8 +106,8 @@ This means a keyword can appear in the filename itself **or** in a parent folder
 | Tumor RNA BAM | user-defined pattern (set during upload) | `Chimeric`, `transcriptome` |
 | Chimeric BAM | user-defined pattern (set during upload) | `transcriptome` |
 | Arriba output files | `arriba` | `discarded`, `STAR` |
-| Expression file | `expression` or `RNAseq` | `report`, `genes_of_interest` |
-| TMB file | filename must be exactly `mutation_loads` | — |
+| Expression file | `expression` or `RNAseq` | `genes_of_interest` |
+| TMB file | `somatic`, and the filename must end with `mutation_loads` | — |
 
 The keyword can live anywhere in the path — these two examples both work:
 
@@ -237,7 +237,7 @@ Works for smaller projects or when a single pipeline writes everything into one 
 
 ```
 project_root/                           ← select this as root
-├── mutation_loads.tsv                  ← in root (shared across patients)
+├── somatic_mutation_loads.tsv          ← shared in root, "somatic" must be in the name (in Options A and B the folder already provides it)
 ├── patient_001/
 │   ├── somatic_variants.tsv
 │   ├── germline_variants.tsv
@@ -256,9 +256,7 @@ project_root/                           ← select this as root
 
 ## Required Columns {-}
 
-Each data file must contain a set of required columns. Column names are case-sensitive.
-Any additional columns in your file are allowed — they will appear in the table but without
-custom formatting or labels.
+Each data file must contain a set of required columns. Column names are matched case-insensitively, so their capitalization does not need to match exactly. Any additional columns in your file are allowed. They will appear in the table but without custom formatting or labels.
 
 ### Somatic Variant File {-}
 

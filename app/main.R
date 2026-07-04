@@ -23,6 +23,9 @@
 # git add .
 # git commit -m "Save current changes to new branch"
 # git push -u origin dev
+#
+# bookdown::render_book("doc")
+#
 box::use(
   rhino,
   shiny[h1,h2,h3,bootstrapPage,div,moduleServer,NS,renderUI,tags,uiOutput,icon,observeEvent,observe,reactive,isTruthy,onFlushed,appendTab,removeTab,withProgress,
