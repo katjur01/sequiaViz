@@ -29,7 +29,7 @@ ui <- function(id) {
   ns <- NS(id)
   useShinyjs()
   tagList(
-    div(style = "font-size: 16px !important; font-weight: normal !important;",
+    div(style = "position: relative; z-index: 100; font-size: 16px !important; font-weight: normal !important;",
       dropdown(right = TRUE, size = "sm", icon = icon("download"), style = "material-flat", width = "300px",
          prettyRadioButtons(
               inputId = ns("template_choice"),

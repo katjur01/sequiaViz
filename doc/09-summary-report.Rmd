@@ -27,7 +27,17 @@ knitr::include_graphics("./screenshots/summary-report-infobox.png")
 | **Fusion genes** | Number of high-confidence fusions (Arriba); total number of detected fusions |
 | **Expression profile** | Number of reference tissues; number of deregulated genes; number of altered pathways |
 
+Each box also carries a small diagonal ribbon in its top corner that mirrors the completion
+state set in the analysis module. While a dataset is still under review, the ribbon is pale
+grey and reads in progress. Once the analysis is marked complete, the ribbon switches to the
+module's own colour and reads complete. This gives a quick sense of how far the case has been
+worked through before the report is generated.
+
 If a dataset was not loaded, its box is greyed out and shows N/A values.
+
+```{r, echo=FALSE, out.width="100%"}
+knitr::include_graphics("./screenshots/summary-report-ribbon.png")
+```
 
 ---
 

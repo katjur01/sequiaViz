@@ -109,3 +109,24 @@ knitr::include_graphics("./screenshots/variant-calling-igv.png")
 **Only flagged items are included in the final report.**
 :::
 
+## Marking an Analysis as Complete {-}
+
+Each analysis module has a switch labeled **Mark analysis complete** in the top left of the
+table header. It records whether you have finished reviewing that dataset for the current 
+patient. The switch has two positions, in progress and complete, so you can see which datasets 
+still need attention and which are done.
+
+Beneath the Select button there is a short reminder pointing back to the switch, so once you
+finish flagging you know where to mark the dataset as reviewed.
+
+In the expression module the switch sits above the two tabs rather than inside them, because
+completion applies to the whole expression dataset at once, not to the Genes of Interest and
+All Genes tabs separately.
+
+The state is stored per patient and per dataset. Marking a dataset complete also updates its
+box on the summary screen, described in [Summary and Report](#summary-and-report).
+
+```{r, echo=FALSE, out.width="100%"}
+knitr::include_graphics("./screenshots/variant-calling-mark.png")
+```
+

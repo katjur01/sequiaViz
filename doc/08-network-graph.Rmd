@@ -7,14 +7,15 @@ output:
 
 # Network Graph {-}
 
-The Network Graph module provides an interactive visualisation of protein-protein interactions
-within biological pathways, contextualising molecular alterations identified in previous modules.
-The network is built using interaction data from [STRING DB](https://string-db.org/) and pathway
-annotations from [KEGG](https://www.genome.jp/kegg/), rendered with Cytoscape.js.
+The Network Graph module provides an interactive visualisation of protein-protein interactions within biological pathways, contextualising molecular alterations identified in previous modules. The nodes of the network are the genes belonging to a selected [KEGG](https://www.genome.jp/kegg/) pathway. The edges are the protein-protein interactions between those genes, retrieved from [STRING DB](https://string-db.org/). The graph is rendered with Cytoscape.js.
 
 The module consists of two interconnected views: a **main graph** showing all genes within a
 selected pathway, and a **subgraph** showing a focused selection of nodes for detailed analysis.
 
+::: {.alert .alert-danger}
+**The Network Graph module requires expression data.** If no expression files were provided
+during upload, the Network Graph module will not be available.
+:::
 ---
 
 ## Graph Elements {-}
