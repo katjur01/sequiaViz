@@ -65,12 +65,13 @@
   </header><main class="col-sm-12 col-md-9 col-lg-7" id="content"><div id="network-graph" class="section level1 unnumbered">
 <h1>Network Graph<a class="anchor" aria-label="anchor" href="#network-graph"><i class="fas fa-link"></i></a>
 </h1>
-<p>The Network Graph module provides an interactive visualisation of protein-protein interactions
-within biological pathways, contextualising molecular alterations identified in previous modules.
-The network is built using interaction data from <a href="https://string-db.org/">STRING DB</a> and pathway
-annotations from <a href="https://www.genome.jp/kegg/">KEGG</a>, rendered with Cytoscape.js.</p>
+<p>The Network Graph module provides an interactive visualisation of protein-protein interactions within biological pathways, contextualising molecular alterations identified in previous modules. The nodes of the network are the genes belonging to a selected <a href="https://www.genome.jp/kegg/">KEGG</a> pathway. The edges are the protein-protein interactions between those genes, retrieved from <a href="https://string-db.org/">STRING DB</a>. The graph is rendered with Cytoscape.js.</p>
 <p>The module consists of two interconnected views: a <strong>main graph</strong> showing all genes within a
 selected pathway, and a <strong>subgraph</strong> showing a focused selection of nodes for detailed analysis.</p>
+<div class="alert alert-danger">
+<p><strong>The Network Graph module requires expression data.</strong> If no expression files were provided
+during upload, the Network Graph module will not be available.</p>
+</div>
 <hr>
 <div id="graph-elements" class="section level2 unnumbered">
 <h2>Graph Elements<a class="anchor" aria-label="anchor" href="#graph-elements"><i class="fas fa-link"></i></a>
@@ -211,7 +212,7 @@ Clicking a row in a table highlights the corresponding node in yellow in the gra
 <footer class="bg-primary text-light mt-5"><div class="container"><div class="row">
 
   <div class="col-12 col-md-6 mt-3">
-    <p>"<strong>SeqUIaSCOPE Documentation</strong>" was written by Kateřina Jurásková. It was last built on 2026-07-04.</p>
+    <p>"<strong>SeqUIaSCOPE Documentation</strong>" was written by Kateřina Jurásková. It was last built on 2026-07-06.</p>
   </div>
 
   <div class="col-12 col-md-6 mt-3">
