@@ -1,0 +1,54 @@
+# -----------------------------------------------------------
+# STAGE 1 — Node.js pro instalaci JS knihoven (Cytoscape, IGV)
+# -----------------------------------------------------------
+FROM node:22 AS frontend-builder
+WORKDIR /build
+
+COPY ./package*.json ./
+RUN npm ci
+
+RUN mkdir -p /dist/js && \
+    cp ./node_modules/cytoscape/dist/cytoscape.min.js /dist/js/ && \
+    cp ./node_modules/cytoscape-cola/cytoscape-cola.js /dist/js/ && \
+    cp ./node_modules/cytoscape-fcose/cytoscape-fcose.js /dist/js/ && \
+    cp ./node_modules/cytoscape-panzoom/cytoscape-panzoom.js /dist/js/ && \
+    cp ./node_modules/igv/dist/igv.min.js /dist/js/
+
+# -----------------------------------------------------------
+# STAGE 2 — RStudio Server s pluny stejnym prostredim jako produkce
+# -----------------------------------------------------------
+FROM rocker/rstudio:4.5.2
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    libgeos-dev \
+    libglpk-dev \
+    libgit2-dev \
+    libwebp-dev \
+    libwebpdemux2 \
+    libwebpmux3 \
+    build-essential \
+    ca-certificates \
+    lsof \
+    curl \
+    poppler-utils \
+    chromium \
+    chromium-driver \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV CHROMOTE_CHROME=/usr/bin/chromium
+
+# Pracovni adresar shodny s produkcnim umistenim aplikace
+RUN mkdir -p /home/rstudio/sequiaScope
+WORKDIR /home/rstudio/sequiaScope
+
+# JS knihovny pripravene v prvni faze
+COPY --from=frontend-builder /dist/js ./app/static/js
+
+# Instalace R balicku, dependencies.R se nacita az pri behu pres volume
+RUN Rscript --no-init-file -e "install.packages('remotes', repos='https://cloud.r-project.org')"
+RUN Rscript --no-init-file -e "install.packages('BiocManager', repos='https://cloud.r-project.org')"
+
+EXPOSE 8787

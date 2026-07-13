@@ -39,6 +39,8 @@ renv.lock
 
 # renv and input data directories
 doc/
+docs/
+pdf_build/
 renv/
 input_files/
 output_files/
