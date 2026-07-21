@@ -6,10 +6,12 @@ site: bookdown::bookdown_site
 documentclass: book
 output:
   bookdown::bs4_book:
-    bootswatch: dark
     css: "custom-styles.css"
-
 ---
+```{r setup, include=FALSE}
+file.create("../docs/.nojekyll")
+```
+
 
 # Introduction {-}
 
