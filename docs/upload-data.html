@@ -85,6 +85,11 @@ at the working directory.</p>
 <p>Choose the most specific directory that still contains all patient folders. Selecting a
 too-broad directory (e.g. your home folder) may cause the file scanner to pick up unrelated
 files. See <a href="data-requirements.html#directory-layouts">Data Requirements — Directory Layouts</a> for guidance.</p>
+<p>Use the optional <strong>BAM files location</strong> field only when your alignment files are in a
+separate directory from your analysis results, as in Option B of the <a href="data-requirements.html#directory-layouts">directory layouts</a>. Leave
+it empty when BAM files are in the same patient folders as the rest of the data. When set, this
+directory becomes the source for BAM files and any BAM files inside the project folders are
+ignored. Patient IDs and BAM patterns still apply.</p>
 </div>
 <div id="add-patients" class="section level3 unnumbered">
 <h3>Add patients<a class="anchor" aria-label="anchor" href="#add-patients"><i class="fas fa-link"></i></a>
@@ -221,8 +226,8 @@ names cannot be matched to file names. Check that:</p>
 </h2>
 <p>When fusion gene data is confirmed and BAM files are available, the application automatically
 starts a background pre-processing step before the Fusion Genes module becomes available.
-This step generates IGV snapshots of each fusion breakpoint and extracts Arriba report images —
-tasks that can take several minutes depending on the number of fusions and the size of BAM files.</p>
+This step generates IGV snapshots of each fusion breakpoint and extracts Arriba report images.
+Tasks that can take several minutes depending on the number of fusions and the size of BAM files.</p>
 <p>Crucially, this runs <strong>in the background</strong> — you do not need to wait for it to finish. You can
 immediately start exploring somatic variants, germline variants, and expression data in the other
 modules while snapshot generation is in progress. The Fusion Genes module will progressively
@@ -231,11 +236,12 @@ update as snapshots become available.</p>
 dataset, a dialog will ask whether you want to <strong>Resume</strong> (reuse existing snapshots and only
 generate the missing ones) or <strong>Clean Start</strong> (delete existing outputs and start fresh). This
 is useful if a previous session was interrupted partway through.</p>
-<p>::: {.alert .alert-warning} If you selected <em>Don’t create IGV snapshots</em> in Step 1, the IGV
+<div class="alert alert-warning">
+<p>If you selected <em>Don’t create IGV snapshots</em> in Step 1, the IGV
 snapshot generation is skipped but Arriba report images are still extracted if Arriba files
 are available. The expanded row preview in the Fusion Genes module will contain Arriba
-visualisations but no IGV images.
-:::</p>
+visualisations but no IGV images.</p>
+</div>
 <hr>
 </div>
 <div id="session-management" class="section level2 unnumbered">
@@ -243,7 +249,7 @@ visualisations but no IGV images.
 </h2>
 <p>SeqUIaSCOPE supports saving and loading analysis sessions so that diagnostic work can be
 interrupted and resumed at any point without repeating the upload and validation steps.</p>
-<p><strong>Saving a session</strong> — click the 💾 icon in the top navigation bar at any point during your
+<p><strong>Saving a session</strong> — click the <i class="fa-solid fa-floppy-disk"></i> icon in the top navigation bar at any point during your
 analysis. The session file captures your current configuration, selected patients and datasets,
 all flagged variants, fusions, and genes, any notes you have added, and the completion
 state of each dataset. The file is saved to the <code>output_files/</code> directory.</p>

@@ -35,7 +35,7 @@ remove them at any time using the filter menu.
 
 | Filter | Default value | Description |
 |--------|--------------|-------------|
-| gnomAD NFE | ≤ 0.01 | Rare variants only |
+| gnomAD NFE | ≤ 0.01 | Rare variants only (for more options, see [required columns](#required-columns)|
 | Coverage depth | > 10 | Sufficient read support |
 | Consequence | all except `synonymous variant` | Exclude silent mutations |
 | Gene region | `exon` and `splice` only | Coding regions only |

@@ -33,6 +33,12 @@ Choose the most specific directory that still contains all patient folders. Sele
 too-broad directory (e.g. your home folder) may cause the file scanner to pick up unrelated
 files. See [Data Requirements — Directory Layouts](#directory-layouts) for guidance.
 
+Use the optional **BAM files location** field only when your alignment files are in a
+separate directory from your analysis results, as in Option B of the [directory layouts](#directory-layouts). Leave
+it empty when BAM files are in the same patient folders as the rest of the data. When set, this
+directory becomes the source for BAM files and any BAM files inside the project folders are
+ignored. Patient IDs and BAM patterns still apply.
+
 ### Add patients {-}
 
 Enter one or more patient IDs using the **+** button next to the Patients panel. You can type
@@ -171,8 +177,8 @@ names cannot be matched to file names. Check that:
 
 When fusion gene data is confirmed and BAM files are available, the application automatically
 starts a background pre-processing step before the Fusion Genes module becomes available.
-This step generates IGV snapshots of each fusion breakpoint and extracts Arriba report images —
-tasks that can take several minutes depending on the number of fusions and the size of BAM files.
+This step generates IGV snapshots of each fusion breakpoint and extracts Arriba report images. 
+Tasks that can take several minutes depending on the number of fusions and the size of BAM files.
 
 Crucially, this runs **in the background** — you do not need to wait for it to finish. You can
 immediately start exploring somatic variants, germline variants, and expression data in the other
@@ -184,7 +190,8 @@ dataset, a dialog will ask whether you want to **Resume** (reuse existing snapsh
 generate the missing ones) or **Clean Start** (delete existing outputs and start fresh). This
 is useful if a previous session was interrupted partway through.
 
-::: {.alert .alert-warning} If you selected *Don't create IGV snapshots* in Step 1, the IGV
+::: {.alert .alert-warning} 
+If you selected *Don't create IGV snapshots* in Step 1, the IGV
 snapshot generation is skipped but Arriba report images are still extracted if Arriba files
 are available. The expanded row preview in the Fusion Genes module will contain Arriba
 visualisations but no IGV images.
@@ -197,7 +204,7 @@ visualisations but no IGV images.
 SeqUIaSCOPE supports saving and loading analysis sessions so that diagnostic work can be
 interrupted and resumed at any point without repeating the upload and validation steps.
 
-**Saving a session** — click the 💾 icon in the top navigation bar at any point during your
+**Saving a session** — click the <i class="fa-solid fa-floppy-disk"></i> icon in the top navigation bar at any point during your
 analysis. The session file captures your current configuration, selected patients and datasets,
 all flagged variants, fusions, and genes, any notes you have added, and the completion
 state of each dataset. The file is saved to the `output_files/` directory.

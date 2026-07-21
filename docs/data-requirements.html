@@ -650,6 +650,16 @@ unrelated files and confuse file matching.</p>
 </tr>
 </tbody>
 </table></div>
+<div class="alert alert-info">
+<p>GnomAD column is the population allele frequency that SeqUIaSCOPE uses to filter variants by how
+common they are. The preferred reference is <code>gnomAD_NFE</code>. If it is not present, the application
+falls back to the first available column from a priority list and uses it as the main frequency
+reference for filtering. Column matching is case insensitive. From gnomAD it accepts <code>gnomAD_NFE</code>,
+<code>gnomAD_AFR</code>, <code>gnomAD_AMR</code>, <code>gnomAD_EAS</code>, <code>gnomAD_SAS</code>, <code>gnomAD_FIN</code>, <code>gnomAD_ASJ</code>, <code>gnomAD_MID</code>,
+and the overall <code>gnomAD_AF</code>. From 1000 Genomes it accepts <code>1000g_eur_af</code>, <code>1000g_amr_af</code>,
+<code>1000g_afr_af</code>, <code>1000g_eas_af</code>, <code>1000g_sas_af</code>, and the overall <code>1000g_af</code>. Your file needs at
+least one of these, and the filter label in the module adjusts to whichever column was found.</p>
+</div>
 </div>
 <div id="fusion-gene-file" class="section level3 unnumbered">
 <h3>Fusion Gene File<a class="anchor" aria-label="anchor" href="#fusion-gene-file"><i class="fas fa-link"></i></a>
@@ -764,46 +774,50 @@ Column names <code>chrom1</code>/<code>chrom2</code> are accepted as alternative
 <td>Database names</td>
 </tr>
 <tr class="odd">
+<td><code>arriba.reading_frame</code></td>
+<td>Reading frame of the fusion predicted by Arriba (added automatically if absent)</td>
+</tr>
+<tr class="even">
 <td><code>arriba.split_reads</code></td>
 <td>Split reads supporting the fusion (Arriba)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>arriba.discordant_mates</code></td>
 <td>Discordant mate pairs (Arriba)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>arriba.break_coverage</code></td>
 <td>Coverage at first breakpoint (Arriba)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>arriba.break2_coverage</code></td>
 <td>Coverage at second breakpoint (Arriba)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>arriba.break_seq</code></td>
 <td>Sequence at breakpoint (Arriba)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>starfus.split_reads</code></td>
 <td>Split reads supporting the fusion (STARFusion)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>starfus.discordant_mates</code></td>
 <td>Discordant mate pairs (STARFusion)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>starfus.counter_fusion1</code></td>
 <td>Counter fusion reads for first gene (STARFusion)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>starfus.counter_fusion2</code></td>
 <td>Counter fusion reads for second gene (STARFusion)</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>starfus.splice_type</code></td>
 <td>Splice junction type (STARFusion)</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>starfus.break_seq</code></td>
 <td>Breakpoint sequence (STARFusion)</td>
 </tr>

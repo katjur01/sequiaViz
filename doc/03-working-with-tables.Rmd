@@ -22,7 +22,7 @@ clinically relevant entries and keep the application responsive with large datas
 
 For **somatic and germline variant calling**, the default filters are the most restrictive —
 see [Variant Calling — Default Filters](#default-filters-applied) for the exact criteria.
-For **fusion gene detection** and **expression profile**, default filters are less aggressive
+For **fusion gene detection** and **expression profile**, no row filters are applied,
 but the column selection in the filter menu may hide some columns by default.
 
 ::: {.alert .alert-warning}

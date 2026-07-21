@@ -316,6 +316,7 @@ Each data file must contain a set of required columns. Column names are matched 
 | `variant_type` | string | Variant type (e.g. `SNV`, `insertion`, `deletion`) |
 | `all_full_annot_name` | string | Full annotation name |
 
+
 **Optional columns:**
 
 | Column | Description |
@@ -326,6 +327,18 @@ Each data file must contain a set of required columns. Column names are matched 
 | `trusight_genes` | TruSight gene panel annotation |
 | `fOne` | fOne database annotation |
 | `snpDB` | dbSNP annotation |
+
+::: {.alert .alert-info}
+GnomAD column is the population allele frequency that SeqUIaSCOPE uses to filter variants by how
+common they are. The preferred reference is `gnomAD_NFE`. If it is not present, the application
+falls back to the first available column from a priority list and uses it as the main frequency
+reference for filtering. Column matching is case insensitive. From gnomAD it accepts `gnomAD_NFE`,
+`gnomAD_AFR`, `gnomAD_AMR`, `gnomAD_EAS`, `gnomAD_SAS`, `gnomAD_FIN`, `gnomAD_ASJ`, `gnomAD_MID`,
+and the overall `gnomAD_AF`. From 1000 Genomes it accepts `1000g_eur_af`, `1000g_amr_af`,
+`1000g_afr_af`, `1000g_eas_af`, `1000g_sas_af`, and the overall `1000g_af`. Your file needs at
+least one of these, and the filter label in the module adjusts to whichever column was found.
+:::
+
 
 ### Fusion Gene File {-}
 
@@ -357,6 +370,7 @@ Column names `chrom1`/`chrom2` are accepted as alternatives to `chr1`/`chr2` and
 |--------|-------------|
 | `DB_count` | Number of databases listing this fusion |
 | `DB_list` | Database names |
+| `arriba.reading_frame` | Reading frame of the fusion predicted by Arriba (added automatically if absent) |
 | `arriba.split_reads` | Split reads supporting the fusion (Arriba) |
 | `arriba.discordant_mates` | Discordant mate pairs (Arriba) |
 | `arriba.break_coverage` | Coverage at first breakpoint (Arriba) |
