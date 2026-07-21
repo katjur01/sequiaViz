@@ -30,6 +30,41 @@
   }
 }
 
+@media print {
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  .alert-warning { background-color: #fff3cd !important; }
+  .alert-info    { background-color: #d1ecf1 !important; }
+  .alert-success { background-color: #d4edda !important; }
+  .alert-danger  { background-color: #f8d7da !important; }
+
+  pre, code { background-color: #f8f9fa !important; }
+
+  .file-card-header.somatic-header    { background-color: #5a9e2f !important; color: #fff !important; }
+  .file-card-header.germline-header   { background-color: #45818e !important; color: #fff !important; }
+  .file-card-header.fusion-header     { background-color: #f1c232 !important; color: #fff !important; }
+  .file-card-header.expression-header { background-color: #3c78d8 !important; color: #fff !important; }
+  
+  .section.level1 {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .alert, pre, table, figure, img {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  h1, h2, h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}
+
 /* ── Headings ────────────────────────────────────────────────────────────── */
 .section.level1 h1 {
   font-size: 48px !important;
